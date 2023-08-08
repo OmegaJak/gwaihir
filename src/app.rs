@@ -1,3 +1,5 @@
+use crate::windows_integration;
+
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
@@ -25,6 +27,13 @@ impl TemplateApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
+        println!("{:#?}", cc.integration_info.window_info.raw_window_handle);
+        match cc.integration_info.window_info.raw_window_handle {
+            raw_window_handle::RawWindowHandle::Win32(handle) => {
+                windows_integration::setup_windows_integration(handle);
+            },
+            _ => todo!(),
+        }
 
         // Load previous app state (if any).
         // Note that you must enable the `persistence` feature for this to work.
