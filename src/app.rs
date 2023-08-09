@@ -1,4 +1,11 @@
-use crate::{windows_integration, tray_icon::{hide_to_tray, TrayIconData}};
+use std::{cell::RefCell, rc::Rc, time::Duration};
+
+use crate::{
+    lock_status_sensor::{
+        EventLoopRegisteredLockStatusSensorBuilder, LockStatusSensor, SessionEvent,
+    },
+    tray_icon::{hide_to_tray, TrayIconData},
+};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -13,6 +20,9 @@ pub struct TemplateApp {
 
     #[serde(skip)]
     tray_icon_data: Option<TrayIconData>,
+
+    #[serde(skip)]
+    lock_status_sensor: Option<LockStatusSensor>,
 }
 
 impl Default for TemplateApp {
@@ -22,30 +32,31 @@ impl Default for TemplateApp {
             label: "Hello World!".to_owned(),
             value: 2.7,
             tray_icon_data: None,
+            lock_status_sensor: None,
         }
     }
 }
 
 impl TemplateApp {
     /// Called once before the first frame.
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(
+        cc: &eframe::CreationContext<'_>,
+        sensor_builder: Rc<RefCell<Option<EventLoopRegisteredLockStatusSensorBuilder>>>,
+    ) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
-        println!("{:#?}", cc.integration_info.window_info.raw_window_handle);
-        match cc.integration_info.window_info.raw_window_handle {
-            raw_window_handle::RawWindowHandle::Win32(handle) => {
-                windows_integration::setup_windows_integration(handle);
-            }
-            _ => todo!(),
-        }
+        let lock_status_sensor = init_lock_status_sensor(cc, sensor_builder);
 
         // Load previous app state (if any).
         // Note that you must enable the `persistence` feature for this to work.
-        if let Some(storage) = cc.storage {
-            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
-        }
+        let mut app: TemplateApp = if let Some(storage) = cc.storage {
+            eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default()
+        } else {
+            Default::default()
+        };
 
-        Default::default()
+        app.lock_status_sensor = lock_status_sensor;
+        app
     }
 }
 
@@ -61,9 +72,24 @@ impl eframe::App for TemplateApp {
         let Self { label, value, .. } = self;
 
         if let Some(icon_data) = self.tray_icon_data.take() {
+            println!("Checking tray");
             self.tray_icon_data = crate::tray_icon::handle_events(frame, icon_data);
-            ctx.request_repaint();
+            ctx.request_repaint_after(Duration::from_millis(100000000));
             return;
+        }
+
+        if let Some(mut sensor) = self.lock_status_sensor.take() {
+            match sensor.recv() {
+                Some(SessionEvent::Locked) => {
+                    println!("Locked!!");
+                }
+                Some(SessionEvent::Unlocked) => {
+                    println!("Unlocked!!");
+                }
+                None => (),
+            }
+
+            self.lock_status_sensor = Some(sensor);
         }
 
         // Examples of how to create different panels and windows.
@@ -136,5 +162,23 @@ impl eframe::App for TemplateApp {
                 ui.label("You would normally choose either panels OR windows.");
             });
         }
+    }
+}
+
+fn init_lock_status_sensor(
+    cc: &eframe::CreationContext<'_>,
+    sensor_builder: Rc<RefCell<Option<EventLoopRegisteredLockStatusSensorBuilder>>>,
+) -> Option<LockStatusSensor> {
+    match cc.integration_info.window_info.raw_window_handle {
+        raw_window_handle::RawWindowHandle::Win32(handle) => {
+            match sensor_builder.take().expect("The lock status sensor builder should be ready when we initialize the Template App").register_os_hook(handle) {
+                Ok(builder) => Some(builder.build()),
+                Err(err) => {
+                    eprintln!("{:#?}", err);
+                    None
+                }
+            }
+        }
+        _ => todo!(),
     }
 }
