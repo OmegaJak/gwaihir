@@ -1,9 +1,10 @@
 #![warn(clippy::all, rust_2018_idioms)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-mod windows_integration;
-pub use app::TemplateApp;
 mod app;
+mod windows_integration;
+mod tray_icon;
+pub use app::TemplateApp;
 
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]

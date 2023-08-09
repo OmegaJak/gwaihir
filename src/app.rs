@@ -1,4 +1,4 @@
-use crate::windows_integration;
+use crate::{windows_integration, tray_icon::{hide_to_tray, TrayIconData}};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -10,6 +10,9 @@ pub struct TemplateApp {
     // this how you opt-out of serialization of a member
     #[serde(skip)]
     value: f32,
+
+    #[serde(skip)]
+    tray_icon_data: Option<TrayIconData>,
 }
 
 impl Default for TemplateApp {
@@ -18,6 +21,7 @@ impl Default for TemplateApp {
             // Example stuff:
             label: "Hello World!".to_owned(),
             value: 2.7,
+            tray_icon_data: None,
         }
     }
 }
@@ -31,7 +35,7 @@ impl TemplateApp {
         match cc.integration_info.window_info.raw_window_handle {
             raw_window_handle::RawWindowHandle::Win32(handle) => {
                 windows_integration::setup_windows_integration(handle);
-            },
+            }
             _ => todo!(),
         }
 
@@ -53,21 +57,32 @@ impl eframe::App for TemplateApp {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let Self { label, value } = self;
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        let Self { label, value, .. } = self;
+
+        if let Some(icon_data) = self.tray_icon_data.take() {
+            self.tray_icon_data = crate::tray_icon::handle_events(frame, icon_data);
+            ctx.request_repaint();
+            return;
+        }
 
         // Examples of how to create different panels and windows.
         // Pick whichever suits you.
         // Tip: a good default choice is to just keep the `CentralPanel`.
         // For inspiration and more examples, go to https://emilk.github.io/egui
-
         #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
+                    if ui.button("Hide to tray").clicked() {
+                        let tray_icon_data = hide_to_tray(frame);
+                        self.tray_icon_data = Some(tray_icon_data);
+                        ui.close_menu();
+                    }
+
                     if ui.button("Quit").clicked() {
-                        _frame.close();
+                        frame.close();
                     }
                 });
             });
