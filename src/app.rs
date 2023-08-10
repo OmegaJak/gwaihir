@@ -1,4 +1,8 @@
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    time::{Duration, SystemTime},
+};
 
 use raw_window_handle::HasRawWindowHandle;
 
@@ -6,6 +10,7 @@ use crate::{
     lock_status_sensor::{
         EventLoopRegisteredLockStatusSensorBuilder, LockStatusSensor, SessionEvent,
     },
+    microphone_usage_sensor::MicrophoneUsageSensor,
     tray_icon::{hide_to_tray, TrayIconData},
 };
 
@@ -25,6 +30,9 @@ pub struct TemplateApp {
 
     #[serde(skip)]
     lock_status_sensor: Option<LockStatusSensor>,
+
+    #[serde(skip)]
+    microphone_usage_sensor: MicrophoneUsageSensor,
 }
 
 impl Default for TemplateApp {
@@ -35,6 +43,7 @@ impl Default for TemplateApp {
             value: 2.7,
             tray_icon_data: None,
             lock_status_sensor: None,
+            microphone_usage_sensor: MicrophoneUsageSensor::new(),
         }
     }
 }
@@ -71,27 +80,13 @@ impl eframe::App for TemplateApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        let Self { label, value, .. } = self;
+        self.check_sensors();
 
         if let Some(icon_data) = self.tray_icon_data.take() {
             println!("Checking tray");
             self.tray_icon_data = crate::tray_icon::handle_events(frame, icon_data);
-            ctx.request_repaint_after(Duration::from_millis(100000000));
+            // ctx.request_repaint_after(Duration::from_millis(100000000));
             return;
-        }
-
-        if let Some(mut sensor) = self.lock_status_sensor.take() {
-            match sensor.recv() {
-                Some(SessionEvent::Locked) => {
-                    println!("Locked!!");
-                }
-                Some(SessionEvent::Unlocked) => {
-                    println!("Unlocked!!");
-                }
-                None => (),
-            }
-
-            self.lock_status_sensor = Some(sensor);
         }
 
         // Examples of how to create different panels and windows.
@@ -121,12 +116,12 @@ impl eframe::App for TemplateApp {
 
             ui.horizontal(|ui| {
                 ui.label("Write something: ");
-                ui.text_edit_singleline(label);
+                ui.text_edit_singleline(&mut self.label);
             });
 
-            ui.add(egui::Slider::new(value, 0.0..=10.0).text("value"));
+            ui.add(egui::Slider::new(&mut self.value, 0.0..=10.0).text("value"));
             if ui.button("Increment").clicked() {
-                *value += 1.0;
+                self.value += 1.0;
             }
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
@@ -158,12 +153,34 @@ impl eframe::App for TemplateApp {
 
         if false {
             egui::Window::new("Window").show(ctx, |ui| {
-                ui.label("Windows can be moved by dragging them.");This is a 
+                ui.label("Windows can be moved by dragging them.");
                 ui.label("They are automatically sized based on contents.");
                 ui.label("You can turn on resizing and scrolling if you like.");
                 ui.label("You would normally choose either panels OR windows.");
             });
         }
+
+        ctx.request_repaint();
+    }
+}
+
+impl TemplateApp {
+    fn check_sensors(&mut self) {
+        if let Some(mut sensor) = self.lock_status_sensor.take() {
+            match sensor.recv() {
+                Some(SessionEvent::Locked) => {
+                    println!("Locked!!");
+                }
+                Some(SessionEvent::Unlocked) => {
+                    println!("Unlocked!!");
+                }
+                None => (),
+            }
+
+            self.lock_status_sensor = Some(sensor);
+        }
+
+        self.microphone_usage_sensor.check_microphone_usage();
     }
 }
 

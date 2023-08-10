@@ -23,6 +23,7 @@ raw-window-handle = "0.5.2"
 winit = "0.28.6"
 tray-icon = "0.8.0"
 thiserror = "1.0.44"
+winreg = "0.50.0"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

@@ -3,6 +3,7 @@
 
 mod app;
 mod lock_status_sensor;
+mod microphone_usage_sensor;
 mod tray_icon;
 pub use app::TemplateApp;
 
