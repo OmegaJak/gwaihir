@@ -6,6 +6,7 @@ mod lock_status_sensor;
 mod microphone_usage_sensor;
 mod sensor_monitor_thread;
 mod tray_icon;
+mod ui_extension_methods;
 pub use app::TemplateApp;
 
 // When compiling natively:
@@ -20,7 +21,7 @@ fn main() -> eframe::Result<()> {
     let mut native_options = eframe::NativeOptions::default();
     let registered_builder =
         LockStatusSensorBuilder::new().set_event_loop_builder(&mut native_options);
-    let (monitor_handle, tx_to_monitor) = create_sensor_monitor_thread();
+    let (monitor_handle, tx_to_monitor, rx_from_monitor) = create_sensor_monitor_thread();
     eframe::run_native(
         "eframe template",
         native_options,
@@ -29,7 +30,12 @@ fn main() -> eframe::Result<()> {
             tx_to_monitor
                 .send(MainToMonitorMessages::SetEguiContext(ctx_clone))
                 .unwrap();
-            Box::new(TemplateApp::new(cc, registered_builder, tx_to_monitor))
+            Box::new(TemplateApp::new(
+                cc,
+                registered_builder,
+                tx_to_monitor,
+                rx_from_monitor,
+            ))
         }),
     )?;
     monitor_handle.join().unwrap();

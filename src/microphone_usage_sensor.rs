@@ -1,6 +1,12 @@
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
 use winreg::RegKey;
+
+#[derive(Clone)]
+pub struct MicrophoneUsage {
+    pub app_name: String,
+    pub last_used: u64,
+}
 
 pub struct MicrophoneUsageSensor {
     last_check_time: Instant,
@@ -13,53 +19,44 @@ impl MicrophoneUsageSensor {
         }
     }
 
-    pub fn check_microphone_usage(&mut self) {
+    pub fn check_microphone_usage(&mut self) -> Option<Vec<MicrophoneUsage>> {
         let now = Instant::now();
         if now.duration_since(self.last_check_time) > Duration::from_millis(500) {
-            print_programs_using_microphone();
+            let all_programs_using_microphone = get_all_programs_using_microphone();
             self.last_check_time = now;
+            return Some(all_programs_using_microphone);
         }
+
+        None
     }
 }
 
-fn print_programs_using_microphone() {
-    let in_use = get_all_programs_last_microphone_usage();
-
-    if in_use.is_empty() {
-        println!("No devices listening to microphone");
-    } else {
-        for (key, last_access) in in_use.iter() {
-            if *last_access == 0 {
-                println!("Currently in use: {}", key);
-            }
-        }
-    }
-}
-
-fn get_all_programs_last_microphone_usage() -> Vec<(String, u64)> {
+fn get_all_programs_using_microphone() -> Vec<MicrophoneUsage> {
+    // If performance becomes a concern, we could maybe usage RegNotifyChangeKeyValue (https://learn.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regnotifychangekeyvalue)
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let microphone_packaged_store = hkcu.open_subkey_with_flags("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone", KEY_READ).unwrap();
     let microphone_nonpackaged_store = hkcu.open_subkey_with_flags("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone\\NonPackaged", KEY_READ).unwrap();
     let in_use: Vec<_> = get_microphone_usage_list(microphone_packaged_store)
         .into_iter()
         .chain(get_microphone_usage_list(microphone_nonpackaged_store).into_iter())
+        .filter(|usage| usage.last_used == 0)
         .collect();
     in_use
 }
 
-fn get_microphone_usage_list(parent_regkey: winreg::RegKey) -> Vec<(String, u64)> {
+fn get_microphone_usage_list(parent_regkey: winreg::RegKey) -> Vec<MicrophoneUsage> {
     parent_regkey
         .enum_keys()
         .filter_map(|x| x.ok())
         .filter_map(|key| {
-            Some((
-                key.clone(),
-                parent_regkey
+            Some(MicrophoneUsage {
+                app_name: key.clone(),
+                last_used: parent_regkey
                     .open_subkey_with_flags(key, KEY_READ)
                     .ok()?
                     .get_value::<u64, _>("LastUsedTimeStop")
                     .ok()?,
-            ))
+            })
         })
         .collect()
 }
