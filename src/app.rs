@@ -1,21 +1,15 @@
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    time::{Duration, SystemTime},
-};
+use std::{cell::RefCell, rc::Rc, sync::mpsc::Sender, time::Duration};
 
 use raw_window_handle::HasRawWindowHandle;
 
 use crate::{
-    lock_status_sensor::{
-        EventLoopRegisteredLockStatusSensorBuilder, LockStatusSensor, SessionEvent,
-    },
-    microphone_usage_sensor::MicrophoneUsageSensor,
+    lock_status_sensor::{EventLoopRegisteredLockStatusSensorBuilder, LockStatusSensor},
+    sensor_monitor_thread::MainToMonitorMessages,
     tray_icon::{hide_to_tray, TrayIconData},
 };
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct TemplateApp {
     // Example stuff:
@@ -29,45 +23,52 @@ pub struct TemplateApp {
     tray_icon_data: Option<TrayIconData>,
 
     #[serde(skip)]
-    lock_status_sensor: Option<LockStatusSensor>,
-
-    #[serde(skip)]
-    microphone_usage_sensor: MicrophoneUsageSensor,
+    tx_to_monitor_thread: Sender<MainToMonitorMessages>,
 }
 
-impl Default for TemplateApp {
-    fn default() -> Self {
-        Self {
-            // Example stuff:
-            label: "Hello World!".to_owned(),
-            value: 2.7,
-            tray_icon_data: None,
-            lock_status_sensor: None,
-            microphone_usage_sensor: MicrophoneUsageSensor::new(),
-        }
-    }
-}
+// impl Default for TemplateApp {
+//     fn default() -> Self {
+//         Self {
+//             // Example stuff:
+//             label: "Hello World!".to_owned(),
+//             value: 2.7,
+//             tray_icon_data: None,
+//             lock_status_sensor: None,
+//             microphone_usage_sensor: MicrophoneUsageSensor::new(),
+//         }
+//     }
+// }
 
 impl TemplateApp {
     /// Called once before the first frame.
     pub fn new(
         cc: &eframe::CreationContext<'_>,
         sensor_builder: Rc<RefCell<Option<EventLoopRegisteredLockStatusSensorBuilder>>>,
+        tx_to_monitor_thread: Sender<MainToMonitorMessages>,
     ) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
         let lock_status_sensor = init_lock_status_sensor(cc, sensor_builder);
+        if let Some(sensor) = lock_status_sensor {
+            tx_to_monitor_thread
+                .send(MainToMonitorMessages::LockStatusSensorInitialized(sensor))
+                .unwrap();
+        }
 
         // Load previous app state (if any).
         // Note that you must enable the `persistence` feature for this to work.
-        let mut app: TemplateApp = if let Some(storage) = cc.storage {
-            eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default()
-        } else {
-            Default::default()
-        };
+        // let mut app: TemplateApp = if let Some(storage) = cc.storage {
+        //     eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default()
+        // } else {
+        //     Default::default()
+        // };
 
-        app.lock_status_sensor = lock_status_sensor;
-        app
+        TemplateApp {
+            label: "Hello World!".to_owned(),
+            value: 2.7,
+            tray_icon_data: None,
+            tx_to_monitor_thread,
+        }
     }
 }
 
@@ -80,12 +81,10 @@ impl eframe::App for TemplateApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        self.check_sensors();
-
         if let Some(icon_data) = self.tray_icon_data.take() {
-            println!("Checking tray");
+            // println!("Checking tray");
             self.tray_icon_data = crate::tray_icon::handle_events(frame, icon_data);
-            // ctx.request_repaint_after(Duration::from_millis(100000000));
+            ctx.request_repaint_after(Duration::from_millis(100000000));
             return;
         }
 
@@ -148,6 +147,7 @@ impl eframe::App for TemplateApp {
                 "https://github.com/emilk/eframe_template/blob/master/",
                 "Source code."
             ));
+
             egui::warn_if_debug_build(ui);
         });
 
@@ -159,28 +159,6 @@ impl eframe::App for TemplateApp {
                 ui.label("You would normally choose either panels OR windows.");
             });
         }
-
-        ctx.request_repaint();
-    }
-}
-
-impl TemplateApp {
-    fn check_sensors(&mut self) {
-        if let Some(mut sensor) = self.lock_status_sensor.take() {
-            match sensor.recv() {
-                Some(SessionEvent::Locked) => {
-                    println!("Locked!!");
-                }
-                Some(SessionEvent::Unlocked) => {
-                    println!("Unlocked!!");
-                }
-                None => (),
-            }
-
-            self.lock_status_sensor = Some(sensor);
-        }
-
-        self.microphone_usage_sensor.check_microphone_usage();
     }
 }
 

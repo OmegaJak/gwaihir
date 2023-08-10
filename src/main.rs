@@ -4,6 +4,7 @@
 mod app;
 mod lock_status_sensor;
 mod microphone_usage_sensor;
+mod sensor_monitor_thread;
 mod tray_icon;
 pub use app::TemplateApp;
 
@@ -12,16 +13,27 @@ pub use app::TemplateApp;
 fn main() -> eframe::Result<()> {
     use lock_status_sensor::LockStatusSensorBuilder;
 
+    use crate::sensor_monitor_thread::{create_sensor_monitor_thread, MainToMonitorMessages};
+
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
     let mut native_options = eframe::NativeOptions::default();
     let registered_builder =
         LockStatusSensorBuilder::new().set_event_loop_builder(&mut native_options);
+    let (monitor_handle, tx_to_monitor) = create_sensor_monitor_thread();
     eframe::run_native(
         "eframe template",
         native_options,
-        Box::new(|cc| Box::new(TemplateApp::new(cc, registered_builder))),
-    )
+        Box::new(move |cc| {
+            let ctx_clone = cc.egui_ctx.clone();
+            tx_to_monitor
+                .send(MainToMonitorMessages::SetEguiContext(ctx_clone))
+                .unwrap();
+            Box::new(TemplateApp::new(cc, registered_builder, tx_to_monitor))
+        }),
+    )?;
+    monitor_handle.join().unwrap();
+    Ok(())
 }
 
 // When compiling to web using trunk:

@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex, RwLock};
 
 use thiserror::Error;
 use windows::Win32::Foundation::HWND;
@@ -25,7 +26,7 @@ pub enum LockStatusSensorError {
 
 type EventLoopBuilder = eframe::EventLoopBuilder<eframe::UserEvent>;
 type WindowHandle = raw_window_handle::Win32WindowHandle;
-type EventBuffer = Rc<RefCell<VecDeque<SessionEvent>>>;
+type EventBuffer = Arc<Mutex<VecDeque<SessionEvent>>>;
 
 pub struct LockStatusSensorBuilder {}
 pub struct OSRegisteredLockStatusSensorBuilder {}
@@ -109,12 +110,12 @@ impl FullyRegisteredLockStatusSensorBuilder {
 
 impl LockStatusSensor {
     pub fn recv(&mut self) -> Option<SessionEvent> {
-        self.event_buffer.borrow_mut().pop_front()
+        self.event_buffer.lock().unwrap().pop_front()
     }
 }
 
-fn create_event_buffer() -> Rc<RefCell<VecDeque<SessionEvent>>> {
-    EventBuffer::new(RefCell::new(VecDeque::new()))
+fn create_event_buffer() -> EventBuffer {
+    EventBuffer::new(Mutex::new(VecDeque::new()))
 }
 
 fn register_os_hook(
@@ -147,11 +148,14 @@ fn register_msg_hook(
             // https://learn.microsoft.com/en-us/windows/win32/termserv/wm-wtssession-change
             if (*msg).message == WM_WTSSESSION_CHANGE {
                 if (*msg).wParam.0 == WTS_SESSION_LOCK.try_into().unwrap() {
-                    event_buffer.borrow_mut().push_back(SessionEvent::Locked);
+                    event_buffer.lock().unwrap().push_back(SessionEvent::Locked)
                 }
 
                 if (*msg).wParam.0 == WTS_SESSION_UNLOCK.try_into().unwrap() {
-                    event_buffer.borrow_mut().push_back(SessionEvent::Unlocked);
+                    event_buffer
+                        .lock()
+                        .unwrap()
+                        .push_back(SessionEvent::Unlocked);
                 }
             }
         }
