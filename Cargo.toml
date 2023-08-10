@@ -7,8 +7,8 @@ rust-version = "1.71"
 
 
 [dependencies]
-egui = { path = "../egui/crates/egui" }
-eframe = { path = "../egui/crates/eframe", default-features = false, features = [
+egui = { git = "https://github.com/emilk/egui", branch = "master" }
+eframe = { git = "https://github.com/emilk/egui", branch = "master", default-features = false, features = [
     "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
     "default_fonts", # Embed the default egui fonts.
     "glow",          # Use the glow rendering backend. Alternative: "wgpu".
@@ -42,10 +42,6 @@ opt-level = 2
 
 
 [patch.crates-io]
-
-# If you want to use the bleeding edge version of egui and eframe:
-# egui = { git = "https://github.com/emilk/egui", branch = "master" }
-# eframe = { git = "https://github.com/emilk/egui", branch = "master" }
 
 # If you fork https://github.com/emilk/egui you can test with:
 # egui = { path = "../egui/crates/egui" }

@@ -1,5 +1,7 @@
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
+use raw_window_handle::HasRawWindowHandle;
+
 use crate::{
     lock_status_sensor::{
         EventLoopRegisteredLockStatusSensorBuilder, LockStatusSensor, SessionEvent,
@@ -156,7 +158,7 @@ impl eframe::App for TemplateApp {
 
         if false {
             egui::Window::new("Window").show(ctx, |ui| {
-                ui.label("Windows can be moved by dragging them.");
+                ui.label("Windows can be moved by dragging them.");This is a 
                 ui.label("They are automatically sized based on contents.");
                 ui.label("You can turn on resizing and scrolling if you like.");
                 ui.label("You would normally choose either panels OR windows.");
@@ -169,7 +171,7 @@ fn init_lock_status_sensor(
     cc: &eframe::CreationContext<'_>,
     sensor_builder: Rc<RefCell<Option<EventLoopRegisteredLockStatusSensorBuilder>>>,
 ) -> Option<LockStatusSensor> {
-    match cc.integration_info.window_info.raw_window_handle {
+    match cc.raw_window_handle() {
         raw_window_handle::RawWindowHandle::Win32(handle) => {
             match sensor_builder.take().expect("The lock status sensor builder should be ready when we initialize the Template App").register_os_hook(handle) {
                 Ok(builder) => Some(builder.build()),
