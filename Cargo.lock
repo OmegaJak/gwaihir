@@ -850,24 +850,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "eframe_template"
-version = "0.1.0"
-dependencies = [
- "eframe",
- "egui",
- "env_logger",
- "log",
- "raw-window-handle",
- "serde",
- "thiserror",
- "tray-icon",
- "wasm-bindgen-futures",
- "windows 0.48.0",
- "winit",
- "winreg",
-]
-
-[[package]]
 name = "egui"
 version = "0.22.0"
 source = "git+https://github.com/emilk/egui?branch=master#af6419343d8e864e0c9afaa559363315abb55424"
@@ -1523,6 +1505,23 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "gwaihir"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "egui",
+ "env_logger",
+ "log",
+ "raw-window-handle",
+ "serde",
+ "thiserror",
+ "tray-icon",
+ "windows 0.48.0",
+ "winit",
+ "winreg",
 ]
 
 [[package]]

@@ -1,10 +1,9 @@
 [package]
-name = "eframe_template"
+name = "gwaihir"
 version = "0.1.0"
 authors = ["Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"]
 edition = "2021"
 rust-version = "1.71"
-
 
 [dependencies]
 egui = { git = "https://github.com/emilk/egui", branch = "master" }
@@ -28,18 +27,6 @@ winreg = "0.50.0"
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.10"
-
-# web:
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen-futures = "0.4"
-
-
-[profile.release]
-opt-level = 2 # fast and small wasm
-
-# Optimize all dependencies even in debug builds:
-[profile.dev.package."*"]
-opt-level = 2
 
 
 [patch.crates-io]
