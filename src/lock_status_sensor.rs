@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use thiserror::Error;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::System::RemoteDesktop::{
-    WTSRegisterSessionNotification, NOTIFY_FOR_ALL_SESSIONS,
+    WTSRegisterSessionNotification, NOTIFY_FOR_THIS_SESSION,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     MSG, WM_WTSSESSION_CHANGE, WTS_SESSION_LOCK, WTS_SESSION_UNLOCK,
@@ -127,7 +127,7 @@ fn register_os_hook(
 
     let hwnd: isize = handle.hwnd as isize;
     unsafe {
-        WTSRegisterSessionNotification(HWND(hwnd), NOTIFY_FOR_ALL_SESSIONS);
+        WTSRegisterSessionNotification(HWND(hwnd), NOTIFY_FOR_THIS_SESSION);
     }
 
     Ok(())
