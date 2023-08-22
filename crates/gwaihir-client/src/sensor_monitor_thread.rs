@@ -5,9 +5,11 @@ use std::{
     time::Duration,
 };
 
+use gwaihir_client_lib::SensorData;
+
 use crate::{
     lock_status_sensor::{LockStatusSensor, SessionEvent},
-    microphone_usage_sensor::{MicrophoneUsage, MicrophoneUsageSensor},
+    microphone_usage_sensor::MicrophoneUsageSensor,
 };
 
 const THREAD_SLEEP_DURATION_MS: u64 = 50;
@@ -15,13 +17,6 @@ const THREAD_SLEEP_DURATION_MS: u64 = 50;
 pub enum MainToMonitorMessages {
     SetEguiContext(egui::Context),
     LockStatusSensorInitialized(LockStatusSensor),
-}
-
-#[derive(Clone)]
-pub struct SensorData {
-    pub num_locks: u32,
-    pub num_unlocks: u32,
-    pub microphone_usage: Vec<MicrophoneUsage>,
 }
 
 pub enum MonitorToMainMessages {
@@ -37,16 +32,6 @@ struct SensorMonitor {
     microphone_usage_sensor: MicrophoneUsageSensor,
 
     sensor_data: SensorData,
-}
-
-impl Default for SensorData {
-    fn default() -> Self {
-        Self {
-            num_locks: 0,
-            num_unlocks: 0,
-            microphone_usage: Vec::new(),
-        }
-    }
 }
 
 pub fn create_sensor_monitor_thread() -> (
@@ -102,16 +87,14 @@ impl SensorMonitor {
     }
 
     fn check_sensor_updates(&mut self) -> bool {
-        let mut updated = false; // This is probably inferior to baking this into SensorData
+        let initial_sensor_data = self.sensor_data.clone();
         if let Some(mut sensor) = self.lock_status_sensor.take() {
             match sensor.recv() {
                 Some(SessionEvent::Locked) => {
                     self.sensor_data.num_locks += 1;
-                    updated = true;
                 }
                 Some(SessionEvent::Unlocked) => {
                     self.sensor_data.num_unlocks += 1;
-                    updated = true;
                 }
                 None => (),
             }
@@ -122,10 +105,9 @@ impl SensorMonitor {
         let microphone_usage = self.microphone_usage_sensor.check_microphone_usage();
         if let Some(usage) = microphone_usage {
             self.sensor_data.microphone_usage = usage;
-            updated = true;
         }
 
-        updated
+        self.sensor_data != initial_sensor_data
     }
 
     fn process_msg(&mut self, msg: MainToMonitorMessages) -> bool {

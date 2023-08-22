@@ -13,6 +13,7 @@ pub use app::TemplateApp;
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
     use lock_status_sensor::LockStatusSensorBuilder;
+    use networking_spacetimedb::SpacetimeDBInterface;
 
     use crate::sensor_monitor_thread::{create_sensor_monitor_thread, MainToMonitorMessages};
 
@@ -30,7 +31,7 @@ fn main() -> eframe::Result<()> {
             tx_to_monitor
                 .send(MainToMonitorMessages::SetEguiContext(ctx_clone))
                 .unwrap();
-            Box::new(TemplateApp::new(
+            Box::new(TemplateApp::<SpacetimeDBInterface>::new(
                 cc,
                 registered_builder,
                 tx_to_monitor,

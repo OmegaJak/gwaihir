@@ -1,12 +1,7 @@
+use gwaihir_client_lib::MicrophoneUsage;
 use std::time::{Duration, Instant};
 use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
 use winreg::RegKey;
-
-#[derive(Clone)]
-pub struct MicrophoneUsage {
-    pub app_name: String,
-    pub last_used: u64,
-}
 
 pub struct MicrophoneUsageSensor {
     last_check_time: Instant,

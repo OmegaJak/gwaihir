@@ -147,11 +147,11 @@ fn register_msg_hook(
         unsafe {
             // https://learn.microsoft.com/en-us/windows/win32/termserv/wm-wtssession-change
             if (*msg).message == WM_WTSSESSION_CHANGE {
-                if (*msg).wParam.0 == WTS_SESSION_LOCK.try_into().unwrap() {
+                if (*msg).wParam.0 == TryInto::<usize>::try_into(WTS_SESSION_LOCK).unwrap() {
                     event_buffer.lock().unwrap().push_back(SessionEvent::Locked)
                 }
 
-                if (*msg).wParam.0 == WTS_SESSION_UNLOCK.try_into().unwrap() {
+                if (*msg).wParam.0 == TryInto::<usize>::try_into(WTS_SESSION_UNLOCK).unwrap() {
                     event_buffer
                         .lock()
                         .unwrap()

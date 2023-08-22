@@ -1,0 +1,4 @@
+set shell := ["cmd.exe", "/c"]
+
+spacetime-publish:
+	spacetime publish gwaihir-test2

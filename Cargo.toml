@@ -1,4 +1,7 @@
 [workspace]
 members = [
-	"crates/gwaihir-client"
+	"crates/gwaihir-client",
+	"crates/gwaihir-client-lib",
+	"crates/spacetimedb-server",
+	"crates/networking-spacetimedb",
 ]

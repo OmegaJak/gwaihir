@@ -5,11 +5,13 @@ use std::{
     time::Duration,
 };
 
+use gwaihir_client_lib::{NetworkInterface, RemoteUpdate, SensorData};
+use networking_spacetimedb::SpacetimeDBInterface;
 use raw_window_handle::HasRawWindowHandle;
 
 use crate::{
     lock_status_sensor::{EventLoopRegisteredLockStatusSensorBuilder, LockStatusSensor},
-    sensor_monitor_thread::{MainToMonitorMessages, MonitorToMainMessages, SensorData},
+    sensor_monitor_thread::{MainToMonitorMessages, MonitorToMainMessages},
     tray_icon::{hide_to_tray, TrayIconData},
     ui_extension_methods::UIExtensionMethods,
 };
@@ -17,7 +19,7 @@ use crate::{
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 // #[derive(serde::Serialize)]
 // #[serde(default)] // if we add new fields, give them default values when deserializing old state
-pub struct TemplateApp {
+pub struct TemplateApp<N> {
     // Example stuff:
     label: String,
 
@@ -32,6 +34,8 @@ pub struct TemplateApp {
     tx_to_monitor_thread: Sender<MainToMonitorMessages>,
     rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
     last_sensor_data: SensorData,
+
+    network: N,
 }
 
 // impl Default for TemplateApp {
@@ -47,7 +51,10 @@ pub struct TemplateApp {
 //     }
 // }
 
-impl TemplateApp {
+impl<N> TemplateApp<N>
+where
+    N: NetworkInterface,
+{
     /// Called once before the first frame.
     pub fn new(
         cc: &eframe::CreationContext<'_>,
@@ -79,11 +86,16 @@ impl TemplateApp {
             tx_to_monitor_thread,
             rx_from_monitor_thread,
             last_sensor_data: SensorData::default(),
+
+            network: NetworkInterface::new(),
         }
     }
 }
 
-impl eframe::App for TemplateApp {
+impl<N> eframe::App for TemplateApp<N>
+where
+    N: NetworkInterface,
+{
     /// Called by the frame work to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         // eframe::set_value(storage, eframe::APP_KEY, self);
@@ -98,7 +110,16 @@ impl eframe::App for TemplateApp {
                 panic!("The background thread unexpected disconnected!");
             }
             Ok(MonitorToMainMessages::UpdatedSensorData(sensor_data)) => {
-                self.last_sensor_data = sensor_data;
+                self.network.publish_status_update(sensor_data);
+            }
+        }
+
+        for remote_update in self.network.receive_updates().into_iter() {
+            match remote_update {
+                RemoteUpdate::UserStatusUpdated(user_name, sensor_data, update_time) => {
+                    println!("Sensor update for {} at {}", user_name, update_time);
+                    self.last_sensor_data = sensor_data;
+                }
             }
         }
 

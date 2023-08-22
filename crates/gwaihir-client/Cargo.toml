@@ -24,6 +24,10 @@ tray-icon = "0.8.0"
 thiserror = "1.0.44"
 winreg = "0.50.0"
 
+# local:
+gwaihir-client-lib = { path = "../gwaihir-client-lib" }
+networking-spacetimedb = { path = "../networking-spacetimedb" }
+
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.10"
