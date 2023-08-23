@@ -149,6 +149,9 @@ where
                         frame.close();
                     }
                 });
+
+                ui.separator();
+                ui.label(format!("Frame: {}", ctx.frame_nr()));
             });
         });
 
@@ -212,6 +215,8 @@ where
                 ui.label("You would normally choose either panels OR windows.");
             });
         }
+
+        ctx.request_repaint_after(Duration::from_secs_f64(1.0));
     }
 }
 
