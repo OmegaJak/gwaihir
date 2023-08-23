@@ -1,11 +1,11 @@
 use eframe::Frame;
 use tray_icon::{
-    menu::{ContextMenu, Menu, MenuEvent, MenuId, MenuItem},
+    menu::{Menu, MenuEvent, MenuId, MenuItem},
     ClickType, Icon, TrayIcon, TrayIconBuilder, TrayIconEvent,
 };
 
 pub struct TrayIconData {
-    tray_icon: TrayIcon,
+    _tray_icon: TrayIcon, // RAII, need to keep this for the icon to stay in the tray
     menu_ids: MenuIds,
 }
 
@@ -14,7 +14,7 @@ pub struct MenuIds {
     quit_id: MenuId,
 }
 
-const TRAY_ICON_BYTES: &'static [u8; 25640] = include_bytes!("../assets/eagle.png");
+const TRAY_ICON_BYTES: &'static [u8; 1860] = include_bytes!("../assets/eagle_32.png");
 
 pub fn hide_to_tray(frame: &mut Frame) -> TrayIconData {
     let menu = Menu::new();
@@ -26,14 +26,14 @@ pub fn hide_to_tray(frame: &mut Frame) -> TrayIconData {
     let icon = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
         .with_tooltip("Resume the thingy")
-        .with_icon(Icon::from_path("crates/gwaihir-client/assets/favicon.ico", None).unwrap())
+        .with_icon(icon_from_png_bytes(TRAY_ICON_BYTES))
         .build()
         .unwrap();
 
     frame.set_visible(false);
 
     TrayIconData {
-        tray_icon: icon,
+        _tray_icon: icon,
         menu_ids: MenuIds {
             show_id: show_item.id().clone(),
             quit_id: quit_item.id().clone(),
@@ -68,4 +68,18 @@ pub fn handle_events(frame: &mut Frame, tray_icon_data: TrayIconData) -> Option<
     }
 
     return Some(tray_icon_data);
+}
+
+fn icon_from_png_bytes(bytes: &[u8]) -> Icon {
+    let decoded_icon = lodepng::decode32(TRAY_ICON_BYTES).unwrap();
+    Icon::from_rgba(
+        decoded_icon
+            .buffer
+            .iter()
+            .flat_map(|rgba| rgba.iter())
+            .collect(),
+        decoded_icon.width.try_into().unwrap(),
+        decoded_icon.height.try_into().unwrap(),
+    )
+    .unwrap()
 }

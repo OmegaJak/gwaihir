@@ -23,6 +23,7 @@ winit = "0.28.6"
 tray-icon = "0.8.0"
 thiserror = "1.0.44"
 winreg = "0.50.0"
+lodepng = "3.7.2"
 
 # local:
 gwaihir-client-lib = { path = "../gwaihir-client-lib" }
