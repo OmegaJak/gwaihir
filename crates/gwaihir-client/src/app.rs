@@ -6,6 +6,7 @@ use std::{
     time::Duration,
 };
 
+use egui::CollapsingHeader;
 use gwaihir_client_lib::{
     chrono::{DateTime, Utc},
     NetworkInterface, RemoteUpdate, SensorData, UniqueUserId,
@@ -239,23 +240,29 @@ where
                         }
                     }
                 });
-                ui.collapsing_default_open("Lock/Unlocks", |ui| {
-                    ui.label(format!("Times Locked: {}", status.sensor_data.num_locks));
-                    ui.label(format!(
-                        "Times Unlocked: {}",
-                        status.sensor_data.num_unlocks
-                    ));
-                });
-                ui.collapsing_default_open("Microphone Usage", |ui| {
-                    ui.label(format!(
-                        "{} app(s) currently listening to the microphone",
-                        status.sensor_data.microphone_usage.len()
-                    ));
-                    for usage in status.sensor_data.microphone_usage.iter() {
-                        let pretty_name = usage.app_name.replace("#", "\\");
-                        ui.label(pretty_name);
-                    }
-                });
+                CollapsingHeader::new("Locks/Unlocks")
+                    .default_open(true)
+                    .id_source(format!("{}_locks", id.as_ref()))
+                    .show(ui, |ui| {
+                        ui.label(format!("Times Locked: {}", status.sensor_data.num_locks));
+                        ui.label(format!(
+                            "Times Unlocked: {}",
+                            status.sensor_data.num_unlocks
+                        ));
+                    });
+                CollapsingHeader::new("Microphone Usage")
+                    .default_open(true)
+                    .id_source(format!("{}_mic", id.as_ref()))
+                    .show(ui, |ui| {
+                        ui.label(format!(
+                            "{} app(s) currently listening to the microphone",
+                            status.sensor_data.microphone_usage.len()
+                        ));
+                        for usage in status.sensor_data.microphone_usage.iter() {
+                            let pretty_name = usage.app_name.replace("#", "\\");
+                            ui.label(pretty_name);
+                        }
+                    });
             }
 
             egui::warn_if_debug_build(ui);
