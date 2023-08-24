@@ -23,6 +23,10 @@ name = "accesskit"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "76eb1adf08c5bcaa8490b9851fd53cca27fa9880076f178ea9d29f05196728a8"
+dependencies = [
+ "enumn",
+ "serde",
+]
 
 [[package]]
 name = "accesskit_consumer"
@@ -110,6 +114,7 @@ checksum = "2c99f64d1e06488f620f932677e24bc6e2897582980441ae90a671415bd7ec2f"
 dependencies = [
  "cfg-if",
  "once_cell",
+ "serde",
  "version_check",
 ]
 
@@ -438,6 +443,9 @@ name = "bitflags"
 version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4682ae6287fcf752ecaabbfcc7b6f9b72aa33933dc23a554d853aea8eea8635"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "bitmaps"
@@ -911,6 +919,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "directories-next"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "339ee130d97a610ea5a5872d2bbb130fdf68884ff09d3028b81bec8a1ac23bbc"
+dependencies = [
+ "cfg-if",
+ "dirs-sys-next",
+]
+
+[[package]]
 name = "dirs-next"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -958,6 +976,7 @@ version = "0.22.0"
 source = "git+https://github.com/emilk/egui?branch=master#627e1b3d5054df9961b5a467ac7c7b866a04d913"
 dependencies = [
  "bytemuck",
+ "serde",
 ]
 
 [[package]]
@@ -967,6 +986,7 @@ source = "git+https://github.com/emilk/egui?branch=master#627e1b3d5054df9961b5a4
 dependencies = [
  "bytemuck",
  "cocoa 0.24.1",
+ "directories-next",
  "egui",
  "egui-winit",
  "egui_glow",
@@ -979,6 +999,8 @@ dependencies = [
  "objc",
  "percent-encoding",
  "raw-window-handle",
+ "ron",
+ "serde",
  "static_assertions",
  "thiserror",
  "wasm-bindgen",
@@ -998,6 +1020,8 @@ dependencies = [
  "epaint",
  "log",
  "nohash-hasher",
+ "ron",
+ "serde",
 ]
 
 [[package]]
@@ -1011,6 +1035,7 @@ dependencies = [
  "instant",
  "log",
  "raw-window-handle",
+ "serde",
  "smithay-clipboard",
  "webbrowser",
  "winit",
@@ -1042,6 +1067,7 @@ version = "0.22.0"
 source = "git+https://github.com/emilk/egui?branch=master#627e1b3d5054df9961b5a467ac7c7b866a04d913"
 dependencies = [
  "bytemuck",
+ "serde",
 ]
 
 [[package]]
@@ -1078,6 +1104,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "enumn"
+version = "0.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b893c4eb2dc092c811165f84dc7447fae16fb66521717968c34c509b39b1a5c5"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.29",
+]
+
+[[package]]
 name = "env_logger"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1103,6 +1140,7 @@ dependencies = [
  "log",
  "nohash-hasher",
  "parking_lot",
+ "serde",
 ]
 
 [[package]]
@@ -2923,6 +2961,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20ec2d3e3fc7a92ced357df9cebd5a10b6fb2aa1ee797bf7e9ce2f17dffc8f59"
 dependencies = [
  "bytemuck",
+]
+
+[[package]]
+name = "ron"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b91f7eff05f748767f183df4320a63d6936e9c6107d97c9e6bdd9784f4289c94"
+dependencies = [
+ "base64 0.21.2",
+ "bitflags 2.4.0",
+ "serde",
+ "serde_derive",
 ]
 
 [[package]]

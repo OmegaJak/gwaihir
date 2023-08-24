@@ -4,6 +4,12 @@ use serde::{Deserialize, Serialize};
 
 pub use chrono;
 
+#[cfg(debug_assertions)]
+pub const APP_ID: &str = "gwaihir-debug";
+
+#[cfg(not(debug_assertions))]
+pub const APP_ID: &str = "gwaihir";
+
 #[nutype]
 #[derive(AsRef, Clone, Into, Hash, Eq, PartialEq)]
 pub struct UniqueUserId(String);

@@ -12,6 +12,7 @@ pub use app::TemplateApp;
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
+    use gwaihir_client_lib::APP_ID;
     use lock_status_sensor::LockStatusSensorBuilder;
     use networking_spacetimedb::SpacetimeDBInterface;
 
@@ -20,6 +21,7 @@ fn main() -> eframe::Result<()> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
     let mut native_options = eframe::NativeOptions::default();
+    native_options.app_id = Some(APP_ID.to_string());
     let registered_builder =
         LockStatusSensorBuilder::new().set_event_loop_builder(&mut native_options);
     let (monitor_handle, tx_to_monitor, rx_from_monitor) = create_sensor_monitor_thread();

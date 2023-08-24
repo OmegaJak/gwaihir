@@ -2,7 +2,7 @@ mod module_bindings;
 
 use gwaihir_client_lib::{
     chrono::{DateTime, NaiveDateTime, Utc},
-    NetworkInterface, RemoteUpdate, SensorData, UniqueUserId, Username,
+    NetworkInterface, RemoteUpdate, SensorData, UniqueUserId, Username, APP_ID,
 };
 use module_bindings::*;
 use spacetimedb_sdk::{
@@ -13,12 +13,6 @@ use spacetimedb_sdk::{
     subscribe,
     table::{TableType, TableWithPrimaryKey},
 };
-
-#[cfg(debug_assertions)]
-const CREDS_DIR: &str = ".gwaihir-debug";
-
-#[cfg(not(debug_assertions))]
-const CREDS_DIR: &str = ".gwaihir";
 
 /// The URL of the SpacetimeDB instance hosting our chat module.
 const SPACETIMEDB_URI: &str = "https://testnet.spacetimedb.com";
@@ -82,7 +76,7 @@ fn connect_to_db() {
     connect(
         SPACETIMEDB_URI,
         DB_NAME,
-        load_credentials(CREDS_DIR).expect("Error reading stored credentials"),
+        load_credentials(&creds_dir()).expect("Error reading stored credentials"),
     )
     .expect("Failed to connect");
 }
@@ -94,7 +88,7 @@ fn subscribe_to_tables() {
 
 /// Our `on_connect` callback: save our credentials to a file.
 fn on_connected(creds: &Credentials) {
-    if let Err(e) = save_credentials(CREDS_DIR, creds) {
+    if let Err(e) = save_credentials(&creds_dir(), creds) {
         eprintln!("Failed to save credentials: {:?}", e);
     }
 }
@@ -167,4 +161,8 @@ fn on_name_set(_sender: &Identity, status: &Status, name: &String) {
     if let Status::Failed(err) = status {
         eprintln!("Failed to change name to {:?}: {}", name, err);
     }
+}
+
+fn creds_dir() -> String {
+    format!(".{}", APP_ID)
 }
