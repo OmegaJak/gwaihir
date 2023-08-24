@@ -9,7 +9,7 @@ use std::{
 use egui::{CollapsingHeader, TextEdit, Widget};
 use gwaihir_client_lib::{
     chrono::{DateTime, Utc},
-    NetworkInterface, RemoteUpdate, SensorData, UniqueUserId,
+    NetworkInterface, RemoteUpdate, SensorData, UniqueUserId, UserStatus, Username,
 };
 
 use raw_window_handle::HasRawWindowHandle;
@@ -21,21 +21,9 @@ use crate::{
     ui_extension_methods::UIExtensionMethods,
 };
 
-/// We derive Deserialize/Serialize so we can persist app state on shutdown.
-// #[derive(serde::Serialize)]
-// #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct TemplateApp<N> {
-    // Example stuff:
-    label: String,
-
-    // this how you opt-out of serialization of a member
-    // #[serde(skip)]
-    value: f32,
-
-    // #[serde(skip)]
     tray_icon_data: Option<TrayIconData>,
 
-    // #[serde(skip)]
     tx_to_monitor_thread: Sender<MainToMonitorMessages>,
     rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
     current_status: HashMap<UniqueUserId, UserStatus>,
@@ -46,72 +34,6 @@ pub struct TemplateApp<N> {
 
     set_name_input: String,
 }
-
-pub struct UserStatus {
-    pub display_name: String,
-    pub is_online: bool,
-    pub sensor_data: SensorData,
-    pub last_update: DateTime<Utc>,
-}
-
-impl UserStatus {
-    fn update(&mut self, remote_update: &RemoteUpdate) {
-        match remote_update {
-            RemoteUpdate::UserStatusUpdated(
-                user_id,
-                username,
-                online,
-                sensor_data,
-                update_time,
-            ) => {
-                self.display_name = if username.as_ref().is_empty() {
-                    user_id.clone().into()
-                } else {
-                    username.clone().into()
-                };
-                self.sensor_data = sensor_data.clone();
-                self.last_update = update_time.clone();
-                self.is_online = online.clone();
-            }
-        }
-    }
-}
-
-impl From<RemoteUpdate> for UserStatus {
-    fn from(update: RemoteUpdate) -> Self {
-        match update {
-            RemoteUpdate::UserStatusUpdated(_, _, _, _, _) => {
-                let mut status = UserStatus::default();
-                status.update(&update);
-                status
-            }
-        }
-    }
-}
-
-impl Default for UserStatus {
-    fn default() -> Self {
-        Self {
-            is_online: false,
-            display_name: Default::default(),
-            sensor_data: Default::default(),
-            last_update: Default::default(),
-        }
-    }
-}
-
-// impl Default for TemplateApp {
-//     fn default() -> Self {
-//         Self {
-//             // Example stuff:
-//             label: "Hello World!".to_owned(),
-//             value: 2.7,
-//             tray_icon_data: None,
-//             lock_status_sensor: None,
-//             microphone_usage_sensor: MicrophoneUsageSensor::new(),
-//         }
-//     }
-// }
 
 impl<N> TemplateApp<N>
 where
@@ -146,8 +68,6 @@ where
         let network: N = NetworkInterface::new(get_remote_update_callback(network_tx, ctx_clone));
         let current_user_id = network.get_current_user_id();
         TemplateApp {
-            label: "Hello World!".to_owned(),
-            value: 2.7,
             tray_icon_data: None,
             tx_to_monitor_thread,
             rx_from_monitor_thread,
@@ -189,16 +109,13 @@ where
         }
 
         while let Ok(update) = self.network_rx.try_recv() {
-            let user_id = match &update {
-                RemoteUpdate::UserStatusUpdated(user_id, _, _, _, _) => user_id,
+            match update {
+                RemoteUpdate::UserStatusUpdated(status) => {
+                    if subscribed_to_user(&status.user_id) {
+                        self.current_status.insert(status.user_id.clone(), status);
+                    }
+                }
             };
-
-            if subscribed_to_user(user_id) {
-                self.current_status
-                    .entry(user_id.clone())
-                    .and_modify(|status| status.update(&update))
-                    .or_insert(update.into());
-            }
         }
 
         if self.current_user_id.is_none() {
@@ -240,7 +157,7 @@ where
         egui::CentralPanel::default().show(ctx, |ui| {
             for (id, status) in &self.current_status {
                 ui.horizontal(|ui| {
-                    ui.heading(status.display_name.clone());
+                    ui.heading(status.display_name());
                     if let Some(current_user_id) = &self.current_user_id {
                         if id == current_user_id {
                             let text_edit_response = TextEdit::singleline(&mut self.set_name_input)

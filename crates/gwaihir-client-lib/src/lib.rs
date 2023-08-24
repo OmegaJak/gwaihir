@@ -19,7 +19,25 @@ pub struct UniqueUserId(String);
 pub struct Username(String);
 
 pub enum RemoteUpdate {
-    UserStatusUpdated(UniqueUserId, Username, bool, SensorData, DateTime<Utc>),
+    UserStatusUpdated(UserStatus),
+}
+
+pub struct UserStatus {
+    pub user_id: UniqueUserId,
+    pub username: Username,
+    pub is_online: bool,
+    pub sensor_data: SensorData,
+    pub last_update: DateTime<Utc>,
+}
+
+impl UserStatus {
+    pub fn display_name(&self) -> String {
+        if self.username.as_ref().is_empty() {
+            self.user_id.clone().into()
+        } else {
+            self.username.clone().into()
+        }
+    }
 }
 
 pub trait NetworkInterface {

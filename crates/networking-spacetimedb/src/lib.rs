@@ -2,7 +2,7 @@ mod module_bindings;
 
 use gwaihir_client_lib::{
     chrono::{DateTime, NaiveDateTime, Utc},
-    NetworkInterface, RemoteUpdate, SensorData, UniqueUserId, Username, APP_ID,
+    NetworkInterface, RemoteUpdate, SensorData, UniqueUserId, UserStatus, Username, APP_ID,
 };
 use module_bindings::*;
 use spacetimedb_sdk::{
@@ -127,20 +127,20 @@ fn on_user_updated(old: &User, new: &User, _: Option<&ReducerEvent>) -> Option<R
 fn generate_remote_update(new: &User) -> Option<RemoteUpdate> {
     if let Some(status) = new.status.clone() {
         let sensor_data = serde_json::from_str(&status).unwrap();
-        let time = DateTime::<Utc>::from_utc(
+        let last_update = DateTime::<Utc>::from_utc(
             NaiveDateTime::from_timestamp_micros(
                 new.last_status_update.unwrap().try_into().unwrap(),
             )
             .unwrap(),
             Utc,
         );
-        return Some(RemoteUpdate::UserStatusUpdated(
-            UniqueUserId::new(identity_leading_hex(&new.identity)),
-            Username::new(new.name.clone().unwrap_or_default()),
-            new.online,
+        return Some(RemoteUpdate::UserStatusUpdated(UserStatus {
+            user_id: UniqueUserId::new(identity_leading_hex(&new.identity)),
+            username: Username::new(new.name.clone().unwrap_or_default()),
+            is_online: new.online,
             sensor_data,
-            time,
-        ));
+            last_update,
+        }));
     }
 
     None
