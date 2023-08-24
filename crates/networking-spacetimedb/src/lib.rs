@@ -14,6 +14,10 @@ use spacetimedb_sdk::{
     table::TableWithPrimaryKey,
 };
 
+#[cfg(debug_assertions)]
+const CREDS_DIR: &str = ".gwaihir-debug";
+
+#[cfg(not(debug_assertions))]
 const CREDS_DIR: &str = ".gwaihir";
 
 /// The URL of the SpacetimeDB instance hosting our chat module.
