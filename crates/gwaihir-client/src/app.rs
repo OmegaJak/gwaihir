@@ -1,5 +1,5 @@
 use std::{
-    cell::RefCell,
+    cell::{OnceCell, RefCell},
     collections::HashMap,
     rc::Rc,
     sync::mpsc::{self, Receiver, Sender, TryRecvError},
@@ -42,7 +42,7 @@ pub struct TemplateApp<N> {
 
     network: N,
     network_rx: Receiver<RemoteUpdate>,
-    current_user_id: UniqueUserId,
+    current_user_id: Option<UniqueUserId>,
 
     set_name_input: String,
 }
@@ -154,7 +154,7 @@ where
 
             network,
             network_rx,
-            current_user_id,
+            current_user_id: None,
 
             set_name_input: String::new(),
         }
@@ -195,7 +195,10 @@ where
                     .or_insert(update.into());
             }
         }
-        // println!("Sensor update for {} at {}", descriptor, update_time);
+
+        if self.current_user_id.is_none() {
+            self.current_user_id = self.network.get_current_user_id();
+        }
 
         if let Some(icon_data) = self.tray_icon_data.take() {
             // println!("Checking tray");
@@ -233,10 +236,12 @@ where
             for (id, status) in &self.current_status {
                 ui.horizontal(|ui| {
                     ui.heading(status.display_name.clone());
-                    if id == &self.current_user_id {
-                        ui.text_edit_singleline(&mut self.set_name_input);
-                        if ui.button("Set Username").clicked() {
-                            self.network.set_username(self.set_name_input.clone());
+                    if let Some(current_user_id) = &self.current_user_id {
+                        if id == current_user_id {
+                            ui.text_edit_singleline(&mut self.set_name_input);
+                            if ui.button("Set Username").clicked() {
+                                self.network.set_username(self.set_name_input.clone());
+                            }
                         }
                     }
                 });

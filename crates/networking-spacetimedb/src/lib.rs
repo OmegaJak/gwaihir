@@ -38,8 +38,8 @@ impl NetworkInterface for SpacetimeDBInterface {
         set_status(json);
     }
 
-    fn get_current_user_id(&self) -> UniqueUserId {
-        UniqueUserId::new(identity_leading_hex(&identity().unwrap()))
+    fn get_current_user_id(&self) -> Option<UniqueUserId> {
+        Some(UniqueUserId::new(identity_leading_hex(&identity().ok()?)))
     }
 
     fn set_username(&self, name: String) {
