@@ -1,17 +1,17 @@
 use std::{
-    cell::{OnceCell, RefCell},
+    cell::RefCell,
     collections::HashMap,
     rc::Rc,
     sync::mpsc::{self, Receiver, Sender, TryRecvError},
     time::Duration,
 };
 
-use egui::CollapsingHeader;
+use egui::{CollapsingHeader, TextEdit, Widget};
 use gwaihir_client_lib::{
     chrono::{DateTime, Utc},
     NetworkInterface, RemoteUpdate, SensorData, UniqueUserId,
 };
-use networking_spacetimedb::SpacetimeDBInterface;
+
 use raw_window_handle::HasRawWindowHandle;
 
 use crate::{
@@ -239,9 +239,15 @@ where
                     ui.heading(status.display_name.clone());
                     if let Some(current_user_id) = &self.current_user_id {
                         if id == current_user_id {
-                            ui.text_edit_singleline(&mut self.set_name_input);
-                            if ui.button("Set Username").clicked() {
+                            let text_edit_response = TextEdit::singleline(&mut self.set_name_input)
+                                .desired_width(100.0)
+                                .ui(ui);
+                            if ui.button("Set Username").clicked()
+                                || (text_edit_response.lost_focus()
+                                    && ui.input(|i| i.key_pressed(egui::Key::Enter)))
+                            {
                                 self.network.set_username(self.set_name_input.clone());
+                                self.set_name_input = String::new();
                             }
                         }
                     }
