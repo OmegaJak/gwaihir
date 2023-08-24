@@ -6,13 +6,14 @@ use std::{
     time::Duration,
 };
 
-use egui::{CollapsingHeader, TextEdit, Widget};
+use egui::{epaint::ahash::HashSet, CollapsingHeader, TextEdit, Widget};
 use gwaihir_client_lib::{
     chrono::{DateTime, Utc},
     NetworkInterface, RemoteUpdate, SensorData, UniqueUserId, UserStatus, Username,
 };
 
 use raw_window_handle::HasRawWindowHandle;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     lock_status_sensor::{EventLoopRegisteredLockStatusSensorBuilder, LockStatusSensor},
@@ -20,6 +21,23 @@ use crate::{
     tray_icon::{hide_to_tray, TrayIconData},
     ui_extension_methods::UIExtensionMethods,
 };
+
+#[derive(Serialize, Deserialize)]
+pub struct Persistence {
+    pub ignored_users: HashSet<String>,
+}
+
+impl Persistence {
+    pub const STORAGE_KEY: &str = eframe::APP_KEY;
+}
+
+impl Default for Persistence {
+    fn default() -> Self {
+        Self {
+            ignored_users: Default::default(),
+        }
+    }
+}
 
 pub struct TemplateApp<N> {
     tray_icon_data: Option<TrayIconData>,
@@ -33,6 +51,8 @@ pub struct TemplateApp<N> {
     current_user_id: Option<UniqueUserId>,
 
     set_name_input: String,
+
+    persistence: Persistence,
 }
 
 impl<N> TemplateApp<N>
@@ -55,18 +75,16 @@ where
                 .unwrap();
         }
 
-        // Load previous app state (if any).
-        // Note that you must enable the `persistence` feature for this to work.
-        // let mut app: TemplateApp = if let Some(storage) = cc.storage {
-        //     eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default()
-        // } else {
-        //     Default::default()
-        // };
+        let persistence: Persistence = cc
+            .storage
+            .and_then(|storage| {
+                return eframe::get_value(storage, Persistence::STORAGE_KEY);
+            })
+            .unwrap_or_default();
 
         let (network_tx, network_rx) = mpsc::channel();
         let ctx_clone = cc.egui_ctx.clone();
         let network: N = NetworkInterface::new(get_remote_update_callback(network_tx, ctx_clone));
-        let current_user_id = network.get_current_user_id();
         TemplateApp {
             tray_icon_data: None,
             tx_to_monitor_thread,
@@ -78,6 +96,8 @@ where
             current_user_id: None,
 
             set_name_input: String::new(),
+
+            persistence,
         }
     }
 }
@@ -88,7 +108,7 @@ where
 {
     /// Called by the frame work to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        // eframe::set_value(storage, eframe::APP_KEY, self);
+        eframe::set_value(storage, Persistence::STORAGE_KEY, &self.persistence);
     }
 
     fn persist_egui_memory(&self) -> bool {
@@ -111,7 +131,7 @@ where
         while let Ok(update) = self.network_rx.try_recv() {
             match update {
                 RemoteUpdate::UserStatusUpdated(status) => {
-                    if subscribed_to_user(&status.user_id) {
+                    if self.subscribed_to_user(&status.user_id) {
                         self.current_status.insert(status.user_id.clone(), status);
                     }
                 }
@@ -156,6 +176,10 @@ where
 
         egui::CentralPanel::default().show(ctx, |ui| {
             for (id, status) in &self.current_status {
+                if !self.subscribed_to_user(id) {
+                    continue;
+                }
+
                 ui.horizontal(|ui| {
                     ui.heading(status.display_name());
                     if let Some(current_user_id) = &self.current_user_id {
@@ -170,6 +194,8 @@ where
                                 self.network.set_username(self.set_name_input.clone());
                                 self.set_name_input = String::new();
                             }
+                        } else if ui.button("x").clicked() {
+                            self.persistence.ignored_users.insert(id.clone().into());
                         }
                     }
                 });
@@ -204,8 +230,13 @@ where
     }
 }
 
-fn subscribed_to_user(user_id: &gwaihir_client_lib::UniqueUserId) -> bool {
-    true
+impl<N> TemplateApp<N> {
+    fn subscribed_to_user(&self, user_id: &gwaihir_client_lib::UniqueUserId) -> bool {
+        !self
+            .persistence
+            .ignored_users
+            .contains(user_id.as_ref().into())
+    }
 }
 
 fn init_lock_status_sensor(
