@@ -241,9 +241,7 @@ where
                         }
                     }
                 });
-                ui.horizontal(|ui| {
-                    ui.label(format!("Is currently online: {}", status.is_online));
-                });
+                ui.label(format!("Is currently online: {}", status.is_online));
                 CollapsingHeader::new("Locks/Unlocks")
                     .default_open(true)
                     .id_source(format!("{}_locks", id.as_ref()))
