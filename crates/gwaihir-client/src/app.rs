@@ -71,6 +71,7 @@ impl UserStatus {
                 };
                 self.sensor_data = sensor_data.clone();
                 self.last_update = update_time.clone();
+                self.is_online = online.clone();
             }
         }
     }
@@ -245,6 +246,7 @@ where
                         }
                     }
                 });
+                ui.label(format!("Is currently online: {}", status.is_online));
                 CollapsingHeader::new("Locks/Unlocks")
                     .default_open(true)
                     .id_source(format!("{}_locks", id.as_ref()))
