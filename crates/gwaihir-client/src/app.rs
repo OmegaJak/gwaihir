@@ -8,7 +8,7 @@ use std::{
 
 use gwaihir_client_lib::{
     chrono::{DateTime, Utc},
-    NetworkInterface, RemoteUpdate, SensorData,
+    NetworkInterface, RemoteUpdate, SensorData, UniqueUserId,
 };
 use networking_spacetimedb::SpacetimeDBInterface;
 use raw_window_handle::HasRawWindowHandle;
@@ -37,14 +37,17 @@ pub struct TemplateApp<N> {
     // #[serde(skip)]
     tx_to_monitor_thread: Sender<MainToMonitorMessages>,
     rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
-    current_status: HashMap<String, UserStatus>,
+    current_status: HashMap<UniqueUserId, UserStatus>,
 
     network: N,
     network_rx: Receiver<RemoteUpdate>,
+    current_user_id: UniqueUserId,
+
+    set_name_input: String,
 }
 
 pub struct UserStatus {
-    pub username: String,
+    pub display_name: String,
     pub is_online: bool,
     pub sensor_data: SensorData,
     pub last_update: DateTime<Utc>,
@@ -53,8 +56,14 @@ pub struct UserStatus {
 impl UserStatus {
     fn update(&mut self, remote_update: &RemoteUpdate) {
         match remote_update {
-            RemoteUpdate::UserStatusUpdated(user_id, username, sensor_data, update_time) => {
-                self.username = if username.as_ref().is_empty() {
+            RemoteUpdate::UserStatusUpdated(
+                user_id,
+                username,
+                online,
+                sensor_data,
+                update_time,
+            ) => {
+                self.display_name = if username.as_ref().is_empty() {
                     user_id.clone().into()
                 } else {
                     username.clone().into()
@@ -69,7 +78,7 @@ impl UserStatus {
 impl From<RemoteUpdate> for UserStatus {
     fn from(update: RemoteUpdate) -> Self {
         match update {
-            RemoteUpdate::UserStatusUpdated(_, _, _, _) => {
+            RemoteUpdate::UserStatusUpdated(_, _, _, _, _) => {
                 let mut status = UserStatus::default();
                 status.update(&update);
                 status
@@ -82,7 +91,7 @@ impl Default for UserStatus {
     fn default() -> Self {
         Self {
             is_online: false,
-            username: Default::default(),
+            display_name: Default::default(),
             sensor_data: Default::default(),
             last_update: Default::default(),
         }
@@ -132,6 +141,8 @@ where
 
         let (network_tx, network_rx) = mpsc::channel();
         let ctx_clone = cc.egui_ctx.clone();
+        let network: N = NetworkInterface::new(get_remote_update_callback(network_tx, ctx_clone));
+        let current_user_id = network.get_current_user_id();
         TemplateApp {
             label: "Hello World!".to_owned(),
             value: 2.7,
@@ -140,8 +151,11 @@ where
             rx_from_monitor_thread,
             current_status: HashMap::new(),
 
-            network: NetworkInterface::new(get_remote_update_callback(network_tx, ctx_clone)),
+            network,
             network_rx,
+            current_user_id,
+
+            set_name_input: String::new(),
         }
     }
 }
@@ -170,12 +184,12 @@ where
 
         while let Ok(update) = self.network_rx.try_recv() {
             let user_id = match &update {
-                RemoteUpdate::UserStatusUpdated(user_id, _, _, _) => user_id,
+                RemoteUpdate::UserStatusUpdated(user_id, _, _, _, _) => user_id,
             };
 
             if subscribed_to_user(user_id) {
                 self.current_status
-                    .entry(user_id.clone().into())
+                    .entry(user_id.clone())
                     .and_modify(|status| status.update(&update))
                     .or_insert(update.into());
             }
@@ -215,8 +229,16 @@ where
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            for status in self.current_status.values() {
-                ui.heading(status.username.clone());
+            for (id, status) in &self.current_status {
+                ui.horizontal(|ui| {
+                    ui.heading(status.display_name.clone());
+                    if id == &self.current_user_id {
+                        ui.text_edit_singleline(&mut self.set_name_input);
+                        if ui.button("Set Username").clicked() {
+                            self.network.set_username(self.set_name_input.clone());
+                        }
+                    }
+                });
                 ui.collapsing_default_open("Lock/Unlocks", |ui| {
                     ui.label(format!("Times Locked: {}", status.sensor_data.num_locks));
                     ui.label(format!(

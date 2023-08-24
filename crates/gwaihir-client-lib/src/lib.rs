@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 pub use chrono;
 
 #[nutype]
-#[derive(AsRef, Clone, Into)]
+#[derive(AsRef, Clone, Into, Hash, Eq, PartialEq)]
 pub struct UniqueUserId(String);
 
 #[nutype]
@@ -13,12 +13,14 @@ pub struct UniqueUserId(String);
 pub struct Username(String);
 
 pub enum RemoteUpdate {
-    UserStatusUpdated(UniqueUserId, Username, SensorData, DateTime<Utc>),
+    UserStatusUpdated(UniqueUserId, Username, bool, SensorData, DateTime<Utc>),
 }
 
 pub trait NetworkInterface {
     fn new(update_callback: impl Fn(RemoteUpdate) + Send + 'static) -> Self;
     fn publish_status_update(&self, status: SensorData);
+    fn set_username(&self, name: String);
+    fn get_current_user_id(&self) -> UniqueUserId;
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]

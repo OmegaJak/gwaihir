@@ -6,7 +6,9 @@ use gwaihir_client_lib::{
 };
 use module_bindings::*;
 use spacetimedb_sdk::{
-    identity::{load_credentials, once_on_connect, save_credentials, Credentials, Identity},
+    identity::{
+        identity, load_credentials, once_on_connect, save_credentials, Credentials, Identity,
+    },
     reducer::Status,
     subscribe,
     table::TableWithPrimaryKey,
@@ -34,6 +36,14 @@ impl NetworkInterface for SpacetimeDBInterface {
     fn publish_status_update(&self, status: SensorData) {
         let json = serde_json::to_string(&status).unwrap();
         set_status(json);
+    }
+
+    fn get_current_user_id(&self) -> UniqueUserId {
+        UniqueUserId::new(identity_leading_hex(&identity().unwrap()))
+    }
+
+    fn set_username(&self, name: String) {
+        set_name(name)
     }
 }
 
@@ -102,21 +112,10 @@ fn identity_leading_hex(id: &Identity) -> String {
 /// Our `User::on_update` callback:
 /// print a notification about name and status changes.
 fn on_user_updated(old: &User, new: &User, _: Option<&ReducerEvent>) -> Option<RemoteUpdate> {
-    // if old.name != new.name {
-    //     println!(
-    //         "User {} renamed to {}.",
-    //         user_name_or_identity(old),
-    //         user_name_or_identity(new)
-    //     );
-    // }
-    // if old.online && !new.online {
-    //     println!("User {} disconnected.", user_name_or_identity(new));
-    // }
-    // if !old.online && new.online {
-    //     println!("User {} connected.", user_name_or_identity(new));
-    // }
-
-    if new.last_status_update != old.last_status_update {
+    if new.last_status_update != old.last_status_update
+        || old.name != new.name
+        || old.online != new.online
+    {
         if let Some(status) = new.status.clone() {
             let sensor_data = serde_json::from_str(&status).unwrap();
             let time = DateTime::<Utc>::from_utc(
@@ -129,6 +128,7 @@ fn on_user_updated(old: &User, new: &User, _: Option<&ReducerEvent>) -> Option<R
             return Some(RemoteUpdate::UserStatusUpdated(
                 UniqueUserId::new(identity_leading_hex(&new.identity)),
                 Username::new(new.name.clone().unwrap_or_default()),
+                new.online,
                 sensor_data,
                 time,
             ));
