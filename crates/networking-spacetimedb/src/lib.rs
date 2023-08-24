@@ -11,7 +11,7 @@ use spacetimedb_sdk::{
     },
     reducer::Status,
     subscribe,
-    table::TableWithPrimaryKey,
+    table::{TableType, TableWithPrimaryKey},
 };
 
 #[cfg(debug_assertions)]
@@ -29,7 +29,7 @@ const DB_NAME: &str = "gwaihir-test2";
 pub struct SpacetimeDBInterface {}
 
 impl NetworkInterface for SpacetimeDBInterface {
-    fn new(update_callback: impl Fn(RemoteUpdate) + Send + 'static) -> Self {
+    fn new(update_callback: impl Fn(RemoteUpdate) + Send + Clone + 'static) -> Self {
         register_callbacks(update_callback);
         connect_to_db();
         subscribe_to_tables();
@@ -52,12 +52,16 @@ impl NetworkInterface for SpacetimeDBInterface {
 }
 
 /// Register all the callbacks our app will use to respond to database events.
-fn register_callbacks(update_callback: impl Fn(RemoteUpdate) + Send + 'static) {
+fn register_callbacks(update_callback: impl Fn(RemoteUpdate) + Send + 'static + Clone) {
     // // When we receive our `Credentials`, save them to a file.
     once_on_connect(on_connected);
 
-    // // When a new user joins, print a notification.
-    // User::on_insert(on_user_inserted);
+    let callback_clone = update_callback.clone();
+    User::on_insert(move |a, _| {
+        if let Some(update) = generate_remote_update(a) {
+            callback_clone(update);
+        }
+    });
 
     // When a user's status changes, print a notification.
     User::on_update(move |a, b, c| {
@@ -120,23 +124,29 @@ fn on_user_updated(old: &User, new: &User, _: Option<&ReducerEvent>) -> Option<R
         || old.name != new.name
         || old.online != new.online
     {
-        if let Some(status) = new.status.clone() {
-            let sensor_data = serde_json::from_str(&status).unwrap();
-            let time = DateTime::<Utc>::from_utc(
-                NaiveDateTime::from_timestamp_micros(
-                    new.last_status_update.unwrap().try_into().unwrap(),
-                )
-                .unwrap(),
-                Utc,
-            );
-            return Some(RemoteUpdate::UserStatusUpdated(
-                UniqueUserId::new(identity_leading_hex(&new.identity)),
-                Username::new(new.name.clone().unwrap_or_default()),
-                new.online,
-                sensor_data,
-                time,
-            ));
-        }
+        return generate_remote_update(new);
+    }
+
+    None
+}
+
+fn generate_remote_update(new: &User) -> Option<RemoteUpdate> {
+    if let Some(status) = new.status.clone() {
+        let sensor_data = serde_json::from_str(&status).unwrap();
+        let time = DateTime::<Utc>::from_utc(
+            NaiveDateTime::from_timestamp_micros(
+                new.last_status_update.unwrap().try_into().unwrap(),
+            )
+            .unwrap(),
+            Utc,
+        );
+        return Some(RemoteUpdate::UserStatusUpdated(
+            UniqueUserId::new(identity_leading_hex(&new.identity)),
+            Username::new(new.name.clone().unwrap_or_default()),
+            new.online,
+            sensor_data,
+            time,
+        ));
     }
 
     None

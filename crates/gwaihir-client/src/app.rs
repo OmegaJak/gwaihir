@@ -308,7 +308,7 @@ fn init_lock_status_sensor(
 fn get_remote_update_callback(
     network_tx: Sender<RemoteUpdate>,
     ctx_clone: egui::Context,
-) -> impl Fn(RemoteUpdate) {
+) -> impl Fn(RemoteUpdate) + Clone {
     move |update| {
         network_tx.send(update).unwrap();
         ctx_clone.request_repaint();

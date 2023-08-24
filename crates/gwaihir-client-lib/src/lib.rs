@@ -17,7 +17,7 @@ pub enum RemoteUpdate {
 }
 
 pub trait NetworkInterface {
-    fn new(update_callback: impl Fn(RemoteUpdate) + Send + 'static) -> Self;
+    fn new(update_callback: impl Fn(RemoteUpdate) + Send + Clone + 'static) -> Self;
     fn publish_status_update(&self, status: SensorData);
     fn set_username(&self, name: String);
     fn get_current_user_id(&self) -> Option<UniqueUserId>;
