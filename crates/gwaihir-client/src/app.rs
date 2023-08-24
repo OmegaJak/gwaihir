@@ -1,11 +1,15 @@
 use std::{
     cell::RefCell,
+    collections::HashMap,
     rc::Rc,
     sync::mpsc::{self, Receiver, Sender, TryRecvError},
     time::Duration,
 };
 
-use gwaihir_client_lib::{NetworkInterface, RemoteUpdate, SensorData};
+use gwaihir_client_lib::{
+    chrono::{DateTime, Utc},
+    NetworkInterface, RemoteUpdate, SensorData,
+};
 use networking_spacetimedb::SpacetimeDBInterface;
 use raw_window_handle::HasRawWindowHandle;
 
@@ -33,10 +37,56 @@ pub struct TemplateApp<N> {
     // #[serde(skip)]
     tx_to_monitor_thread: Sender<MainToMonitorMessages>,
     rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
-    last_sensor_data: SensorData,
+    current_status: HashMap<String, UserStatus>,
 
     network: N,
     network_rx: Receiver<RemoteUpdate>,
+}
+
+pub struct UserStatus {
+    pub username: String,
+    pub is_online: bool,
+    pub sensor_data: SensorData,
+    pub last_update: DateTime<Utc>,
+}
+
+impl UserStatus {
+    fn update(&mut self, remote_update: &RemoteUpdate) {
+        match remote_update {
+            RemoteUpdate::UserStatusUpdated(user_id, username, sensor_data, update_time) => {
+                self.username = if username.as_ref().is_empty() {
+                    user_id.clone().into()
+                } else {
+                    username.clone().into()
+                };
+                self.sensor_data = sensor_data.clone();
+                self.last_update = update_time.clone();
+            }
+        }
+    }
+}
+
+impl From<RemoteUpdate> for UserStatus {
+    fn from(update: RemoteUpdate) -> Self {
+        match update {
+            RemoteUpdate::UserStatusUpdated(_, _, _, _) => {
+                let mut status = UserStatus::default();
+                status.update(&update);
+                status
+            }
+        }
+    }
+}
+
+impl Default for UserStatus {
+    fn default() -> Self {
+        Self {
+            is_online: false,
+            username: Default::default(),
+            sensor_data: Default::default(),
+            last_update: Default::default(),
+        }
+    }
 }
 
 // impl Default for TemplateApp {
@@ -88,7 +138,7 @@ where
             tray_icon_data: None,
             tx_to_monitor_thread,
             rx_from_monitor_thread,
-            last_sensor_data: SensorData::default(),
+            current_status: HashMap::new(),
 
             network: NetworkInterface::new(get_remote_update_callback(network_tx, ctx_clone)),
             network_rx,
@@ -119,13 +169,18 @@ where
         }
 
         while let Ok(update) = self.network_rx.try_recv() {
-            match update {
-                RemoteUpdate::UserStatusUpdated(user_name, sensor_data, update_time) => {
-                    println!("Sensor update for {} at {}", user_name, update_time);
-                    self.last_sensor_data = sensor_data;
-                }
+            let user_id = match &update {
+                RemoteUpdate::UserStatusUpdated(user_id, _, _, _) => user_id,
+            };
+
+            if subscribed_to_user(user_id) {
+                self.current_status
+                    .entry(user_id.clone().into())
+                    .and_modify(|status| status.update(&update))
+                    .or_insert(update.into());
             }
         }
+        // println!("Sensor update for {} at {}", descriptor, update_time);
 
         if let Some(icon_data) = self.tray_icon_data.take() {
             // println!("Checking tray");
@@ -159,69 +214,35 @@ where
             });
         });
 
-        egui::SidePanel::left("side_panel").show(ctx, |ui| {
-            ui.heading("Side Panel");
-
-            ui.horizontal(|ui| {
-                ui.label("Write something: ");
-                ui.text_edit_singleline(&mut self.label);
-            });
-
-            ui.add(egui::Slider::new(&mut self.value, 0.0..=10.0).text("value"));
-            if ui.button("Increment").clicked() {
-                self.value += 1.0;
-            }
-
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 0.0;
-                    ui.label("powered by ");
-                    ui.hyperlink_to("egui", "https://github.com/emilk/egui");
-                    ui.label(" and ");
-                    ui.hyperlink_to(
-                        "eframe",
-                        "https://github.com/emilk/egui/tree/master/crates/eframe",
-                    );
-                    ui.label(".");
-                });
-            });
-        });
-
         egui::CentralPanel::default().show(ctx, |ui| {
-            // The central panel the region left after adding TopPanel's and SidePanel's
-            ui.heading("Sensor Data");
-            ui.collapsing_default_open("Lock/Unlocks", |ui| {
-                ui.label(format!("Times Locked: {}", self.last_sensor_data.num_locks));
-                ui.label(format!(
-                    "Times Unlocked: {}",
-                    self.last_sensor_data.num_unlocks
-                ));
-            });
-            ui.collapsing_default_open("Microphone Usage", |ui| {
-                ui.label(format!(
-                    "{} app(s) currently listening to the microphone",
-                    self.last_sensor_data.microphone_usage.len()
-                ));
-                for usage in self.last_sensor_data.microphone_usage.iter() {
-                    let pretty_name = usage.app_name.replace("#", "\\");
-                    ui.label(pretty_name);
-                }
-            });
+            for status in self.current_status.values() {
+                ui.heading(status.username.clone());
+                ui.collapsing_default_open("Lock/Unlocks", |ui| {
+                    ui.label(format!("Times Locked: {}", status.sensor_data.num_locks));
+                    ui.label(format!(
+                        "Times Unlocked: {}",
+                        status.sensor_data.num_unlocks
+                    ));
+                });
+                ui.collapsing_default_open("Microphone Usage", |ui| {
+                    ui.label(format!(
+                        "{} app(s) currently listening to the microphone",
+                        status.sensor_data.microphone_usage.len()
+                    ));
+                    for usage in status.sensor_data.microphone_usage.iter() {
+                        let pretty_name = usage.app_name.replace("#", "\\");
+                        ui.label(pretty_name);
+                    }
+                });
+            }
 
             egui::warn_if_debug_build(ui);
         });
-
-        if false {
-            egui::Window::new("Window").show(ctx, |ui| {
-                ui.label("Windows can be moved by dragging them.");
-                ui.label("They are automatically sized based on contents.");
-                ui.label("You can turn on resizing and scrolling if you like.");
-                ui.label("You would normally choose either panels OR windows.");
-            });
-        }
-
-        ctx.request_repaint_after(Duration::from_secs_f64(1.0));
     }
+}
+
+fn subscribed_to_user(user_id: &gwaihir_client_lib::UniqueUserId) -> bool {
+    true
 }
 
 fn init_lock_status_sensor(

@@ -1,10 +1,19 @@
 use chrono::{DateTime, Utc};
+use nutype::nutype;
 use serde::{Deserialize, Serialize};
 
 pub use chrono;
 
+#[nutype]
+#[derive(AsRef, Clone, Into)]
+pub struct UniqueUserId(String);
+
+#[nutype]
+#[derive(AsRef, Clone, Into)]
+pub struct Username(String);
+
 pub enum RemoteUpdate {
-    UserStatusUpdated(String, SensorData, DateTime<Utc>),
+    UserStatusUpdated(UniqueUserId, Username, SensorData, DateTime<Utc>),
 }
 
 pub trait NetworkInterface {

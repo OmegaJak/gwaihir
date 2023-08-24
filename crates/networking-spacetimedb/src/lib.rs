@@ -2,7 +2,7 @@ mod module_bindings;
 
 use gwaihir_client_lib::{
     chrono::{DateTime, NaiveDateTime, Utc},
-    NetworkInterface, RemoteUpdate, SensorData,
+    NetworkInterface, RemoteUpdate, SensorData, UniqueUserId, Username,
 };
 use module_bindings::*;
 use spacetimedb_sdk::{
@@ -127,7 +127,8 @@ fn on_user_updated(old: &User, new: &User, _: Option<&ReducerEvent>) -> Option<R
                 Utc,
             );
             return Some(RemoteUpdate::UserStatusUpdated(
-                new.name.clone().unwrap_or_default(),
+                UniqueUserId::new(identity_leading_hex(&new.identity)),
+                Username::new(new.name.clone().unwrap_or_default()),
                 sensor_data,
                 time,
             ));

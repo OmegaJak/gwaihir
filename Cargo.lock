@@ -1760,6 +1760,7 @@ name = "gwaihir-client-lib"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "nutype",
  "serde",
 ]
 
@@ -2449,6 +2450,26 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.29",
+]
+
+[[package]]
+name = "nutype"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ae1c26994c543093dea62dc235aba699a8ea1ba5bcab09449a757449a643a91"
+dependencies = [
+ "nutype_macros",
+]
+
+[[package]]
+name = "nutype_macros"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f23758ee2f73e58d93bad0e422ed9cbb9a9609797c2ee3b27f8c1537b38a2ca"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]

@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 serde = { version = "1.0.185", features = ["derive"] }
 chrono = "0.4.26"
+nutype = "0.3.1"
