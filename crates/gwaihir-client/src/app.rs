@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     rc::Rc,
-    sync::mpsc::{Receiver, Sender, TryRecvError},
+    sync::mpsc::{self, Receiver, Sender, TryRecvError},
     time::Duration,
 };
 
@@ -36,6 +36,7 @@ pub struct TemplateApp<N> {
     last_sensor_data: SensorData,
 
     network: N,
+    network_rx: Receiver<RemoteUpdate>,
 }
 
 // impl Default for TemplateApp {
@@ -79,6 +80,8 @@ where
         //     Default::default()
         // };
 
+        let (network_tx, network_rx) = mpsc::channel();
+        let ctx_clone = cc.egui_ctx.clone();
         TemplateApp {
             label: "Hello World!".to_owned(),
             value: 2.7,
@@ -87,7 +90,8 @@ where
             rx_from_monitor_thread,
             last_sensor_data: SensorData::default(),
 
-            network: NetworkInterface::new(),
+            network: NetworkInterface::new(get_remote_update_callback(network_tx, ctx_clone)),
+            network_rx,
         }
     }
 }
@@ -114,8 +118,8 @@ where
             }
         }
 
-        for remote_update in self.network.receive_updates().into_iter() {
-            match remote_update {
+        while let Ok(update) = self.network_rx.try_recv() {
+            match update {
                 RemoteUpdate::UserStatusUpdated(user_name, sensor_data, update_time) => {
                     println!("Sensor update for {} at {}", user_name, update_time);
                     self.last_sensor_data = sensor_data;
@@ -235,5 +239,15 @@ fn init_lock_status_sensor(
             }
         }
         _ => todo!(),
+    }
+}
+
+fn get_remote_update_callback(
+    network_tx: Sender<RemoteUpdate>,
+    ctx_clone: egui::Context,
+) -> impl Fn(RemoteUpdate) {
+    move |update| {
+        network_tx.send(update).unwrap();
+        ctx_clone.request_repaint();
     }
 }

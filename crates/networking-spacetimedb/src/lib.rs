@@ -1,5 +1,4 @@
 mod module_bindings;
-use std::sync::mpsc::{self, Receiver, Sender};
 
 use gwaihir_client_lib::{
     chrono::{DateTime, NaiveDateTime, Utc},
@@ -21,37 +20,25 @@ const SPACETIMEDB_URI: &str = "https://testnet.spacetimedb.com";
 /// The module name we chose when we published our module.
 const DB_NAME: &str = "gwaihir-test2";
 
-pub struct SpacetimeDBInterface {
-    receiver: Receiver<RemoteUpdate>,
-}
+pub struct SpacetimeDBInterface {}
 
 impl NetworkInterface for SpacetimeDBInterface {
-    fn new() -> Self {
-        let (tx, rx) = mpsc::channel();
-        register_callbacks(tx);
+    fn new(update_callback: impl Fn(RemoteUpdate) + Send + 'static) -> Self {
+        register_callbacks(update_callback);
         connect_to_db();
         subscribe_to_tables();
 
-        Self { receiver: rx }
+        Self {}
     }
 
     fn publish_status_update(&self, status: SensorData) {
         let json = serde_json::to_string(&status).unwrap();
         set_status(json);
     }
-
-    fn receive_updates(&self) -> Vec<RemoteUpdate> {
-        let mut updates = Vec::new();
-        while let Ok(update) = self.receiver.try_recv() {
-            updates.push(update);
-        }
-
-        updates
-    }
 }
 
 /// Register all the callbacks our app will use to respond to database events.
-fn register_callbacks(sender: Sender<RemoteUpdate>) {
+fn register_callbacks(update_callback: impl Fn(RemoteUpdate) + Send + 'static) {
     // // When we receive our `Credentials`, save them to a file.
     once_on_connect(on_connected);
 
@@ -59,7 +46,11 @@ fn register_callbacks(sender: Sender<RemoteUpdate>) {
     // User::on_insert(on_user_inserted);
 
     // When a user's status changes, print a notification.
-    User::on_update(move |a, b, c| on_user_updated(a, b, c, sender.clone()));
+    User::on_update(move |a, b, c| {
+        if let Some(update) = on_user_updated(a, b, c) {
+            update_callback(update);
+        }
+    });
 
     // // When we receive the message backlog, print it in timestamp order.
     // on_subscription_applied(on_sub_applied);
@@ -110,7 +101,7 @@ fn identity_leading_hex(id: &Identity) -> String {
 
 /// Our `User::on_update` callback:
 /// print a notification about name and status changes.
-fn on_user_updated(old: &User, new: &User, _: Option<&ReducerEvent>, sender: Sender<RemoteUpdate>) {
+fn on_user_updated(old: &User, new: &User, _: Option<&ReducerEvent>) -> Option<RemoteUpdate> {
     // if old.name != new.name {
     //     println!(
     //         "User {} renamed to {}.",
@@ -135,15 +126,15 @@ fn on_user_updated(old: &User, new: &User, _: Option<&ReducerEvent>, sender: Sen
                 .unwrap(),
                 Utc,
             );
-            sender
-                .send(RemoteUpdate::UserStatusUpdated(
-                    new.name.clone().unwrap_or_default(),
-                    sensor_data,
-                    time,
-                ))
-                .unwrap();
+            return Some(RemoteUpdate::UserStatusUpdated(
+                new.name.clone().unwrap_or_default(),
+                sensor_data,
+                time,
+            ));
         }
     }
+
+    None
 }
 
 /// Our `on_subscription_applied` callback:

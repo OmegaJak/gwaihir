@@ -8,9 +8,8 @@ pub enum RemoteUpdate {
 }
 
 pub trait NetworkInterface {
-    fn new() -> Self;
+    fn new(update_callback: impl Fn(RemoteUpdate) + Send + 'static) -> Self;
     fn publish_status_update(&self, status: SensorData);
-    fn receive_updates(&self) -> Vec<RemoteUpdate>;
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
