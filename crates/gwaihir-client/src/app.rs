@@ -1,5 +1,6 @@
 use std::{
     cell::RefCell,
+    cmp::Ordering,
     collections::HashMap,
     rc::Rc,
     sync::mpsc::{self, Receiver, Sender, TryRecvError},
@@ -100,6 +101,36 @@ where
             persistence,
         }
     }
+
+    fn get_filtered_sorted_user_status_list(&self) -> Vec<(UniqueUserId, UserStatus)> {
+        let mut user_status_list = self
+            .current_status
+            .iter()
+            .filter(|(id, _)| self.subscribed_to_user(&id))
+            .map(|(id, status)| (id.clone(), status.clone()))
+            .collect::<Vec<_>>();
+
+        // Sort to ensure current user is on top
+        user_status_list.sort_by(|(id_a, _), (id_b, _)| {
+            if self
+                .current_user_id
+                .as_ref()
+                .is_some_and(|own_id| own_id == id_a)
+            {
+                Ordering::Less
+            } else if self
+                .current_user_id
+                .as_ref()
+                .is_some_and(|own_id| own_id == id_b)
+            {
+                Ordering::Equal
+            } else {
+                id_a.cmp(id_b)
+            }
+        });
+
+        user_status_list
+    }
 }
 
 impl<N> eframe::App for TemplateApp<N>
@@ -175,11 +206,8 @@ where
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            for (id, status) in &self.current_status {
-                if !self.subscribed_to_user(id) {
-                    continue;
-                }
-
+            let user_status_list = self.get_filtered_sorted_user_status_list();
+            for (id, status) in user_status_list.iter() {
                 ui.horizontal(|ui| {
                     ui.heading(status.display_name());
                     if let Some(current_user_id) = &self.current_user_id {
@@ -195,7 +223,7 @@ where
                                 self.set_name_input = String::new();
                             }
                         } else if ui.button("x").clicked() {
-                            self.persistence.ignored_users.insert(id.clone().into());
+                            self.persistence.ignored_users.insert((*id).clone().into());
                         }
                     }
                 });

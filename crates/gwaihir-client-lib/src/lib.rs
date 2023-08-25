@@ -11,7 +11,7 @@ pub const APP_ID: &str = "gwaihir-debug";
 pub const APP_ID: &str = "gwaihir";
 
 #[nutype]
-#[derive(AsRef, Clone, Into, Hash, Eq, PartialEq)]
+#[derive(Deref, AsRef, Clone, Into, Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub struct UniqueUserId(String);
 
 #[nutype]
@@ -22,6 +22,7 @@ pub enum RemoteUpdate {
     UserStatusUpdated(UserStatus),
 }
 
+#[derive(Clone)]
 pub struct UserStatus {
     pub user_id: UniqueUserId,
     pub username: Username,
