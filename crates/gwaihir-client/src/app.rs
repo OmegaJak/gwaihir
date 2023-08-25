@@ -10,7 +10,7 @@ use std::{
 use egui::{epaint::ahash::HashSet, CollapsingHeader, TextEdit, Widget};
 use gwaihir_client_lib::{
     chrono::{DateTime, Utc},
-    NetworkInterface, RemoteUpdate, SensorData, UniqueUserId, UserStatus, Username,
+    NetworkInterface, RemoteUpdate, SensorData, UniqueUserId, UserStatus, Username, APP_ID,
 };
 
 use raw_window_handle::HasRawWindowHandle;
@@ -21,6 +21,7 @@ use crate::{
     sensor_monitor_thread::{MainToMonitorMessages, MonitorToMainMessages},
     tray_icon::{hide_to_tray, TrayIconData},
     ui_extension_methods::UIExtensionMethods,
+    widgets::auto_launch_checkbox::{AutoLaunchCheckbox, AutoLaunchCheckboxUiExtension},
 };
 
 #[derive(Serialize, Deserialize)]
@@ -189,6 +190,8 @@ where
             // The top panel is often a good place for a menu bar:
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
+                    ui.auto_launch_checkbox(APP_ID.to_string(), None);
+
                     if ui.button("Hide to tray").clicked() {
                         let tray_icon_data = hide_to_tray(frame);
                         self.tray_icon_data = Some(tray_icon_data);

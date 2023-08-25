@@ -7,6 +7,7 @@ mod microphone_usage_sensor;
 mod sensor_monitor_thread;
 mod tray_icon;
 mod ui_extension_methods;
+mod widgets;
 pub use app::TemplateApp;
 
 // When compiling natively:
