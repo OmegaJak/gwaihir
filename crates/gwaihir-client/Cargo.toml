@@ -24,7 +24,7 @@ tray-icon = "0.8.0"
 thiserror = "1.0.44"
 winreg = "0.50.0"
 lodepng = "3.7.2"
-auto-launch = "0.4.0"
+auto-launch = { git = "https://github.com/OmegaJak/auto-launch", branch = "report_task_manager_disabled_as_disabled" } # Until https://github.com/zzzgydi/auto-launch/pull/8 is merged and available
 
 # local:
 gwaihir-client-lib = { path = "../gwaihir-client-lib" }
