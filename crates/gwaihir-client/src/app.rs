@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use egui::{epaint::ahash::HashSet, CollapsingHeader, TextEdit, Widget};
+use egui::{epaint::ahash::HashSet, CollapsingHeader, Color32, RichText, TextEdit, Widget};
 use gwaihir_client_lib::{
     chrono::{DateTime, Utc},
     NetworkInterface, RemoteUpdate, SensorData, UniqueUserId, UserStatus, Username, APP_ID,
@@ -212,6 +212,8 @@ where
             let user_status_list = self.get_filtered_sorted_user_status_list();
             for (id, status) in user_status_list.iter() {
                 ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 2.0;
+                    show_online_status(status, ui);
                     ui.heading(status.display_name());
                     if let Some(current_user_id) = &self.current_user_id {
                         if id == current_user_id {
@@ -230,9 +232,8 @@ where
                         }
                     }
                 });
-                ui.label(format!("Is currently online: {}", status.is_online));
+                show_lock_status(status, ui);
                 CollapsingHeader::new("Locks/Unlocks")
-                    .default_open(true)
                     .id_source(format!("{}_locks", id.as_ref()))
                     .show(ui, |ui| {
                         ui.label(format!("Times Locked: {}", status.sensor_data.num_locks));
@@ -267,6 +268,21 @@ impl<N> TemplateApp<N> {
             .persistence
             .ignored_users
             .contains(user_id.as_ref().into())
+    }
+}
+fn show_online_status(status: &UserStatus, ui: &mut egui::Ui) {
+    let mut online_color = Color32::RED;
+    if status.is_online {
+        online_color = Color32::GREEN;
+    }
+    ui.label(RichText::new("⏺ ").color(online_color).heading());
+}
+
+fn show_lock_status(status: &UserStatus, ui: &mut egui::Ui) {
+    if status.sensor_data.num_locks > status.sensor_data.num_unlocks {
+        ui.label(RichText::new("Currently Locked").color(Color32::RED));
+    } else {
+        ui.label(RichText::new("Currently Unlocked").color(Color32::DARK_GREEN));
     }
 }
 
