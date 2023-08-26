@@ -5,6 +5,7 @@ use gwaihir_client_lib::{
     NetworkInterface, RemoteUpdate, SensorData, UniqueUserId, UserStatus, Username, APP_ID,
 };
 use module_bindings::*;
+use serde::Serialize;
 use spacetimedb_sdk::{
     identity::{
         identity, load_credentials, once_on_connect, save_credentials, Credentials, Identity,
@@ -31,8 +32,8 @@ impl NetworkInterface for SpacetimeDBInterface {
         Self {}
     }
 
-    fn publish_status_update(&self, status: SensorData) {
-        let json = serde_json::to_string(&status).unwrap();
+    fn publish_update(&self, sensor_outputs: impl Serialize) {
+        let json = serde_json::to_string(&sensor_outputs).unwrap();
         set_status(json);
     }
 

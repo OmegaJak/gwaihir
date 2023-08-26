@@ -88,7 +88,7 @@ impl SensorMonitor {
 
     fn check_sensor_updates(&mut self) -> bool {
         let initial_sensor_data = self.sensor_data.clone();
-        if let Some(mut sensor) = self.lock_status_sensor.take() {
+        if let Some(sensor) = self.lock_status_sensor.as_mut() {
             match sensor.recv() {
                 Some(SessionEvent::Locked) => {
                     self.sensor_data.num_locks += 1;
@@ -98,8 +98,6 @@ impl SensorMonitor {
                 }
                 None => (),
             }
-
-            self.lock_status_sensor = Some(sensor);
         }
 
         let microphone_usage = self.microphone_usage_sensor.check_microphone_usage();

@@ -156,7 +156,7 @@ where
                 panic!("The background thread unexpected disconnected!");
             }
             Ok(MonitorToMainMessages::UpdatedSensorData(sensor_data)) => {
-                self.network.publish_status_update(sensor_data);
+                self.network.publish_update(sensor_data);
             }
         }
 
@@ -232,16 +232,9 @@ where
                         }
                     }
                 });
-                show_lock_status(status, ui);
-                CollapsingHeader::new("Locks/Unlocks")
-                    .id_source(format!("{}_locks", id.as_ref()))
-                    .show(ui, |ui| {
-                        ui.label(format!("Times Locked: {}", status.sensor_data.num_locks));
-                        ui.label(format!(
-                            "Times Unlocked: {}",
-                            status.sensor_data.num_unlocks
-                        ));
-                    });
+
+                show_lock_status(status, ui, id);
+
                 CollapsingHeader::new("Microphone Usage")
                     .default_open(true)
                     .id_source(format!("{}_mic", id.as_ref()))
@@ -270,20 +263,13 @@ impl<N> TemplateApp<N> {
             .contains(user_id.as_ref().into())
     }
 }
+
 fn show_online_status(status: &UserStatus, ui: &mut egui::Ui) {
     let mut online_color = Color32::RED;
     if status.is_online {
         online_color = Color32::GREEN;
     }
     ui.label(RichText::new("⏺ ").color(online_color).heading());
-}
-
-fn show_lock_status(status: &UserStatus, ui: &mut egui::Ui) {
-    if status.sensor_data.num_locks > status.sensor_data.num_unlocks {
-        ui.label(RichText::new("Currently Locked").color(Color32::RED));
-    } else {
-        ui.label(RichText::new("Currently Unlocked").color(Color32::DARK_GREEN));
-    }
 }
 
 fn init_lock_status_sensor(

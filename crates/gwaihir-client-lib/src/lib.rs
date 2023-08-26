@@ -43,7 +43,7 @@ impl UserStatus {
 
 pub trait NetworkInterface {
     fn new(update_callback: impl Fn(RemoteUpdate) + Send + Clone + 'static) -> Self;
-    fn publish_status_update(&self, status: SensorData);
+    fn publish_update(&self, sensor_outputs: impl Serialize);
     fn set_username(&self, name: String);
     fn get_current_user_id(&self) -> Option<UniqueUserId>;
 }

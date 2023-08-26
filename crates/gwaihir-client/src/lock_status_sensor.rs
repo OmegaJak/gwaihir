@@ -49,8 +49,7 @@ impl LockStatusSensorBuilder {
         self,
         native_options: &mut eframe::NativeOptions,
     ) -> Rc<RefCell<Option<EventLoopRegisteredLockStatusSensorBuilder>>> {
-        let registered_builder: Rc<RefCell<Option<EventLoopRegisteredLockStatusSensorBuilder>>> =
-            Rc::new(RefCell::new(None));
+        let registered_builder = Rc::new(RefCell::new(None));
         let builder_clone = registered_builder.clone();
 
         native_options.event_loop_builder = Some(Box::new(move |builder| {
