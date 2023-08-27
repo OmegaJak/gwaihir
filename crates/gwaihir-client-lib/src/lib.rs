@@ -10,12 +10,22 @@ pub const APP_ID: &str = "gwaihir-debug";
 #[cfg(not(debug_assertions))]
 pub const APP_ID: &str = "gwaihir";
 
-#[nutype]
-#[derive(Deref, AsRef, Clone, Into, Hash, Eq, PartialEq, PartialOrd, Ord)]
+#[nutype(derive(
+    Deref,
+    AsRef,
+    Clone,
+    Into,
+    Hash,
+    Eq,
+    PartialEq,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+))]
 pub struct UniqueUserId(String);
 
-#[nutype]
-#[derive(AsRef, Clone, Into)]
+#[nutype(derive(AsRef, Clone, Into))]
 pub struct Username(String);
 
 pub enum RemoteUpdate {

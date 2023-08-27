@@ -26,7 +26,7 @@ use crate::{
 
 #[derive(Serialize, Deserialize)]
 pub struct Persistence {
-    pub ignored_users: HashSet<String>,
+    pub ignored_users: HashSet<UniqueUserId>,
 }
 
 impl Persistence {
@@ -263,11 +263,8 @@ where
 }
 
 impl<N> TemplateApp<N> {
-    fn subscribed_to_user(&self, user_id: &gwaihir_client_lib::UniqueUserId) -> bool {
-        !self
-            .persistence
-            .ignored_users
-            .contains(user_id.as_ref().into())
+    fn subscribed_to_user(&self, user_id: &UniqueUserId) -> bool {
+        !self.persistence.ignored_users.contains(user_id)
     }
 }
 fn show_online_status(status: &UserStatus, ui: &mut egui::Ui) {
