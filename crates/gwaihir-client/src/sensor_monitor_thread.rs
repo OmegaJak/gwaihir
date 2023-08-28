@@ -5,11 +5,9 @@ use std::{
     time::Duration,
 };
 
-use gwaihir_client_lib::SensorData;
-
 use crate::{
-    lock_status_sensor::{LockStatusSensor, SessionEvent},
-    microphone_usage_sensor::MicrophoneUsageSensor,
+    lock_status_sensor::LockStatusSensor, microphone_usage_sensor::MicrophoneUsageSensor,
+    sensor_outputs::SensorOutputs,
 };
 
 const THREAD_SLEEP_DURATION_MS: u64 = 50;
@@ -20,7 +18,7 @@ pub enum MainToMonitorMessages {
 }
 
 pub enum MonitorToMainMessages {
-    UpdatedSensorData(SensorData),
+    UpdatedSensorOutputs(SensorOutputs),
 }
 
 struct SensorMonitor {
@@ -72,7 +70,7 @@ impl SensorMonitor {
 
             if self.check_sensor_updates() {
                 self.tx_to_main
-                    .send(MonitorToMainMessages::UpdatedSensorData(
+                    .send(MonitorToMainMessages::UpdatedSensorOutputs(
                         self.sensor_data.clone(),
                     ))
                     .unwrap();

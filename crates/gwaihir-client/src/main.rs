@@ -4,14 +4,13 @@
 use crate::sensor_monitor_thread::{create_sensor_monitor_thread, MainToMonitorMessages};
 pub use app::TemplateApp;
 use gwaihir_client_lib::APP_ID;
-use lock_status_sensor::LockStatusSensorBuilder;
 use networking_spacetimedb::SpacetimeDBInterface;
+use sensors::lock_status_sensor::LockStatusSensorBuilder;
 
 mod app;
-mod lock_status_sensor;
-mod microphone_usage_sensor;
 mod sensor_monitor_thread;
 mod sensor_outputs;
+mod sensors;
 mod tray_icon;
 mod ui_extension_methods;
 mod widgets;

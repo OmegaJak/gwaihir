@@ -1,7 +1,8 @@
-use gwaihir_client_lib::MicrophoneUsage;
 use std::time::{Duration, Instant};
 use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
 use winreg::RegKey;
+
+use crate::sensor_outputs::microphone_usage::AppMicrophoneUsage;
 
 pub struct MicrophoneUsageSensor {
     last_check_time: Instant,
@@ -14,7 +15,7 @@ impl MicrophoneUsageSensor {
         }
     }
 
-    pub fn check_microphone_usage(&mut self) -> Option<Vec<MicrophoneUsage>> {
+    pub fn check_microphone_usage(&mut self) -> Option<Vec<AppMicrophoneUsage>> {
         let now = Instant::now();
         if now.duration_since(self.last_check_time) > Duration::from_millis(500) {
             let all_programs_using_microphone = get_all_programs_using_microphone();
@@ -26,7 +27,7 @@ impl MicrophoneUsageSensor {
     }
 }
 
-fn get_all_programs_using_microphone() -> Vec<MicrophoneUsage> {
+fn get_all_programs_using_microphone() -> Vec<AppMicrophoneUsage> {
     // If performance becomes a concern, we could maybe usage RegNotifyChangeKeyValue (https://learn.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regnotifychangekeyvalue)
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let microphone_packaged_store = hkcu.open_subkey_with_flags("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone", KEY_READ).unwrap();
@@ -39,12 +40,12 @@ fn get_all_programs_using_microphone() -> Vec<MicrophoneUsage> {
     in_use
 }
 
-fn get_microphone_usage_list(parent_regkey: winreg::RegKey) -> Vec<MicrophoneUsage> {
+fn get_microphone_usage_list(parent_regkey: winreg::RegKey) -> Vec<AppMicrophoneUsage> {
     parent_regkey
         .enum_keys()
         .filter_map(|x| x.ok())
         .filter_map(|key| {
-            Some(MicrophoneUsage {
+            Some(AppMicrophoneUsage {
                 app_name: key.clone(),
                 last_used: parent_regkey
                     .open_subkey_with_flags(key, KEY_READ)

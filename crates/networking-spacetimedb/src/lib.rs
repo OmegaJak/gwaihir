@@ -2,10 +2,10 @@ mod module_bindings;
 
 use gwaihir_client_lib::{
     chrono::{DateTime, NaiveDateTime, Utc},
-    NetworkInterface, RemoteUpdate, SensorData, UniqueUserId, UserStatus, Username, APP_ID,
+    NetworkInterface, UniqueUserId, UserStatus, Username, APP_ID,
 };
 use module_bindings::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use spacetimedb_sdk::{
     identity::{
         identity, load_credentials, once_on_connect, save_credentials, Credentials, Identity,
@@ -23,8 +23,11 @@ const DB_NAME: &str = "gwaihir-test2";
 
 pub struct SpacetimeDBInterface {}
 
-impl NetworkInterface for SpacetimeDBInterface {
-    fn new(update_callback: impl Fn(RemoteUpdate) + Send + Clone + 'static) -> Self {
+impl<T> NetworkInterface<T> for SpacetimeDBInterface
+where
+    T: Serialize + for<'a> Deserialize<'a>,
+{
+    fn new(update_callback: impl Fn(UserStatus<T>) + Send + Clone + 'static) -> Self {
         register_callbacks(update_callback);
         connect_to_db();
         subscribe_to_tables();
@@ -32,7 +35,7 @@ impl NetworkInterface for SpacetimeDBInterface {
         Self {}
     }
 
-    fn publish_update(&self, sensor_outputs: impl Serialize) {
+    fn publish_update(&self, sensor_outputs: T) {
         let json = serde_json::to_string(&sensor_outputs).unwrap();
         set_status(json);
     }
@@ -47,13 +50,16 @@ impl NetworkInterface for SpacetimeDBInterface {
 }
 
 /// Register all the callbacks our app will use to respond to database events.
-fn register_callbacks(update_callback: impl Fn(RemoteUpdate) + Send + 'static + Clone) {
+fn register_callbacks<T>(update_callback: impl Fn(UserStatus<T>) + Send + 'static + Clone)
+where
+    T: for<'a> Deserialize<'a>,
+{
     // // When we receive our `Credentials`, save them to a file.
     once_on_connect(on_connected);
 
     let callback_clone = update_callback.clone();
     User::on_insert(move |a, _| {
-        if let Some(update) = generate_remote_update(a) {
+        if let Some(update) = convert_to_user_status(a) {
             callback_clone(update);
         }
     });
@@ -114,18 +120,24 @@ fn identity_leading_hex(id: &Identity) -> String {
 
 /// Our `User::on_update` callback:
 /// print a notification about name and status changes.
-fn on_user_updated(old: &User, new: &User, _: Option<&ReducerEvent>) -> Option<RemoteUpdate> {
+fn on_user_updated<T>(old: &User, new: &User, _: Option<&ReducerEvent>) -> Option<UserStatus<T>>
+where
+    T: for<'a> Deserialize<'a>,
+{
     if new.last_status_update != old.last_status_update
         || old.name != new.name
         || old.online != new.online
     {
-        return generate_remote_update(new);
+        return convert_to_user_status(new);
     }
 
     None
 }
 
-fn generate_remote_update(new: &User) -> Option<RemoteUpdate> {
+fn convert_to_user_status<T>(new: &User) -> Option<UserStatus<T>>
+where
+    T: for<'a> Deserialize<'a>,
+{
     if let Some(status) = new.status.clone() {
         let sensor_data = serde_json::from_str(&status).unwrap();
         let last_update = DateTime::<Utc>::from_utc(
@@ -135,13 +147,13 @@ fn generate_remote_update(new: &User) -> Option<RemoteUpdate> {
             .unwrap(),
             Utc,
         );
-        return Some(RemoteUpdate::UserStatusUpdated(UserStatus {
+        return Some(UserStatus {
             user_id: UniqueUserId::new(identity_leading_hex(&new.identity)),
             username: Username::new(new.name.clone().unwrap_or_default()),
             is_online: new.online,
-            sensor_data,
+            sensor_outputs: sensor_data,
             last_update,
-        }));
+        });
     }
 
     None

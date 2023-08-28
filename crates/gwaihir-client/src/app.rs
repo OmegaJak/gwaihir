@@ -155,7 +155,7 @@ where
             Err(TryRecvError::Disconnected) => {
                 panic!("The background thread unexpected disconnected!");
             }
-            Ok(MonitorToMainMessages::UpdatedSensorData(sensor_data)) => {
+            Ok(MonitorToMainMessages::UpdatedSensorOutputs(sensor_data)) => {
                 self.network.publish_update(sensor_data);
             }
         }
@@ -181,11 +181,6 @@ where
             return;
         }
 
-        // Examples of how to create different panels and windows.
-        // Pick whichever suits you.
-        // Tip: a good default choice is to just keep the `CentralPanel`.
-        // For inspiration and more examples, go to https://emilk.github.io/egui
-        #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
             egui::menu::bar(ui, |ui| {
@@ -233,21 +228,7 @@ where
                     }
                 });
 
-                show_lock_status(status, ui, id);
-
-                CollapsingHeader::new("Microphone Usage")
-                    .default_open(true)
-                    .id_source(format!("{}_mic", id.as_ref()))
-                    .show(ui, |ui| {
-                        ui.label(format!(
-                            "{} app(s) currently listening to the microphone",
-                            status.sensor_data.microphone_usage.len()
-                        ));
-                        for usage in status.sensor_data.microphone_usage.iter() {
-                            let pretty_name = usage.app_name.replace("#", "\\");
-                            ui.label(pretty_name);
-                        }
-                    });
+                // show_lock_status(status, ui, id);
             }
 
             egui::warn_if_debug_build(ui);
@@ -259,14 +240,6 @@ impl<N> TemplateApp<N> {
     fn subscribed_to_user(&self, user_id: &UniqueUserId) -> bool {
         !self.persistence.ignored_users.contains(user_id)
     }
-}
-
-fn show_online_status(status: &UserStatus, ui: &mut egui::Ui) {
-    let mut online_color = Color32::RED;
-    if status.is_online {
-        online_color = Color32::GREEN;
-    }
-    ui.label(RichText::new("⏺ ").color(online_color).heading());
 }
 
 fn init_lock_status_sensor(
