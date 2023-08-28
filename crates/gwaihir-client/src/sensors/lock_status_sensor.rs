@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
+use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, Mutex, RwLock};
 
 use thiserror::Error;
@@ -12,6 +13,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
     MSG, WM_WTSSESSION_CHANGE, WTS_SESSION_LOCK, WTS_SESSION_UNLOCK,
 };
 use winit::platform::windows::EventLoopBuilderExtWindows;
+
+use crate::sensor_outputs::lock_status::LockStatus;
+use crate::sensor_outputs::SensorOutput;
+
+use super::Sensor;
 
 pub enum SessionEvent {
     Locked,
@@ -29,15 +35,16 @@ type WindowHandle = raw_window_handle::Win32WindowHandle;
 type EventBuffer = Arc<Mutex<VecDeque<SessionEvent>>>;
 
 pub struct LockStatusSensorBuilder {}
-pub struct OSRegisteredLockStatusSensorBuilder {}
+// pub struct OSRegisteredLockStatusSensorBuilder {}
 pub struct EventLoopRegisteredLockStatusSensorBuilder {
-    event_buffer: EventBuffer,
+    sensor_rx: Receiver<SessionEvent>,
 }
 pub struct FullyRegisteredLockStatusSensorBuilder {
-    event_buffer: EventBuffer,
+    sensor_rx: Receiver<SessionEvent>,
 }
 pub struct LockStatusSensor {
-    event_buffer: EventBuffer,
+    session_event_rx: Receiver<SessionEvent>,
+    lock_status: LockStatus,
 }
 
 impl LockStatusSensorBuilder {
@@ -63,17 +70,19 @@ impl LockStatusSensorBuilder {
         self,
         builder: &mut EventLoopBuilder,
     ) -> EventLoopRegisteredLockStatusSensorBuilder {
-        let event_buffer = create_event_buffer();
-        register_msg_hook(builder, event_buffer.clone());
-        EventLoopRegisteredLockStatusSensorBuilder { event_buffer }
+        let (tx_to_sensor, rx_from_windows) = mpsc::channel();
+        register_msg_hook(builder, tx_to_sensor);
+        EventLoopRegisteredLockStatusSensorBuilder {
+            sensor_rx: rx_from_windows,
+        }
     }
 
-    pub fn register_os_hook(
-        handle: WindowHandle,
-    ) -> Result<OSRegisteredLockStatusSensorBuilder, LockStatusSensorError> {
-        register_os_hook(handle)?;
-        Ok(OSRegisteredLockStatusSensorBuilder {})
-    }
+    // pub fn register_os_hook(
+    //     handle: WindowHandle,
+    // ) -> Result<OSRegisteredLockStatusSensorBuilder, LockStatusSensorError> {
+    //     register_os_hook(handle)?;
+    //     Ok(OSRegisteredLockStatusSensorBuilder {})
+    // }
 }
 
 impl EventLoopRegisteredLockStatusSensorBuilder {
@@ -83,33 +92,41 @@ impl EventLoopRegisteredLockStatusSensorBuilder {
     ) -> Result<FullyRegisteredLockStatusSensorBuilder, LockStatusSensorError> {
         register_os_hook(handle)?;
         Ok(FullyRegisteredLockStatusSensorBuilder {
-            event_buffer: self.event_buffer,
+            sensor_rx: self.sensor_rx,
         })
     }
 }
 
-impl OSRegisteredLockStatusSensorBuilder {
-    pub fn register_msg_hook(
-        self,
-        builder: &mut EventLoopBuilder,
-    ) -> FullyRegisteredLockStatusSensorBuilder {
-        let event_buffer = create_event_buffer();
-        register_msg_hook(builder, event_buffer.clone());
-        FullyRegisteredLockStatusSensorBuilder { event_buffer }
-    }
-}
+// impl OSRegisteredLockStatusSensorBuilder {
+//     pub fn register_msg_hook(
+//         self,
+//         builder: &mut EventLoopBuilder,
+//     ) -> FullyRegisteredLockStatusSensorBuilder {
+//         let event_buffer = create_event_buffer();
+//         register_msg_hook(builder, event_buffer.clone());
+//         FullyRegisteredLockStatusSensorBuilder { event_buffer }
+//     }
+// }
 
 impl FullyRegisteredLockStatusSensorBuilder {
     pub fn build(self) -> LockStatusSensor {
         LockStatusSensor {
-            event_buffer: self.event_buffer,
+            session_event_rx: self.sensor_rx,
+            lock_status: Default::default(),
         }
     }
 }
 
-impl LockStatusSensor {
-    pub fn recv(&mut self) -> Option<SessionEvent> {
-        self.event_buffer.lock().unwrap().pop_front()
+impl Sensor for LockStatusSensor {
+    fn get_output(&mut self) -> SensorOutput {
+        match self.session_event_rx.try_recv() {
+            Err(TryRecvError::Empty) => (),
+            Err(TryRecvError::Disconnected) => todo!(),
+            Ok(SessionEvent::Locked) => self.lock_status.num_locks += 1,
+            Ok(SessionEvent::Unlocked) => self.lock_status.num_unlocks += 1,
+        }
+
+        SensorOutput::LockStatus(self.lock_status.clone())
     }
 }
 
@@ -134,7 +151,7 @@ fn register_os_hook(
 
 fn register_msg_hook(
     builder: &mut eframe::EventLoopBuilder<eframe::UserEvent>,
-    event_buffer: EventBuffer,
+    tx_to_sensor: Sender<SessionEvent>,
 ) -> () {
     builder.with_msg_hook(move |msg| {
         let disable_winit_default_processing = false;
@@ -147,14 +164,11 @@ fn register_msg_hook(
             // https://learn.microsoft.com/en-us/windows/win32/termserv/wm-wtssession-change
             if (*msg).message == WM_WTSSESSION_CHANGE {
                 if (*msg).wParam.0 == TryInto::<usize>::try_into(WTS_SESSION_LOCK).unwrap() {
-                    event_buffer.lock().unwrap().push_back(SessionEvent::Locked)
+                    tx_to_sensor.send(SessionEvent::Locked).unwrap();
                 }
 
                 if (*msg).wParam.0 == TryInto::<usize>::try_into(WTS_SESSION_UNLOCK).unwrap() {
-                    event_buffer
-                        .lock()
-                        .unwrap()
-                        .push_back(SessionEvent::Unlocked);
+                    tx_to_sensor.send(SessionEvent::Unlocked).unwrap();
                 }
             }
         }

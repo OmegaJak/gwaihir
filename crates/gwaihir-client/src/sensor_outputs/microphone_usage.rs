@@ -4,8 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use super::SensorWidget;
 
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct MicrophoneUsage {
-    usage: Vec<AppMicrophoneUsage>,
+    pub usage: Vec<AppMicrophoneUsage>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
@@ -14,8 +15,14 @@ pub struct AppMicrophoneUsage {
     pub last_used: u64,
 }
 
+impl Default for MicrophoneUsage {
+    fn default() -> Self {
+        Self { usage: Vec::new() }
+    }
+}
+
 impl SensorWidget for MicrophoneUsage {
-    fn show(&self, ui: &mut egui::Ui, id: UniqueUserId) {
+    fn show(&self, ui: &mut egui::Ui, id: &UniqueUserId) {
         CollapsingHeader::new("Microphone Usage")
             .default_open(true)
             .id_source(format!("{}_mic", id.as_ref()))

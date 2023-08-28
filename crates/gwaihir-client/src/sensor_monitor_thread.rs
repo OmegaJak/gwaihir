@@ -1,13 +1,15 @@
 use std::{
-    borrow::BorrowMut,
     sync::mpsc::{channel, Receiver, Sender, TryRecvError},
     thread::{sleep, JoinHandle},
     time::Duration,
 };
 
 use crate::{
-    lock_status_sensor::LockStatusSensor, microphone_usage_sensor::MicrophoneUsageSensor,
-    sensor_outputs::SensorOutputs,
+    sensor_outputs::{SensorOutput, SensorOutputs},
+    sensors::{
+        lock_status_sensor::LockStatusSensor, microphone_usage_sensor::MicrophoneUsageSensor,
+        Sensor,
+    },
 };
 
 const THREAD_SLEEP_DURATION_MS: u64 = 50;
@@ -26,10 +28,7 @@ struct SensorMonitor {
     tx_to_main: Sender<MonitorToMainMessages>,
     egui_ctx: Option<egui::Context>,
 
-    lock_status_sensor: Option<LockStatusSensor>,
-    microphone_usage_sensor: MicrophoneUsageSensor,
-
-    sensor_data: SensorData,
+    sensors: Vec<(Box<dyn Sensor>, SensorOutput)>,
 }
 
 pub fn create_sensor_monitor_thread() -> (
@@ -44,10 +43,11 @@ pub fn create_sensor_monitor_thread() -> (
             rx_from_main: monitor_rx,
             tx_to_main: monitor_tx,
             egui_ctx: None,
-            lock_status_sensor: None,
-            microphone_usage_sensor: MicrophoneUsageSensor::new(),
 
-            sensor_data: SensorData::default(),
+            sensors: vec![(
+                Box::new(MicrophoneUsageSensor::new()),
+                SensorOutput::MicrophoneUsage(Default::default()),
+            )],
         };
         monitor.run();
     });
@@ -70,13 +70,12 @@ impl SensorMonitor {
 
             if self.check_sensor_updates() {
                 self.tx_to_main
-                    .send(MonitorToMainMessages::UpdatedSensorOutputs(
-                        self.sensor_data.clone(),
-                    ))
+                    .send(MonitorToMainMessages::UpdatedSensorOutputs(SensorOutputs {
+                        outputs: self.get_sensor_output_snapshot(),
+                    }))
                     .unwrap();
-                if let Some(ctx) = self.egui_ctx.take() {
+                if let Some(ctx) = self.egui_ctx.as_ref() {
                     ctx.request_repaint();
-                    self.egui_ctx = Some(ctx);
                 }
             }
 
@@ -85,25 +84,16 @@ impl SensorMonitor {
     }
 
     fn check_sensor_updates(&mut self) -> bool {
-        let initial_sensor_data = self.sensor_data.clone();
-        if let Some(sensor) = self.lock_status_sensor.as_mut() {
-            match sensor.recv() {
-                Some(SessionEvent::Locked) => {
-                    self.sensor_data.num_locks += 1;
-                }
-                Some(SessionEvent::Unlocked) => {
-                    self.sensor_data.num_unlocks += 1;
-                }
-                None => (),
-            }
+        let initial_sensor_data = self.get_sensor_output_snapshot();
+        for (sensor, old_output) in self.sensors.iter_mut() {
+            let output = sensor.as_mut().get_output();
+            *old_output = output;
         }
 
-        let microphone_usage = self.microphone_usage_sensor.check_microphone_usage();
-        if let Some(usage) = microphone_usage {
-            self.sensor_data.microphone_usage = usage;
-        }
-
-        self.sensor_data != initial_sensor_data
+        self.get_sensor_output_snapshot()
+            .iter()
+            .zip(initial_sensor_data.iter())
+            .any(|(a, b)| a != b)
     }
 
     fn process_msg(&mut self, msg: MainToMonitorMessages) -> bool {
@@ -112,10 +102,20 @@ impl SensorMonitor {
                 self.egui_ctx = Some(ctx);
             }
             MainToMonitorMessages::LockStatusSensorInitialized(sensor) => {
-                self.lock_status_sensor = Some(sensor);
+                self.sensors.push((
+                    Box::new(sensor),
+                    SensorOutput::LockStatus(Default::default()),
+                ));
             }
         }
 
         false
+    }
+
+    fn get_sensor_output_snapshot(&self) -> Vec<SensorOutput> {
+        self.sensors
+            .iter()
+            .map(|(_, output)| output.clone())
+            .collect()
     }
 }

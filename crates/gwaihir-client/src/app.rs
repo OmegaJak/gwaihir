@@ -7,21 +7,18 @@ use std::{
     time::Duration,
 };
 
-use egui::{epaint::ahash::HashSet, CollapsingHeader, Color32, RichText, TextEdit, Widget};
-use gwaihir_client_lib::{
-    chrono::{DateTime, Utc},
-    NetworkInterface, RemoteUpdate, SensorData, UniqueUserId, UserStatus, Username, APP_ID,
-};
+use egui::{epaint::ahash::HashSet, TextEdit, Widget};
+use gwaihir_client_lib::{NetworkInterface, RemoteUpdate, UniqueUserId, UserStatus, APP_ID};
 
 use raw_window_handle::HasRawWindowHandle;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    lock_status_sensor::{EventLoopRegisteredLockStatusSensorBuilder, LockStatusSensor},
     sensor_monitor_thread::{MainToMonitorMessages, MonitorToMainMessages},
+    sensor_outputs::{online_status::OnlineStatus, SensorOutput, SensorOutputs, SensorWidget},
+    sensors::lock_status_sensor::{EventLoopRegisteredLockStatusSensorBuilder, LockStatusSensor},
     tray_icon::{hide_to_tray, TrayIconData},
-    ui_extension_methods::UIExtensionMethods,
-    widgets::auto_launch_checkbox::{AutoLaunchCheckbox, AutoLaunchCheckboxUiExtension},
+    widgets::auto_launch_checkbox::AutoLaunchCheckboxUiExtension,
 };
 
 #[derive(Serialize, Deserialize)]
@@ -46,10 +43,10 @@ pub struct TemplateApp<N> {
 
     tx_to_monitor_thread: Sender<MainToMonitorMessages>,
     rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
-    current_status: HashMap<UniqueUserId, UserStatus>,
+    current_status: HashMap<UniqueUserId, UserStatus<SensorOutputs>>,
 
     network: N,
-    network_rx: Receiver<RemoteUpdate>,
+    network_rx: Receiver<gwaihir_client_lib::RemoteUpdate<SensorOutputs>>,
     current_user_id: Option<UniqueUserId>,
 
     set_name_input: String,
@@ -59,7 +56,7 @@ pub struct TemplateApp<N> {
 
 impl<N> TemplateApp<N>
 where
-    N: NetworkInterface,
+    N: NetworkInterface<SensorOutputs>,
 {
     /// Called once before the first frame.
     pub fn new(
@@ -103,7 +100,9 @@ where
         }
     }
 
-    fn get_filtered_sorted_user_status_list(&self) -> Vec<(UniqueUserId, UserStatus)> {
+    fn get_filtered_sorted_user_status_list(
+        &self,
+    ) -> Vec<(UniqueUserId, UserStatus<SensorOutputs>)> {
         let mut user_status_list = self
             .current_status
             .iter()
@@ -136,7 +135,7 @@ where
 
 impl<N> eframe::App for TemplateApp<N>
 where
-    N: NetworkInterface,
+    N: NetworkInterface<SensorOutputs>,
 {
     /// Called by the frame work to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
@@ -155,8 +154,8 @@ where
             Err(TryRecvError::Disconnected) => {
                 panic!("The background thread unexpected disconnected!");
             }
-            Ok(MonitorToMainMessages::UpdatedSensorOutputs(sensor_data)) => {
-                self.network.publish_update(sensor_data);
+            Ok(MonitorToMainMessages::UpdatedSensorOutputs(sensor_outputs)) => {
+                self.network.publish_update(sensor_outputs);
             }
         }
 
@@ -208,7 +207,11 @@ where
             for (id, status) in user_status_list.iter() {
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 2.0;
-                    show_online_status(status, ui);
+                    // show_online_status(status, ui);
+                    OnlineStatus {
+                        online: status.is_online,
+                    }
+                    .show(ui, id); //TODO: This is a hack till we figure out online status/sensor stuff
                     ui.heading(status.display_name());
                     if let Some(current_user_id) = &self.current_user_id {
                         if id == current_user_id {
@@ -228,7 +231,26 @@ where
                     }
                 });
 
-                // show_lock_status(status, ui, id);
+                // for output in status.sensor_outputs.outputs.iter() {
+                //     output.show(ui, id);
+                // }
+                let lock_status = status
+                    .sensor_outputs
+                    .outputs
+                    .iter()
+                    .find(|v| matches!(v, SensorOutput::LockStatus(_)));
+                if let Some(SensorOutput::LockStatus(lock_status)) = lock_status {
+                    lock_status.show(ui, id);
+                }
+
+                let mic_usage = status
+                    .sensor_outputs
+                    .outputs
+                    .iter()
+                    .find(|v| matches!(v, SensorOutput::MicrophoneUsage(_)));
+                if let Some(SensorOutput::MicrophoneUsage(mic_usage)) = mic_usage {
+                    mic_usage.show(ui, id);
+                }
             }
 
             egui::warn_if_debug_build(ui);
@@ -261,9 +283,9 @@ fn init_lock_status_sensor(
 }
 
 fn get_remote_update_callback(
-    network_tx: Sender<RemoteUpdate>,
+    network_tx: Sender<RemoteUpdate<SensorOutputs>>,
     ctx_clone: egui::Context,
-) -> impl Fn(RemoteUpdate) + Clone {
+) -> impl Fn(RemoteUpdate<SensorOutputs>) + Clone {
     move |update| {
         network_tx.send(update).unwrap();
         ctx_clone.request_repaint();

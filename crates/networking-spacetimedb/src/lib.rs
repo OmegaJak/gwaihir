@@ -2,7 +2,7 @@ mod module_bindings;
 
 use gwaihir_client_lib::{
     chrono::{DateTime, NaiveDateTime, Utc},
-    NetworkInterface, UniqueUserId, UserStatus, Username, APP_ID,
+    NetworkInterface, RemoteUpdate, UniqueUserId, UserStatus, Username, APP_ID,
 };
 use module_bindings::*;
 use serde::{Deserialize, Serialize};
@@ -27,7 +27,7 @@ impl<T> NetworkInterface<T> for SpacetimeDBInterface
 where
     T: Serialize + for<'a> Deserialize<'a>,
 {
-    fn new(update_callback: impl Fn(UserStatus<T>) + Send + Clone + 'static) -> Self {
+    fn new(update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static) -> Self {
         register_callbacks(update_callback);
         connect_to_db();
         subscribe_to_tables();
@@ -50,7 +50,7 @@ where
 }
 
 /// Register all the callbacks our app will use to respond to database events.
-fn register_callbacks<T>(update_callback: impl Fn(UserStatus<T>) + Send + 'static + Clone)
+fn register_callbacks<T>(update_callback: impl Fn(RemoteUpdate<T>) + Send + 'static + Clone)
 where
     T: for<'a> Deserialize<'a>,
 {
@@ -59,7 +59,7 @@ where
 
     let callback_clone = update_callback.clone();
     User::on_insert(move |a, _| {
-        if let Some(update) = convert_to_user_status(a) {
+        if let Some(update) = convert_to_remote_update(a) {
             callback_clone(update);
         }
     });
@@ -120,7 +120,7 @@ fn identity_leading_hex(id: &Identity) -> String {
 
 /// Our `User::on_update` callback:
 /// print a notification about name and status changes.
-fn on_user_updated<T>(old: &User, new: &User, _: Option<&ReducerEvent>) -> Option<UserStatus<T>>
+fn on_user_updated<T>(old: &User, new: &User, _: Option<&ReducerEvent>) -> Option<RemoteUpdate<T>>
 where
     T: for<'a> Deserialize<'a>,
 {
@@ -128,32 +128,43 @@ where
         || old.name != new.name
         || old.online != new.online
     {
-        return convert_to_user_status(new);
+        return convert_to_remote_update(new);
     }
 
     None
 }
 
-fn convert_to_user_status<T>(new: &User) -> Option<UserStatus<T>>
+fn convert_to_remote_update<T>(new: &User) -> Option<RemoteUpdate<T>>
 where
     T: for<'a> Deserialize<'a>,
 {
     if let Some(status) = new.status.clone() {
-        let sensor_data = serde_json::from_str(&status).unwrap();
-        let last_update = DateTime::<Utc>::from_utc(
-            NaiveDateTime::from_timestamp_micros(
-                new.last_status_update.unwrap().try_into().unwrap(),
-            )
-            .unwrap(),
-            Utc,
-        );
-        return Some(UserStatus {
-            user_id: UniqueUserId::new(identity_leading_hex(&new.identity)),
-            username: Username::new(new.name.clone().unwrap_or_default()),
-            is_online: new.online,
-            sensor_outputs: sensor_data,
-            last_update,
-        });
+        match serde_json::from_str(&status) {
+            Ok(sensor_data) => {
+                let last_update = DateTime::<Utc>::from_utc(
+                    NaiveDateTime::from_timestamp_micros(
+                        new.last_status_update.unwrap().try_into().unwrap(),
+                    )
+                    .unwrap(),
+                    Utc,
+                );
+                return Some(RemoteUpdate::UserStatusUpdated(UserStatus {
+                    user_id: UniqueUserId::new(identity_leading_hex(&new.identity)),
+                    username: Username::new(new.name.clone().unwrap_or_default()),
+                    is_online: new.online,
+                    sensor_outputs: sensor_data,
+                    last_update,
+                }));
+            }
+            Err(e) => {
+                eprintln!(
+                    "Failed to deserialize sensor data for user ({:?}, {}): {}",
+                    new.name,
+                    identity_leading_hex(&new.identity),
+                    e
+                );
+            }
+        }
     }
 
     None

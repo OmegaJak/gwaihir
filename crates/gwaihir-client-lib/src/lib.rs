@@ -28,9 +28,9 @@ pub struct UniqueUserId(String);
 #[nutype(derive(AsRef, Clone, Into))]
 pub struct Username(String);
 
-// pub enum RemoteUpdate {
-//     UserStatusUpdated(UserStatus),
-// }
+pub enum RemoteUpdate<T> {
+    UserStatusUpdated(UserStatus<T>),
+}
 
 #[derive(Clone)]
 pub struct UserStatus<T> {
@@ -59,7 +59,7 @@ pub trait NetworkInterface<T>
 where
     T: Serialize + for<'a> Deserialize<'a>,
 {
-    fn new(update_callback: impl Fn(UserStatus<T>) + Send + Clone + 'static) -> Self;
+    fn new(update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static) -> Self;
     fn publish_update(&self, sensor_outputs: T);
     fn set_username(&self, name: String);
     fn get_current_user_id(&self) -> Option<UniqueUserId>;

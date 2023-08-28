@@ -1,15 +1,26 @@
 use egui::{CollapsingHeader, Color32, RichText};
 use gwaihir_client_lib::UniqueUserId;
+use serde::{Deserialize, Serialize};
 
 use super::SensorWidget;
 
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct LockStatus {
-    num_locks: u32,
-    num_unlocks: u32,
+    pub num_locks: u32,
+    pub num_unlocks: u32,
+}
+
+impl Default for LockStatus {
+    fn default() -> Self {
+        Self {
+            num_locks: 0,
+            num_unlocks: 0,
+        }
+    }
 }
 
 impl SensorWidget for LockStatus {
-    fn show(&self, ui: &mut egui::Ui, id: UniqueUserId) {
+    fn show(&self, ui: &mut egui::Ui, id: &UniqueUserId) {
         self.show_overall(ui);
         self.show_details(id, ui);
     }
@@ -24,7 +35,7 @@ impl LockStatus {
         }
     }
 
-    fn show_details(&self, id: UniqueUserId, ui: &mut egui::Ui) {
+    fn show_details(&self, id: &UniqueUserId, ui: &mut egui::Ui) {
         CollapsingHeader::new("Locks/Unlocks")
             .id_source(format!("{}_locks", id.as_ref()))
             .show(ui, |ui| {
