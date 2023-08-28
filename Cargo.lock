@@ -2516,16 +2516,18 @@ dependencies = [
 
 [[package]]
 name = "nutype"
-version = "0.3.1"
-source = "git+https://github.com/greyblake/nutype?branch=master#8af249d00dfd4898da7cea49ac5b756b14d60455"
+version = "0.4.0-beta.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "312ebc882516887d78226e9f428a6bf10068d569afdfddbb07cc9676220ef176"
 dependencies = [
  "nutype_macros",
 ]
 
 [[package]]
 name = "nutype_macros"
-version = "0.3.1"
-source = "git+https://github.com/greyblake/nutype?branch=master#8af249d00dfd4898da7cea49ac5b756b14d60455"
+version = "0.4.0-beta.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e49bcbb0fa6032d256ae2772d7b1f71c7982fb575540a4ad006c0f5003728fd5"
 dependencies = [
  "cfg-if",
  "kinded",
