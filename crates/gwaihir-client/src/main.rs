@@ -35,9 +35,9 @@ fn main() -> eframe::Result<()> {
                 registered_builder,
                 tx_to_monitor,
                 rx_from_monitor,
+                monitor_handle,
             ))
         }),
     )?;
-    monitor_handle.join().unwrap();
     Ok(())
 }

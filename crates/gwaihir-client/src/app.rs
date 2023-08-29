@@ -4,6 +4,7 @@ use std::{
     collections::HashMap,
     rc::Rc,
     sync::mpsc::{self, Receiver, Sender, TryRecvError},
+    thread::JoinHandle,
     time::Duration,
 };
 
@@ -43,7 +44,9 @@ impl Default for Persistence {
 pub struct GwaihirApp<N> {
     tray_icon_data: Option<TrayIconData>,
 
-    _tx_to_monitor_thread: Sender<MainToMonitorMessages>,
+    sensor_monitor_thread_join_handle: Option<JoinHandle<()>>,
+
+    tx_to_monitor_thread: Sender<MainToMonitorMessages>,
     rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
     current_status: HashMap<UniqueUserId, UserStatus<SensorOutputs>>,
 
@@ -66,6 +69,7 @@ where
         sensor_builder: Rc<RefCell<Option<EventLoopRegisteredLockStatusSensorBuilder>>>,
         tx_to_monitor_thread: Sender<MainToMonitorMessages>,
         rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
+        sensor_monitor_thread_join_handle: JoinHandle<()>,
     ) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
@@ -88,9 +92,11 @@ where
         let network: N = NetworkInterface::new(get_remote_update_callback(network_tx, ctx_clone));
         GwaihirApp {
             tray_icon_data: None,
-            _tx_to_monitor_thread: tx_to_monitor_thread,
+            tx_to_monitor_thread,
             rx_from_monitor_thread,
             current_status: HashMap::new(),
+
+            sensor_monitor_thread_join_handle: Some(sensor_monitor_thread_join_handle),
 
             network,
             network_rx,
@@ -146,6 +152,15 @@ where
 
     fn persist_egui_memory(&self) -> bool {
         false
+    }
+
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        if let Some(join_handle) = self.sensor_monitor_thread_join_handle.take() {
+            self.tx_to_monitor_thread
+                .send(MainToMonitorMessages::Shutdown)
+                .unwrap();
+            join_handle.join().ok();
+        }
     }
 
     /// Called each time the UI needs repainting, which may be many times per second.

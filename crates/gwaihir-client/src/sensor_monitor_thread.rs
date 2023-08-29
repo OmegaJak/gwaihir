@@ -1,4 +1,5 @@
 use std::{
+    ops::ControlFlow,
     sync::mpsc::{channel, Receiver, Sender, TryRecvError},
     thread::{sleep, JoinHandle},
     time::Duration,
@@ -15,6 +16,7 @@ use crate::sensors::lock_status_sensor::LockStatusSensor;
 const THREAD_SLEEP_DURATION_MS: u64 = 50;
 
 pub enum MainToMonitorMessages {
+    Shutdown,
     SetEguiContext(egui::Context),
     LockStatusSensorInitialized(LockStatusSensor),
 }
@@ -68,27 +70,33 @@ impl SensorMonitor {
 
     fn run(&mut self) {
         loop {
-            self.loop_body();
+            match self.loop_body() {
+                ControlFlow::Continue(_) => (),
+                ControlFlow::Break(_) => return,
+            }
 
             sleep(Duration::from_millis(THREAD_SLEEP_DURATION_MS));
         }
     }
 
-    fn loop_body(&mut self) {
-        self.receive_msgs_from_main();
+    fn loop_body(&mut self) -> ControlFlow<()> {
+        self.receive_msgs_from_main()?;
         self.send_sensor_msgs_to_main();
+        ControlFlow::Continue(())
     }
 
-    fn receive_msgs_from_main(&mut self) {
+    fn receive_msgs_from_main(&mut self) -> ControlFlow<()> {
         match self.rx_from_main.try_recv() {
             Err(TryRecvError::Empty) => (),
             Err(TryRecvError::Disconnected) => {
                 panic!("Communication with main unexpectedly disconnected");
             }
             Ok(msg) => {
-                self.process_msg(msg);
+                return self.process_msg(msg);
             }
         }
+
+        ControlFlow::Continue(())
     }
 
     fn send_sensor_msgs_to_main(&mut self) {
@@ -114,8 +122,9 @@ impl SensorMonitor {
         self.get_sensor_output_snapshot() != self.last_sent_outputs
     }
 
-    fn process_msg(&mut self, msg: MainToMonitorMessages) -> bool {
+    fn process_msg(&mut self, msg: MainToMonitorMessages) -> ControlFlow<()> {
         match msg {
+            MainToMonitorMessages::Shutdown => return ControlFlow::Break(()),
             MainToMonitorMessages::SetEguiContext(ctx) => {
                 self.egui_ctx = Some(ctx);
             }
@@ -127,7 +136,7 @@ impl SensorMonitor {
             }
         }
 
-        false
+        ControlFlow::Continue(())
     }
 
     fn get_sensor_output_snapshot(&self) -> Vec<SensorOutput> {
