@@ -38,7 +38,6 @@ pub struct UserStatus<T> {
     pub user_id: UniqueUserId,
     pub username: Username,
     pub last_update: DateTime<Utc>,
-    pub is_online: bool,
     pub sensor_outputs: T,
 }
 

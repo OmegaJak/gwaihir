@@ -153,7 +153,6 @@ where
                 return Some(RemoteUpdate::UserStatusUpdated(UserStatus {
                     user_id: UniqueUserId::new(identity_leading_hex(&new.identity)),
                     username: Username::new(new.name.clone().unwrap_or_default()),
-                    is_online: new.online,
                     sensor_outputs: sensor_data,
                     last_update,
                 }));
