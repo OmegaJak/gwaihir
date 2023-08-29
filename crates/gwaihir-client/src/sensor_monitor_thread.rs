@@ -160,54 +160,48 @@ mod tests {
     }
 
     fn init_monitor_and_flush_initial_messages() -> MonitorAndChannels {
-        let mut data = init_monitor();
-        data.monitor.loop_body();
-        while let Ok(_) = data.monitor_to_main_rx.try_recv() {}
-        data
+        let mut monitor_and_channels = init_monitor();
+        monitor_and_channels.monitor.loop_body();
+        while let Ok(_) = monitor_and_channels.monitor_to_main_rx.try_recv() {}
+        monitor_and_channels
     }
 
     #[test]
     fn sends_one_sensor_update_on_startup() {
-        let mut monitor_data = init_monitor();
+        let mut mc = init_monitor();
 
-        monitor_data.monitor.loop_body();
+        mc.monitor.loop_body();
 
         assert_matches!(
-            monitor_data.monitor_to_main_rx.try_recv(),
+            mc.monitor_to_main_rx.try_recv(),
             Ok(MonitorToMainMessages::UpdatedSensorOutputs(_))
         );
-        assert_matches!(
-            monitor_data.monitor_to_main_rx.try_recv(),
-            Err(TryRecvError::Empty)
-        );
+        assert_matches!(mc.monitor_to_main_rx.try_recv(), Err(TryRecvError::Empty));
     }
 
     #[test]
     fn sends_no_sensor_update_on_second_loop_with_no_sensor_changes() {
-        let mut monitor_data = init_monitor_and_flush_initial_messages();
+        let mut mc = init_monitor_and_flush_initial_messages();
 
-        monitor_data.monitor.loop_body();
+        mc.monitor.loop_body();
 
-        assert_matches!(
-            monitor_data.monitor_to_main_rx.try_recv(),
-            Err(TryRecvError::Empty)
-        );
+        assert_matches!(mc.monitor_to_main_rx.try_recv(), Err(TryRecvError::Empty));
     }
 
     #[test]
     fn sends_lock_status_update_once_sensor_is_ready() {
-        let mut data = init_monitor_and_flush_initial_messages();
+        let mut mc = init_monitor_and_flush_initial_messages();
         let (lock_status_sensor, _session_event_tx) = LockStatusSensor::new();
 
-        data.main_to_monitor_tx
+        mc.main_to_monitor_tx
             .send(MainToMonitorMessages::LockStatusSensorInitialized(
                 lock_status_sensor,
             ))
             .unwrap();
 
-        data.monitor.loop_body();
+        mc.monitor.loop_body();
         assert_matches!(
-            data.monitor_to_main_rx.try_recv(),
+            mc.monitor_to_main_rx.try_recv(),
             Ok(MonitorToMainMessages::UpdatedSensorOutputs(_))
         );
     }
