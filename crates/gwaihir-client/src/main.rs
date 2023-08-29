@@ -1,24 +1,20 @@
 #![warn(clippy::all, rust_2018_idioms)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+use crate::sensor_monitor_thread::{create_sensor_monitor_thread, MainToMonitorMessages};
+pub use app::GwaihirApp;
+use gwaihir_client_lib::APP_ID;
+use networking_spacetimedb::SpacetimeDBInterface;
+use sensors::lock_status_sensor::LockStatusSensorBuilder;
+
 mod app;
-mod lock_status_sensor;
-mod microphone_usage_sensor;
 mod sensor_monitor_thread;
+mod sensors;
 mod tray_icon;
 mod ui_extension_methods;
 mod widgets;
-pub use app::TemplateApp;
 
-// When compiling natively:
-#[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
-    use gwaihir_client_lib::APP_ID;
-    use lock_status_sensor::LockStatusSensorBuilder;
-    use networking_spacetimedb::SpacetimeDBInterface;
-
-    use crate::sensor_monitor_thread::{create_sensor_monitor_thread, MainToMonitorMessages};
-
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
     let mut native_options = eframe::NativeOptions::default();
@@ -34,14 +30,14 @@ fn main() -> eframe::Result<()> {
             tx_to_monitor
                 .send(MainToMonitorMessages::SetEguiContext(ctx_clone))
                 .unwrap();
-            Box::new(TemplateApp::<SpacetimeDBInterface>::new(
+            Box::new(GwaihirApp::<SpacetimeDBInterface>::new(
                 cc,
                 registered_builder,
                 tx_to_monitor,
                 rx_from_monitor,
+                monitor_handle,
             ))
         }),
     )?;
-    monitor_handle.join().unwrap();
     Ok(())
 }

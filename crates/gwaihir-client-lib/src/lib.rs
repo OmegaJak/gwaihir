@@ -22,26 +22,26 @@ pub const APP_ID: &str = "gwaihir";
     Ord,
     Serialize,
     Deserialize,
+    Debug
 ))]
 pub struct UniqueUserId(String);
 
-#[nutype(derive(AsRef, Clone, Into))]
+#[nutype(derive(AsRef, Clone, Into, Debug))]
 pub struct Username(String);
 
-pub enum RemoteUpdate {
-    UserStatusUpdated(UserStatus),
+pub enum RemoteUpdate<T> {
+    UserStatusUpdated(UserStatus<T>),
 }
 
-#[derive(Clone)]
-pub struct UserStatus {
+#[derive(Clone, Debug)]
+pub struct UserStatus<T> {
     pub user_id: UniqueUserId,
     pub username: Username,
-    pub is_online: bool,
-    pub sensor_data: SensorData,
     pub last_update: DateTime<Utc>,
+    pub sensor_outputs: T,
 }
 
-impl UserStatus {
+impl<T> UserStatus<T> {
     pub fn display_name(&self) -> String {
         if self.username.as_ref().is_empty() {
             self.user_id.clone().into()
@@ -51,32 +51,16 @@ impl UserStatus {
     }
 }
 
-pub trait NetworkInterface {
-    fn new(update_callback: impl Fn(RemoteUpdate) + Send + Clone + 'static) -> Self;
-    fn publish_status_update(&self, status: SensorData);
+pub trait AcceptsOnlineStatus {
+    fn set_online_status(&mut self, online: bool);
+}
+
+pub trait NetworkInterface<T>
+where
+    T: Serialize + for<'a> Deserialize<'a>,
+{
+    fn new(update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static) -> Self;
+    fn publish_update(&self, sensor_outputs: T);
     fn set_username(&self, name: String);
     fn get_current_user_id(&self) -> Option<UniqueUserId>;
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
-pub struct MicrophoneUsage {
-    pub app_name: String,
-    pub last_used: u64,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
-pub struct SensorData {
-    pub num_locks: u32,
-    pub num_unlocks: u32,
-    pub microphone_usage: Vec<MicrophoneUsage>,
-}
-
-impl Default for SensorData {
-    fn default() -> Self {
-        Self {
-            num_locks: 0,
-            num_unlocks: 0,
-            microphone_usage: Vec::new(),
-        }
-    }
 }

@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 hex = "0.4.3"
 spacetimedb-sdk = "0.6.1"
+serde = { version = "1" }
 
 # local:
 gwaihir-client-lib = { path = "../gwaihir-client-lib" }

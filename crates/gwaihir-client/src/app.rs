@@ -4,24 +4,24 @@ use std::{
     collections::HashMap,
     rc::Rc,
     sync::mpsc::{self, Receiver, Sender, TryRecvError},
+    thread::JoinHandle,
     time::Duration,
 };
 
-use egui::{epaint::ahash::HashSet, CollapsingHeader, Color32, RichText, TextEdit, Widget};
-use gwaihir_client_lib::{
-    chrono::{DateTime, Utc},
-    NetworkInterface, RemoteUpdate, SensorData, UniqueUserId, UserStatus, Username, APP_ID,
-};
+use egui::{epaint::ahash::HashSet, TextEdit, Widget};
+use gwaihir_client_lib::{NetworkInterface, RemoteUpdate, UniqueUserId, UserStatus, APP_ID};
 
 use raw_window_handle::HasRawWindowHandle;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    lock_status_sensor::{EventLoopRegisteredLockStatusSensorBuilder, LockStatusSensor},
     sensor_monitor_thread::{MainToMonitorMessages, MonitorToMainMessages},
+    sensors::{
+        lock_status_sensor::{EventLoopRegisteredLockStatusSensorBuilder, LockStatusSensor},
+        outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
+    },
     tray_icon::{hide_to_tray, TrayIconData},
-    ui_extension_methods::UIExtensionMethods,
-    widgets::auto_launch_checkbox::{AutoLaunchCheckbox, AutoLaunchCheckboxUiExtension},
+    widgets::auto_launch_checkbox::AutoLaunchCheckboxUiExtension,
 };
 
 #[derive(Serialize, Deserialize)]
@@ -41,15 +41,17 @@ impl Default for Persistence {
     }
 }
 
-pub struct TemplateApp<N> {
+pub struct GwaihirApp<N> {
     tray_icon_data: Option<TrayIconData>,
+
+    sensor_monitor_thread_join_handle: Option<JoinHandle<()>>,
 
     tx_to_monitor_thread: Sender<MainToMonitorMessages>,
     rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
-    current_status: HashMap<UniqueUserId, UserStatus>,
+    current_status: HashMap<UniqueUserId, UserStatus<SensorOutputs>>,
 
     network: N,
-    network_rx: Receiver<RemoteUpdate>,
+    network_rx: Receiver<gwaihir_client_lib::RemoteUpdate<SensorOutputs>>,
     current_user_id: Option<UniqueUserId>,
 
     set_name_input: String,
@@ -57,9 +59,9 @@ pub struct TemplateApp<N> {
     persistence: Persistence,
 }
 
-impl<N> TemplateApp<N>
+impl<N> GwaihirApp<N>
 where
-    N: NetworkInterface,
+    N: NetworkInterface<SensorOutputs>,
 {
     /// Called once before the first frame.
     pub fn new(
@@ -67,6 +69,7 @@ where
         sensor_builder: Rc<RefCell<Option<EventLoopRegisteredLockStatusSensorBuilder>>>,
         tx_to_monitor_thread: Sender<MainToMonitorMessages>,
         rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
+        sensor_monitor_thread_join_handle: JoinHandle<()>,
     ) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
@@ -87,11 +90,13 @@ where
         let (network_tx, network_rx) = mpsc::channel();
         let ctx_clone = cc.egui_ctx.clone();
         let network: N = NetworkInterface::new(get_remote_update_callback(network_tx, ctx_clone));
-        TemplateApp {
+        GwaihirApp {
             tray_icon_data: None,
             tx_to_monitor_thread,
             rx_from_monitor_thread,
             current_status: HashMap::new(),
+
+            sensor_monitor_thread_join_handle: Some(sensor_monitor_thread_join_handle),
 
             network,
             network_rx,
@@ -103,7 +108,9 @@ where
         }
     }
 
-    fn get_filtered_sorted_user_status_list(&self) -> Vec<(UniqueUserId, UserStatus)> {
+    fn get_filtered_sorted_user_status_list(
+        &self,
+    ) -> Vec<(UniqueUserId, UserStatus<SensorOutputs>)> {
         let mut user_status_list = self
             .current_status
             .iter()
@@ -134,9 +141,9 @@ where
     }
 }
 
-impl<N> eframe::App for TemplateApp<N>
+impl<N> eframe::App for GwaihirApp<N>
 where
-    N: NetworkInterface,
+    N: NetworkInterface<SensorOutputs>,
 {
     /// Called by the frame work to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
@@ -147,6 +154,15 @@ where
         false
     }
 
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        if let Some(join_handle) = self.sensor_monitor_thread_join_handle.take() {
+            self.tx_to_monitor_thread
+                .send(MainToMonitorMessages::Shutdown)
+                .unwrap();
+            join_handle.join().ok();
+        }
+    }
+
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
@@ -155,8 +171,9 @@ where
             Err(TryRecvError::Disconnected) => {
                 panic!("The background thread unexpected disconnected!");
             }
-            Ok(MonitorToMainMessages::UpdatedSensorData(sensor_data)) => {
-                self.network.publish_status_update(sensor_data);
+            Ok(MonitorToMainMessages::UpdatedSensorOutputs(sensor_outputs)) => {
+                // println!("Publishing update: {:#?}", &sensor_outputs);
+                self.network.publish_update(sensor_outputs);
             }
         }
 
@@ -164,6 +181,7 @@ where
             match update {
                 RemoteUpdate::UserStatusUpdated(status) => {
                     if self.subscribed_to_user(&status.user_id) {
+                        // println!("Got user update from DB: {:#?}", &status);
                         self.current_status.insert(status.user_id.clone(), status);
                     }
                 }
@@ -181,11 +199,6 @@ where
             return;
         }
 
-        // Examples of how to create different panels and windows.
-        // Pick whichever suits you.
-        // Tip: a good default choice is to just keep the `CentralPanel`.
-        // For inspiration and more examples, go to https://emilk.github.io/egui
-        #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
             egui::menu::bar(ui, |ui| {
@@ -213,7 +226,11 @@ where
             for (id, status) in user_status_list.iter() {
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 2.0;
-                    show_online_status(status, ui);
+                    status.sensor_outputs.show_first(
+                        |o| matches!(o, SensorOutput::OnlineStatus(_)),
+                        ui,
+                        id,
+                    );
                     ui.heading(status.display_name());
                     if let Some(current_user_id) = &self.current_user_id {
                         if id == current_user_id {
@@ -232,29 +249,18 @@ where
                         }
                     }
                 });
-                show_lock_status(status, ui);
-                CollapsingHeader::new("Locks/Unlocks")
-                    .id_source(format!("{}_locks", id.as_ref()))
-                    .show(ui, |ui| {
-                        ui.label(format!("Times Locked: {}", status.sensor_data.num_locks));
-                        ui.label(format!(
-                            "Times Unlocked: {}",
-                            status.sensor_data.num_unlocks
-                        ));
-                    });
-                CollapsingHeader::new("Microphone Usage")
-                    .default_open(true)
-                    .id_source(format!("{}_mic", id.as_ref()))
-                    .show(ui, |ui| {
-                        ui.label(format!(
-                            "{} app(s) currently listening to the microphone",
-                            status.sensor_data.microphone_usage.len()
-                        ));
-                        for usage in status.sensor_data.microphone_usage.iter() {
-                            let pretty_name = usage.app_name.replace("#", "\\");
-                            ui.label(pretty_name);
-                        }
-                    });
+
+                status.sensor_outputs.show_first(
+                    |o| matches!(o, SensorOutput::LockStatus(_)),
+                    ui,
+                    id,
+                );
+
+                status.sensor_outputs.show_first(
+                    |o| matches!(o, SensorOutput::MicrophoneUsage(_)),
+                    ui,
+                    id,
+                );
             }
 
             egui::warn_if_debug_build(ui);
@@ -262,24 +268,9 @@ where
     }
 }
 
-impl<N> TemplateApp<N> {
+impl<N> GwaihirApp<N> {
     fn subscribed_to_user(&self, user_id: &UniqueUserId) -> bool {
         !self.persistence.ignored_users.contains(user_id)
-    }
-}
-fn show_online_status(status: &UserStatus, ui: &mut egui::Ui) {
-    let mut online_color = Color32::RED;
-    if status.is_online {
-        online_color = Color32::GREEN;
-    }
-    ui.label(RichText::new("⏺ ").color(online_color).heading());
-}
-
-fn show_lock_status(status: &UserStatus, ui: &mut egui::Ui) {
-    if status.sensor_data.num_locks > status.sensor_data.num_unlocks {
-        ui.label(RichText::new("Currently Locked").color(Color32::RED));
-    } else {
-        ui.label(RichText::new("Currently Unlocked").color(Color32::DARK_GREEN));
     }
 }
 
@@ -302,9 +293,9 @@ fn init_lock_status_sensor(
 }
 
 fn get_remote_update_callback(
-    network_tx: Sender<RemoteUpdate>,
+    network_tx: Sender<RemoteUpdate<SensorOutputs>>,
     ctx_clone: egui::Context,
-) -> impl Fn(RemoteUpdate) + Clone {
+) -> impl Fn(RemoteUpdate<SensorOutputs>) + Clone {
     move |update| {
         network_tx.send(update).unwrap();
         ctx_clone.request_repaint();

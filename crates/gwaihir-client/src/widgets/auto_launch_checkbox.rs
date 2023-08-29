@@ -1,8 +1,6 @@
 use auto_launch::AutoLaunch;
 use egui::{Response, Ui, Widget};
 
-use crate::app;
-
 #[must_use = "You should put this widget in a ui with `ui.add(widget);`"]
 pub struct AutoLaunchCheckbox {
     enabled: bool,
