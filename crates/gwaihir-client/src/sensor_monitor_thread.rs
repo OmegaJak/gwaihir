@@ -143,25 +143,32 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
 
-    struct MonitorData {
+    struct MonitorAndChannels {
         monitor: SensorMonitor,
         main_to_monitor_tx: Sender<MainToMonitorMessages>,
         monitor_to_main_rx: Receiver<MonitorToMainMessages>,
     }
 
-    fn init_monitor() -> MonitorData {
+    fn init_monitor() -> MonitorAndChannels {
         let (main_to_monitor_tx, main_to_monitor_rx) = channel();
         let (monitor_to_main_tx, monitor_to_main_rx) = channel();
         let monitor = SensorMonitor::new(main_to_monitor_rx, monitor_to_main_tx);
-        MonitorData {
+        MonitorAndChannels {
             monitor,
             main_to_monitor_tx,
             monitor_to_main_rx,
         }
     }
 
+    fn init_monitor_and_flush_initial_messages() -> MonitorAndChannels {
+        let mut data = init_monitor();
+        data.monitor.loop_body();
+        while let Ok(_) = data.monitor_to_main_rx.try_recv() {}
+        data
+    }
+
     #[test]
-    fn sends_sensor_update_on_startup() {
+    fn sends_one_sensor_update_on_startup() {
         let mut monitor_data = init_monitor();
 
         monitor_data.monitor.loop_body();
@@ -170,13 +177,17 @@ mod tests {
             monitor_data.monitor_to_main_rx.try_recv(),
             Ok(MonitorToMainMessages::UpdatedSensorOutputs(_))
         );
+        assert_matches!(
+            monitor_data.monitor_to_main_rx.try_recv(),
+            Err(TryRecvError::Empty)
+        );
     }
 
     #[test]
     fn sends_no_sensor_update_on_second_loop_with_no_sensor_changes() {
-        let mut monitor_data = init_monitor();
+        let mut monitor_data = init_monitor_and_flush_initial_messages();
+
         monitor_data.monitor.loop_body();
-        monitor_data.monitor_to_main_rx.try_recv().ok();
 
         assert_matches!(
             monitor_data.monitor_to_main_rx.try_recv(),
@@ -186,9 +197,7 @@ mod tests {
 
     #[test]
     fn sends_lock_status_update_once_sensor_is_ready() {
-        let mut data = init_monitor();
-        data.monitor.loop_body();
-        let _ = data.monitor_to_main_rx.try_recv();
+        let mut data = init_monitor_and_flush_initial_messages();
         let (lock_status_sensor, _session_event_tx) = LockStatusSensor::new();
 
         data.main_to_monitor_tx
