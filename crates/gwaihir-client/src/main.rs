@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use crate::sensor_monitor_thread::{create_sensor_monitor_thread, MainToMonitorMessages};
-pub use app::TemplateApp;
+pub use app::GwaihirApp;
 use gwaihir_client_lib::APP_ID;
 use networking_spacetimedb::SpacetimeDBInterface;
 use sensors::lock_status_sensor::LockStatusSensorBuilder;
@@ -31,7 +31,7 @@ fn main() -> eframe::Result<()> {
             tx_to_monitor
                 .send(MainToMonitorMessages::SetEguiContext(ctx_clone))
                 .unwrap();
-            Box::new(TemplateApp::<SpacetimeDBInterface>::new(
+            Box::new(GwaihirApp::<SpacetimeDBInterface>::new(
                 cc,
                 registered_builder,
                 tx_to_monitor,

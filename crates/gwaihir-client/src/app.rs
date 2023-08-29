@@ -38,10 +38,10 @@ impl Default for Persistence {
     }
 }
 
-pub struct TemplateApp<N> {
+pub struct GwaihirApp<N> {
     tray_icon_data: Option<TrayIconData>,
 
-    tx_to_monitor_thread: Sender<MainToMonitorMessages>,
+    _tx_to_monitor_thread: Sender<MainToMonitorMessages>,
     rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
     current_status: HashMap<UniqueUserId, UserStatus<SensorOutputs>>,
 
@@ -54,7 +54,7 @@ pub struct TemplateApp<N> {
     persistence: Persistence,
 }
 
-impl<N> TemplateApp<N>
+impl<N> GwaihirApp<N>
 where
     N: NetworkInterface<SensorOutputs>,
 {
@@ -84,9 +84,9 @@ where
         let (network_tx, network_rx) = mpsc::channel();
         let ctx_clone = cc.egui_ctx.clone();
         let network: N = NetworkInterface::new(get_remote_update_callback(network_tx, ctx_clone));
-        TemplateApp {
+        GwaihirApp {
             tray_icon_data: None,
-            tx_to_monitor_thread,
+            _tx_to_monitor_thread: tx_to_monitor_thread,
             rx_from_monitor_thread,
             current_status: HashMap::new(),
 
@@ -133,7 +133,7 @@ where
     }
 }
 
-impl<N> eframe::App for TemplateApp<N>
+impl<N> eframe::App for GwaihirApp<N>
 where
     N: NetworkInterface<SensorOutputs>,
 {
@@ -251,7 +251,7 @@ where
     }
 }
 
-impl<N> TemplateApp<N> {
+impl<N> GwaihirApp<N> {
     fn subscribed_to_user(&self, user_id: &UniqueUserId) -> bool {
         !self.persistence.ignored_users.contains(user_id)
     }
