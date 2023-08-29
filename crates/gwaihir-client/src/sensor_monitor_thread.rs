@@ -74,7 +74,12 @@ impl SensorMonitor {
         }
     }
 
-    fn loop_body(&mut self) -> ControlFlow<()> {
+    fn loop_body(&mut self) {
+        self.receive_msgs_from_main();
+        self.send_sensor_msgs_to_main();
+    }
+
+    fn receive_msgs_from_main(&mut self) {
         match self.rx_from_main.try_recv() {
             Err(TryRecvError::Empty) => (),
             Err(TryRecvError::Disconnected) => {
@@ -84,7 +89,9 @@ impl SensorMonitor {
                 self.process_msg(msg);
             }
         }
+    }
 
+    fn send_sensor_msgs_to_main(&mut self) {
         if self.check_sensor_updates() {
             self.tx_to_main
                 .send(MonitorToMainMessages::UpdatedSensorOutputs(SensorOutputs {
@@ -96,7 +103,6 @@ impl SensorMonitor {
                 ctx.request_repaint();
             }
         }
-        ControlFlow::Continue(())
     }
 
     fn check_sensor_updates(&mut self) -> bool {
