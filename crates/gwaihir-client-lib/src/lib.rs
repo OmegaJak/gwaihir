@@ -22,17 +22,18 @@ pub const APP_ID: &str = "gwaihir";
     Ord,
     Serialize,
     Deserialize,
+    Debug
 ))]
 pub struct UniqueUserId(String);
 
-#[nutype(derive(AsRef, Clone, Into))]
+#[nutype(derive(AsRef, Clone, Into, Debug))]
 pub struct Username(String);
 
 pub enum RemoteUpdate<T> {
     UserStatusUpdated(UserStatus<T>),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct UserStatus<T> {
     pub user_id: UniqueUserId,
     pub username: Username,

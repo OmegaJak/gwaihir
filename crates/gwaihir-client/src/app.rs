@@ -155,6 +155,7 @@ where
                 panic!("The background thread unexpected disconnected!");
             }
             Ok(MonitorToMainMessages::UpdatedSensorOutputs(sensor_outputs)) => {
+                // println!("Publishing update: {:#?}", &sensor_outputs);
                 self.network.publish_update(sensor_outputs);
             }
         }
@@ -163,6 +164,7 @@ where
             match update {
                 RemoteUpdate::UserStatusUpdated(status) => {
                     if self.subscribed_to_user(&status.user_id) {
+                        // println!("Got user update from DB: {:#?}", &status);
                         self.current_status.insert(status.user_id.clone(), status);
                     }
                 }

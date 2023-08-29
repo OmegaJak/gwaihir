@@ -42,6 +42,7 @@ pub struct EventLoopRegisteredLockStatusSensorBuilder {
 pub struct FullyRegisteredLockStatusSensorBuilder {
     sensor_rx: Receiver<SessionEvent>,
 }
+
 pub struct LockStatusSensor {
     session_event_rx: Receiver<SessionEvent>,
     lock_status: LockStatus,
@@ -127,6 +128,20 @@ impl Sensor for LockStatusSensor {
         }
 
         SensorOutput::LockStatus(self.lock_status.clone())
+    }
+}
+
+#[cfg(test)]
+impl LockStatusSensor {
+    pub fn new() -> (Self, Sender<SessionEvent>) {
+        let (tx, rx) = mpsc::channel();
+        (
+            LockStatusSensor {
+                session_event_rx: rx,
+                lock_status: Default::default(),
+            },
+            tx,
+        )
     }
 }
 

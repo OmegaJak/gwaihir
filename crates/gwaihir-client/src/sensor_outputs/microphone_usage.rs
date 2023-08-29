@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::SensorWidget;
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct MicrophoneUsage {
     pub usage: Vec<AppMicrophoneUsage>,
 }

@@ -9,12 +9,12 @@ pub mod lock_status;
 pub mod microphone_usage;
 pub mod online_status;
 
-#[derive(Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
 pub struct SensorOutputs {
     pub outputs: Vec<SensorOutput>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub enum SensorOutput {
     LockStatus(LockStatus),
     MicrophoneUsage(MicrophoneUsage),
