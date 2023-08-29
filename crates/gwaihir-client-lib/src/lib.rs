@@ -65,20 +65,3 @@ where
     fn set_username(&self, name: String);
     fn get_current_user_id(&self) -> Option<UniqueUserId>;
 }
-
-// #[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
-// pub struct SensorData {
-//     pub num_locks: u32,
-//     pub num_unlocks: u32,
-//     pub microphone_usage: Vec<MicrophoneUsage>,
-// }
-
-// impl Default for SensorData {
-//     fn default() -> Self {
-//         Self {
-//             num_locks: 0,
-//             num_unlocks: 0,
-//             microphone_usage: Vec::new(),
-//         }
-//     }
-// }
