@@ -30,3 +30,17 @@ impl SensorWidget for SensorOutput {
         }
     }
 }
+
+impl SensorOutputs {
+    pub fn show_first(
+        &self,
+        mut predicate: impl FnMut(&SensorOutput) -> bool,
+        ui: &mut egui::Ui,
+        id: &UniqueUserId,
+    ) {
+        self.outputs
+            .iter()
+            .find(|v| predicate(v))
+            .map(|o| o.show(ui, id));
+    }
+}

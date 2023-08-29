@@ -231,26 +231,17 @@ where
                     }
                 });
 
-                // for output in status.sensor_outputs.outputs.iter() {
-                //     output.show(ui, id);
-                // }
-                let lock_status = status
-                    .sensor_outputs
-                    .outputs
-                    .iter()
-                    .find(|v| matches!(v, SensorOutput::LockStatus(_)));
-                if let Some(SensorOutput::LockStatus(lock_status)) = lock_status {
-                    lock_status.show(ui, id);
-                }
+                status.sensor_outputs.show_first(
+                    |o| matches!(o, SensorOutput::LockStatus(_)),
+                    ui,
+                    id,
+                );
 
-                let mic_usage = status
-                    .sensor_outputs
-                    .outputs
-                    .iter()
-                    .find(|v| matches!(v, SensorOutput::MicrophoneUsage(_)));
-                if let Some(SensorOutput::MicrophoneUsage(mic_usage)) = mic_usage {
-                    mic_usage.show(ui, id);
-                }
+                status.sensor_outputs.show_first(
+                    |o| matches!(o, SensorOutput::MicrophoneUsage(_)),
+                    ui,
+                    id,
+                );
             }
 
             egui::warn_if_debug_build(ui);
