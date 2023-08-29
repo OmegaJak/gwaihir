@@ -11,11 +11,6 @@ pub struct MicrophoneUsageSensor {
     most_recent_data: MicrophoneUsage,
 }
 
-struct AppMicrophoneUsage {
-    app_name: AppName,
-    last_used: u64,
-}
-
 impl Sensor for MicrophoneUsageSensor {
     fn get_output(&mut self) -> SensorOutput {
         self.check_microphone_usage();
@@ -48,28 +43,32 @@ fn get_all_programs_using_microphone() -> Vec<AppName> {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let microphone_packaged_store = hkcu.open_subkey_with_flags("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone", KEY_READ).unwrap();
     let microphone_nonpackaged_store = hkcu.open_subkey_with_flags("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone\\NonPackaged", KEY_READ).unwrap();
-    let in_use: Vec<_> = get_microphone_usage_list(microphone_packaged_store)
-        .into_iter()
-        .chain(get_microphone_usage_list(microphone_nonpackaged_store).into_iter())
-        .filter(|usage| usage.last_used == 0)
-        .map(|a| a.app_name)
-        .collect();
+
+    let mut in_use = get_apps_using_microphone(microphone_packaged_store);
+    in_use.append(&mut get_apps_using_microphone(microphone_nonpackaged_store));
     in_use
 }
 
-fn get_microphone_usage_list(parent_regkey: winreg::RegKey) -> Vec<AppMicrophoneUsage> {
+fn get_apps_using_microphone(parent_regkey: winreg::RegKey) -> Vec<AppName> {
     parent_regkey
         .enum_keys()
         .filter_map(|x| x.ok())
         .filter_map(|key| {
-            Some(AppMicrophoneUsage {
-                app_name: key.clone().into(),
-                last_used: parent_regkey
-                    .open_subkey_with_flags(key, KEY_READ)
-                    .ok()?
-                    .get_value::<u64, _>("LastUsedTimeStop")
-                    .ok()?,
-            })
+            if get_last_microphone_usage_time(&parent_regkey, &key)? == 0 {
+                Some(key.clone().into())
+            } else {
+                None
+            }
         })
         .collect()
+}
+
+fn get_last_microphone_usage_time(parent_regkey: &RegKey, app_name: &str) -> Option<u64> {
+    Some(
+        parent_regkey
+            .open_subkey_with_flags(app_name, KEY_READ)
+            .ok()?
+            .get_value::<u64, _>("LastUsedTimeStop")
+            .ok()?,
+    )
 }
