@@ -50,7 +50,7 @@ where
 }
 
 /// Register all the callbacks our app will use to respond to database events.
-fn register_callbacks<T>(update_callback: impl Fn(RemoteUpdate<T>) + Send + 'static + Clone)
+fn register_callbacks<T>(update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static)
 where
     T: for<'a> Deserialize<'a> + AcceptsOnlineStatus,
 {
