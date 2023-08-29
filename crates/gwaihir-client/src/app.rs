@@ -207,11 +207,11 @@ where
             for (id, status) in user_status_list.iter() {
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 2.0;
-                    // show_online_status(status, ui);
-                    OnlineStatus {
-                        online: status.is_online,
-                    }
-                    .show(ui, id); //TODO: This is a hack till we figure out online status/sensor stuff
+                    status.sensor_outputs.show_first(
+                        |o| matches!(o, SensorOutput::OnlineStatus(_)),
+                        ui,
+                        id,
+                    );
                     ui.heading(status.display_name());
                     if let Some(current_user_id) = &self.current_user_id {
                         if id == current_user_id {

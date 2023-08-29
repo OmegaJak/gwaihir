@@ -2,7 +2,8 @@ mod module_bindings;
 
 use gwaihir_client_lib::{
     chrono::{DateTime, NaiveDateTime, Utc},
-    NetworkInterface, RemoteUpdate, UniqueUserId, UserStatus, Username, APP_ID,
+    AcceptsOnlineStatus, NetworkInterface, RemoteUpdate, UniqueUserId, UserStatus, Username,
+    APP_ID,
 };
 use module_bindings::*;
 use serde::{Deserialize, Serialize};
@@ -25,7 +26,7 @@ pub struct SpacetimeDBInterface {}
 
 impl<T> NetworkInterface<T> for SpacetimeDBInterface
 where
-    T: Serialize + for<'a> Deserialize<'a>,
+    T: Serialize + for<'a> Deserialize<'a> + AcceptsOnlineStatus,
 {
     fn new(update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static) -> Self {
         register_callbacks(update_callback);
@@ -52,7 +53,7 @@ where
 /// Register all the callbacks our app will use to respond to database events.
 fn register_callbacks<T>(update_callback: impl Fn(RemoteUpdate<T>) + Send + 'static + Clone)
 where
-    T: for<'a> Deserialize<'a>,
+    T: for<'a> Deserialize<'a> + AcceptsOnlineStatus,
 {
     // // When we receive our `Credentials`, save them to a file.
     once_on_connect(on_connected);
@@ -122,7 +123,7 @@ fn identity_leading_hex(id: &Identity) -> String {
 /// print a notification about name and status changes.
 fn on_user_updated<T>(old: &User, new: &User, _: Option<&ReducerEvent>) -> Option<RemoteUpdate<T>>
 where
-    T: for<'a> Deserialize<'a>,
+    T: for<'a> Deserialize<'a> + AcceptsOnlineStatus,
 {
     if new.last_status_update != old.last_status_update
         || old.name != new.name
@@ -136,11 +137,11 @@ where
 
 fn convert_to_remote_update<T>(new: &User) -> Option<RemoteUpdate<T>>
 where
-    T: for<'a> Deserialize<'a>,
+    T: for<'a> Deserialize<'a> + AcceptsOnlineStatus,
 {
     if let Some(status) = new.status.clone() {
-        match serde_json::from_str(&status) {
-            Ok(sensor_data) => {
+        match serde_json::from_str::<T>(&status) {
+            Ok(mut sensor_data) => {
                 let last_update = DateTime::<Utc>::from_utc(
                     NaiveDateTime::from_timestamp_micros(
                         new.last_status_update.unwrap().try_into().unwrap(),
@@ -148,6 +149,7 @@ where
                     .unwrap(),
                     Utc,
                 );
+                sensor_data.set_online_status(new.online);
                 return Some(RemoteUpdate::UserStatusUpdated(UserStatus {
                     user_id: UniqueUserId::new(identity_leading_hex(&new.identity)),
                     username: Username::new(new.name.clone().unwrap_or_default()),

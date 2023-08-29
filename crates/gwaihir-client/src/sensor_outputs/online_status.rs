@@ -1,8 +1,10 @@
 use egui::{Color32, RichText};
 use gwaihir_client_lib::UniqueUserId;
+use serde::{Deserialize, Serialize};
 
 use super::SensorWidget;
 
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct OnlineStatus {
     pub online: bool,
 }
