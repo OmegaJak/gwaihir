@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     sensor_monitor_thread::{MainToMonitorMessages, MonitorToMainMessages},
-    sensor_outputs::{online_status::OnlineStatus, SensorOutput, SensorOutputs, SensorWidget},
+    sensor_outputs::{SensorOutput, SensorOutputs},
     sensors::lock_status_sensor::{EventLoopRegisteredLockStatusSensorBuilder, LockStatusSensor},
     tray_icon::{hide_to_tray, TrayIconData},
     widgets::auto_launch_checkbox::AutoLaunchCheckboxUiExtension,

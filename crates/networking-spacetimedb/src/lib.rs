@@ -11,7 +11,6 @@ use spacetimedb_sdk::{
     identity::{
         identity, load_credentials, once_on_connect, save_credentials, Credentials, Identity,
     },
-    reducer::Status,
     subscribe,
     table::{TableType, TableWithPrimaryKey},
 };
@@ -101,20 +100,6 @@ fn on_connected(creds: &Credentials) {
     }
 }
 
-/// Our `User::on_insert` callback:
-/// if the user is online, print a notification.
-fn on_user_inserted(user: &User, _: Option<&ReducerEvent>) {
-    if user.online {
-        println!("User {} connected.", user_name_or_identity(user));
-    }
-}
-
-fn user_name_or_identity(user: &User) -> String {
-    user.name
-        .clone()
-        .unwrap_or_else(|| identity_leading_hex(&user.identity))
-}
-
 fn identity_leading_hex(id: &Identity) -> String {
     hex::encode(&id.bytes()[0..8])
 }
@@ -169,23 +154,6 @@ where
     }
 
     None
-}
-
-/// Our `on_subscription_applied` callback:
-/// sort all past messages and print them in timestamp order.
-fn on_sub_applied() {
-    // let mut messages = Message::iter().collect::<Vec<_>>();
-    // messages.sort_by_key(|m| m.sent);
-    // for message in messages {
-    //     print_message(&message);
-    // }
-}
-
-/// Our `on_set_name` callback: print a warning if the reducer failed.
-fn on_name_set(_sender: &Identity, status: &Status, name: &String) {
-    if let Status::Failed(err) = status {
-        eprintln!("Failed to change name to {:?}: {}", name, err);
-    }
 }
 
 fn creds_dir() -> String {

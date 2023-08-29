@@ -71,7 +71,7 @@ pub fn handle_events(frame: &mut Frame, tray_icon_data: TrayIconData) -> Option<
 }
 
 fn icon_from_png_bytes(bytes: &[u8]) -> Icon {
-    let decoded_icon = lodepng::decode32(TRAY_ICON_BYTES).unwrap();
+    let decoded_icon = lodepng::decode32(bytes).unwrap();
     Icon::from_rgba(
         decoded_icon
             .buffer

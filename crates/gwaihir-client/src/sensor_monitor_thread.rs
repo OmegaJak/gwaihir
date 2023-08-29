@@ -1,5 +1,4 @@
 use std::{
-    ops::ControlFlow,
     sync::mpsc::{channel, Receiver, Sender, TryRecvError},
     thread::{sleep, JoinHandle},
     time::Duration,

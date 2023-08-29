@@ -1,9 +1,9 @@
+use super::Sensor;
+use crate::sensor_outputs::lock_status::LockStatus;
+use crate::sensor_outputs::SensorOutput;
 use std::cell::RefCell;
-use std::collections::VecDeque;
 use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
-use std::sync::{Arc, Mutex, RwLock};
-
 use thiserror::Error;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::System::RemoteDesktop::{
@@ -13,11 +13,6 @@ use windows::Win32::UI::WindowsAndMessaging::{
     MSG, WM_WTSSESSION_CHANGE, WTS_SESSION_LOCK, WTS_SESSION_UNLOCK,
 };
 use winit::platform::windows::EventLoopBuilderExtWindows;
-
-use crate::sensor_outputs::lock_status::LockStatus;
-use crate::sensor_outputs::SensorOutput;
-
-use super::Sensor;
 
 pub enum SessionEvent {
     Locked,
@@ -32,7 +27,6 @@ pub enum LockStatusSensorError {
 
 type EventLoopBuilder = eframe::EventLoopBuilder<eframe::UserEvent>;
 type WindowHandle = raw_window_handle::Win32WindowHandle;
-type EventBuffer = Arc<Mutex<VecDeque<SessionEvent>>>;
 
 pub struct LockStatusSensorBuilder {}
 // pub struct OSRegisteredLockStatusSensorBuilder {}
@@ -77,13 +71,6 @@ impl LockStatusSensorBuilder {
             sensor_rx: rx_from_windows,
         }
     }
-
-    // pub fn register_os_hook(
-    //     handle: WindowHandle,
-    // ) -> Result<OSRegisteredLockStatusSensorBuilder, LockStatusSensorError> {
-    //     register_os_hook(handle)?;
-    //     Ok(OSRegisteredLockStatusSensorBuilder {})
-    // }
 }
 
 impl EventLoopRegisteredLockStatusSensorBuilder {
@@ -97,17 +84,6 @@ impl EventLoopRegisteredLockStatusSensorBuilder {
         })
     }
 }
-
-// impl OSRegisteredLockStatusSensorBuilder {
-//     pub fn register_msg_hook(
-//         self,
-//         builder: &mut EventLoopBuilder,
-//     ) -> FullyRegisteredLockStatusSensorBuilder {
-//         let event_buffer = create_event_buffer();
-//         register_msg_hook(builder, event_buffer.clone());
-//         FullyRegisteredLockStatusSensorBuilder { event_buffer }
-//     }
-// }
 
 impl FullyRegisteredLockStatusSensorBuilder {
     pub fn build(self) -> LockStatusSensor {
@@ -143,10 +119,6 @@ impl LockStatusSensor {
             tx,
         )
     }
-}
-
-fn create_event_buffer() -> EventBuffer {
-    EventBuffer::new(Mutex::new(VecDeque::new()))
 }
 
 fn register_os_hook(

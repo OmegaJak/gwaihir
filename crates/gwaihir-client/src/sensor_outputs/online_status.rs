@@ -10,7 +10,7 @@ pub struct OnlineStatus {
 }
 
 impl SensorWidget for OnlineStatus {
-    fn show(&self, ui: &mut egui::Ui, id: &UniqueUserId) {
+    fn show(&self, ui: &mut egui::Ui, _id: &UniqueUserId) {
         let mut online_color = Color32::RED;
         if self.online {
             online_color = Color32::GREEN;
