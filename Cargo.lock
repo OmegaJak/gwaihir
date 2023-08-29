@@ -1793,6 +1793,7 @@ dependencies = [
  "lodepng",
  "log",
  "networking-spacetimedb",
+ "nutype",
  "raw-window-handle",
  "serde",
  "thiserror",

@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
 use winreg::RegKey;
 
-use crate::sensor_outputs::microphone_usage::{AppMicrophoneUsage, MicrophoneUsage};
+use crate::sensor_outputs::microphone_usage::{AppName, MicrophoneUsage};
 use crate::sensor_outputs::SensorOutput;
 
 use super::Sensor;
@@ -10,6 +10,11 @@ use super::Sensor;
 pub struct MicrophoneUsageSensor {
     last_check_time: Instant,
     most_recent_data: MicrophoneUsage,
+}
+
+struct AppMicrophoneUsage {
+    app_name: AppName,
+    last_used: u64,
 }
 
 impl Sensor for MicrophoneUsageSensor {
@@ -39,7 +44,7 @@ impl MicrophoneUsageSensor {
     }
 }
 
-fn get_all_programs_using_microphone() -> Vec<AppMicrophoneUsage> {
+fn get_all_programs_using_microphone() -> Vec<AppName> {
     // If performance becomes a concern, we could maybe usage RegNotifyChangeKeyValue (https://learn.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regnotifychangekeyvalue)
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let microphone_packaged_store = hkcu.open_subkey_with_flags("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone", KEY_READ).unwrap();
@@ -48,6 +53,7 @@ fn get_all_programs_using_microphone() -> Vec<AppMicrophoneUsage> {
         .into_iter()
         .chain(get_microphone_usage_list(microphone_nonpackaged_store).into_iter())
         .filter(|usage| usage.last_used == 0)
+        .map(|a| a.app_name)
         .collect();
     in_use
 }
@@ -58,7 +64,7 @@ fn get_microphone_usage_list(parent_regkey: winreg::RegKey) -> Vec<AppMicrophone
         .filter_map(|x| x.ok())
         .filter_map(|key| {
             Some(AppMicrophoneUsage {
-                app_name: key.clone(),
+                app_name: key.clone().into(),
                 last_used: parent_regkey
                     .open_subkey_with_flags(key, KEY_READ)
                     .ok()?

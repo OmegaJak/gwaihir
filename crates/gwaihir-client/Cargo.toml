@@ -25,6 +25,7 @@ thiserror = "1.0.44"
 winreg = "0.50.0"
 lodepng = "3.7.2"
 auto-launch = { git = "https://github.com/OmegaJak/auto-launch", branch = "report_task_manager_disabled_as_disabled" } # Until https://github.com/zzzgydi/auto-launch/pull/8 is merged and available
+nutype = { version = "0.4.0-beta.2", features = ["serde"] }
 
 # local:
 gwaihir-client-lib = { path = "../gwaihir-client-lib" }

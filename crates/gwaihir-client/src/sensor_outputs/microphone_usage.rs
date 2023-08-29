@@ -1,19 +1,17 @@
 use egui::CollapsingHeader;
 use gwaihir_client_lib::UniqueUserId;
+use nutype::nutype;
 use serde::{Deserialize, Serialize};
 
 use super::SensorWidget;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct MicrophoneUsage {
-    pub usage: Vec<AppMicrophoneUsage>,
+    pub usage: Vec<AppName>,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
-pub struct AppMicrophoneUsage {
-    pub app_name: String,
-    pub last_used: u64,
-}
+#[nutype(derive(Serialize, Deserialize, PartialEq, AsRef, Clone, Into, Debug, From))]
+pub struct AppName(String);
 
 impl Default for MicrophoneUsage {
     fn default() -> Self {
@@ -31,8 +29,8 @@ impl SensorWidget for MicrophoneUsage {
                     "{} app(s) currently listening to the microphone",
                     self.usage.len()
                 ));
-                for usage in self.usage.iter() {
-                    let pretty_name = usage.app_name.replace("#", "\\");
+                for app in self.usage.iter() {
+                    let pretty_name = app.as_ref().replace("#", "\\");
                     ui.label(pretty_name);
                 }
             });
