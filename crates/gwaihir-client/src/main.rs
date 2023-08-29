@@ -9,7 +9,6 @@ use sensors::lock_status_sensor::LockStatusSensorBuilder;
 
 mod app;
 mod sensor_monitor_thread;
-mod sensor_outputs;
 mod sensors;
 mod tray_icon;
 mod ui_extension_methods;

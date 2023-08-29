@@ -4,9 +4,10 @@ use std::{
     time::Duration,
 };
 
-use crate::{
-    sensor_outputs::{SensorOutput, SensorOutputs},
-    sensors::{microphone_usage_sensor::MicrophoneUsageSensor, Sensor},
+use crate::sensors::{
+    microphone_usage_sensor::MicrophoneUsageSensor,
+    outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
+    Sensor,
 };
 
 use crate::sensors::lock_status_sensor::LockStatusSensor;

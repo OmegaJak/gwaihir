@@ -2,9 +2,8 @@ use std::time::{Duration, Instant};
 use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
 use winreg::RegKey;
 
-use crate::sensor_outputs::microphone_usage::{AppName, MicrophoneUsage};
-use crate::sensor_outputs::SensorOutput;
-
+use super::outputs::microphone_usage::{AppName, MicrophoneUsage};
+use super::outputs::sensor_output::SensorOutput;
 use super::Sensor;
 
 pub struct MicrophoneUsageSensor {

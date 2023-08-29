@@ -3,7 +3,7 @@ use gwaihir_client_lib::UniqueUserId;
 use nutype::nutype;
 use serde::{Deserialize, Serialize};
 
-use super::SensorWidget;
+use crate::sensors::outputs::sensor_output::SensorWidget;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct MicrophoneUsage {

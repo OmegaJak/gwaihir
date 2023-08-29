@@ -1,6 +1,6 @@
+use super::outputs::lock_status::LockStatus;
+use super::outputs::sensor_output::SensorOutput;
 use super::Sensor;
-use crate::sensor_outputs::lock_status::LockStatus;
-use crate::sensor_outputs::SensorOutput;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
@@ -29,7 +29,6 @@ type EventLoopBuilder = eframe::EventLoopBuilder<eframe::UserEvent>;
 type WindowHandle = raw_window_handle::Win32WindowHandle;
 
 pub struct LockStatusSensorBuilder {}
-// pub struct OSRegisteredLockStatusSensorBuilder {}
 pub struct EventLoopRegisteredLockStatusSensorBuilder {
     sensor_rx: Receiver<SessionEvent>,
 }

@@ -2,7 +2,7 @@ use egui::{CollapsingHeader, Color32, RichText};
 use gwaihir_client_lib::UniqueUserId;
 use serde::{Deserialize, Serialize};
 
-use super::SensorWidget;
+use crate::sensors::outputs::sensor_output::SensorWidget;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct LockStatus {
