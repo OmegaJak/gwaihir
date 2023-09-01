@@ -55,11 +55,14 @@ pub trait AcceptsOnlineStatus {
     fn set_online_status(&mut self, online: bool);
 }
 
-pub trait NetworkInterface<T>
+pub trait NetworkInterfaceCreator<T, NI>
 where
-    T: Serialize + for<'a> Deserialize<'a>,
+    NI: NetworkInterface<T>,
 {
-    fn new(update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static) -> Self;
+    fn new(update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static) -> NI;
+}
+
+pub trait NetworkInterface<T> {
     fn publish_update(&self, sensor_outputs: T);
     fn set_username(&self, name: String);
     fn get_current_user_id(&self) -> Option<UniqueUserId>;

@@ -8,6 +8,7 @@ use networking_spacetimedb::SpacetimeDBInterface;
 use sensors::lock_status_sensor::LockStatusSensorBuilder;
 
 mod app;
+mod offline_network_interface;
 mod sensor_monitor_thread;
 mod sensors;
 mod tray_icon;
@@ -30,7 +31,7 @@ fn main() -> eframe::Result<()> {
             tx_to_monitor
                 .send(MainToMonitorMessages::SetEguiContext(ctx_clone))
                 .unwrap();
-            Box::new(GwaihirApp::<SpacetimeDBInterface>::new(
+            Box::new(GwaihirApp::new::<SpacetimeDBInterface>(
                 cc,
                 registered_builder,
                 tx_to_monitor,

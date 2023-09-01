@@ -2,8 +2,8 @@ mod module_bindings;
 
 use gwaihir_client_lib::{
     chrono::{DateTime, NaiveDateTime, Utc},
-    AcceptsOnlineStatus, NetworkInterface, RemoteUpdate, UniqueUserId, UserStatus, Username,
-    APP_ID,
+    AcceptsOnlineStatus, NetworkInterface, NetworkInterfaceCreator, RemoteUpdate, UniqueUserId,
+    UserStatus, Username, APP_ID,
 };
 use module_bindings::*;
 use serde::{Deserialize, Serialize};
@@ -23,7 +23,7 @@ const DB_NAME: &str = "gwaihir-test2";
 
 pub struct SpacetimeDBInterface {}
 
-impl<T> NetworkInterface<T> for SpacetimeDBInterface
+impl<T> NetworkInterfaceCreator<T, SpacetimeDBInterface> for SpacetimeDBInterface
 where
     T: Serialize + for<'a> Deserialize<'a> + AcceptsOnlineStatus,
 {
@@ -34,7 +34,12 @@ where
 
         Self {}
     }
+}
 
+impl<T> NetworkInterface<T> for SpacetimeDBInterface
+where
+    T: Serialize + for<'a> Deserialize<'a> + AcceptsOnlineStatus,
+{
     fn publish_update(&self, sensor_outputs: T) {
         let json = serde_json::to_string(&sensor_outputs).unwrap();
         set_status(json);

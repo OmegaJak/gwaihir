@@ -9,12 +9,15 @@ use std::{
 };
 
 use egui::{epaint::ahash::HashSet, TextEdit, Widget};
-use gwaihir_client_lib::{NetworkInterface, RemoteUpdate, UniqueUserId, UserStatus, APP_ID};
+use gwaihir_client_lib::{
+    NetworkInterface, NetworkInterfaceCreator, RemoteUpdate, UniqueUserId, UserStatus, APP_ID,
+};
 
 use raw_window_handle::HasRawWindowHandle;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    offline_network_interface::OfflineNetworkInterface,
     sensor_monitor_thread::{MainToMonitorMessages, MonitorToMainMessages},
     sensors::{
         lock_status_sensor::{EventLoopRegisteredLockStatusSensorBuilder, LockStatusSensor},
@@ -41,7 +44,7 @@ impl Default for Persistence {
     }
 }
 
-pub struct GwaihirApp<N> {
+pub struct GwaihirApp {
     tray_icon_data: Option<TrayIconData>,
 
     sensor_monitor_thread_join_handle: Option<JoinHandle<()>>,
@@ -50,7 +53,7 @@ pub struct GwaihirApp<N> {
     rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
     current_status: HashMap<UniqueUserId, UserStatus<SensorOutputs>>,
 
-    network: N,
+    network: Box<dyn NetworkInterface<SensorOutputs>>,
     network_rx: Receiver<gwaihir_client_lib::RemoteUpdate<SensorOutputs>>,
     current_user_id: Option<UniqueUserId>,
 
@@ -59,18 +62,21 @@ pub struct GwaihirApp<N> {
     persistence: Persistence,
 }
 
-impl<N> GwaihirApp<N>
-where
-    N: NetworkInterface<SensorOutputs>,
-{
+impl GwaihirApp {
     /// Called once before the first frame.
-    pub fn new(
+    pub fn new<N>(
         cc: &eframe::CreationContext<'_>,
         sensor_builder: Rc<RefCell<Option<EventLoopRegisteredLockStatusSensorBuilder>>>,
         tx_to_monitor_thread: Sender<MainToMonitorMessages>,
         rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
         sensor_monitor_thread_join_handle: JoinHandle<()>,
-    ) -> Self {
+    ) -> Self
+    where
+        N: NetworkInterface<SensorOutputs>
+            + NetworkInterfaceCreator<SensorOutputs, N>
+            + Send
+            + 'static,
+    {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
         let lock_status_sensor = init_lock_status_sensor(cc, sensor_builder);
@@ -88,8 +94,8 @@ where
             .unwrap_or_default();
 
         let (network_tx, network_rx) = mpsc::channel();
-        let ctx_clone = cc.egui_ctx.clone();
-        let network: N = NetworkInterface::new(get_remote_update_callback(network_tx, ctx_clone));
+        let network: Box<dyn NetworkInterface<SensorOutputs>> =
+            init_network_interface::<N>(network_tx, cc.egui_ctx.clone());
         GwaihirApp {
             tray_icon_data: None,
             tx_to_monitor_thread,
@@ -141,10 +147,7 @@ where
     }
 }
 
-impl<N> eframe::App for GwaihirApp<N>
-where
-    N: NetworkInterface<SensorOutputs>,
-{
+impl eframe::App for GwaihirApp {
     /// Called by the frame work to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, Persistence::STORAGE_KEY, &self.persistence);
@@ -268,7 +271,7 @@ where
     }
 }
 
-impl<N> GwaihirApp<N> {
+impl GwaihirApp {
     fn subscribed_to_user(&self, user_id: &UniqueUserId) -> bool {
         !self.persistence.ignored_users.contains(user_id)
     }
@@ -292,6 +295,31 @@ fn init_lock_status_sensor(
     }
 }
 
+fn init_network_interface<N>(
+    network_tx: Sender<RemoteUpdate<SensorOutputs>>,
+    egui_ctx: egui::Context,
+) -> Box<dyn NetworkInterface<SensorOutputs> + Send>
+where
+    N: NetworkInterface<SensorOutputs> + NetworkInterfaceCreator<SensorOutputs, N> + Send + 'static,
+{
+    let network_tx_clone = network_tx.clone();
+    let ctx_clone = egui_ctx.clone();
+    run_with_timeout(
+        move || {
+            Box::new(N::new(get_remote_update_callback(network_tx, egui_ctx)))
+                as Box<dyn NetworkInterface<SensorOutputs> + Send>
+        },
+        Duration::from_secs(5),
+        Some(std::thread::Builder::new().name("network_interface_initializer".to_string())),
+    )
+    .unwrap_or_else(move |_e| {
+        Box::new(OfflineNetworkInterface::new(get_remote_update_callback(
+            network_tx_clone,
+            ctx_clone,
+        )))
+    })
+}
+
 fn get_remote_update_callback(
     network_tx: Sender<RemoteUpdate<SensorOutputs>>,
     ctx_clone: egui::Context,
@@ -299,5 +327,44 @@ fn get_remote_update_callback(
     move |update| {
         network_tx.send(update).unwrap();
         ctx_clone.request_repaint();
+    }
+}
+
+// https://stackoverflow.com/a/74234262/6581675
+fn run_with_timeout<F, T>(
+    f: F,
+    timeout: Duration,
+    thread_builder: Option<std::thread::Builder>,
+) -> Result<T, ()>
+where
+    F: FnOnce() -> T + Send + 'static,
+    T: Send + 'static,
+{
+    let (tx, rx) = mpsc::channel();
+    let thread_builder = thread_builder.unwrap_or_else(|| std::thread::Builder::new());
+    let handle = thread_builder
+        .spawn(move || {
+            let result = f();
+            match tx.send(result) {
+                Ok(()) => {} // everything good
+                Err(_) => {} // we have been released, don't panic
+            }
+        })
+        .unwrap();
+
+    match rx.recv_timeout(timeout) {
+        Ok(result) => Ok(result),
+        Err(mpsc::RecvTimeoutError::Timeout) => Err(()),
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            // thread crashed
+            if handle.is_finished() {
+                let _ = handle.join(); // print crash msg
+            } else {
+                unreachable!(
+                    "it shouldn't be possible for the thread to drop the sender without crashing"
+                )
+            }
+            Err(())
+        }
     }
 }
