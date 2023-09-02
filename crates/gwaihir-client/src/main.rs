@@ -3,7 +3,10 @@
 
 use crate::sensor_monitor_thread::{create_sensor_monitor_thread, MainToMonitorMessages};
 pub use app::GwaihirApp;
+use directories_next::ProjectDirs;
+use flexi_logger::LoggerHandle;
 use gwaihir_client_lib::APP_ID;
+use log::info;
 use networking_spacetimedb::SpacetimeDBInterface;
 use sensors::lock_status_sensor::LockStatusSensorBuilder;
 
@@ -16,7 +19,8 @@ mod ui_extension_methods;
 mod widgets;
 
 fn main() -> eframe::Result<()> {
-    env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
+    let _logger = init_logging();
+    info!("Starting Gwaihir");
 
     let mut native_options = eframe::NativeOptions::default();
     native_options.app_id = Some(APP_ID.to_string());
@@ -40,5 +44,34 @@ fn main() -> eframe::Result<()> {
             ))
         }),
     )?;
+
+    info!("Gwaihir closing nominally");
     Ok(())
+}
+
+fn init_logging() -> LoggerHandle {
+    let log_directory = ProjectDirs::from("", "", APP_ID)
+        .unwrap()
+        .data_dir()
+        .join("..")
+        .join("logs");
+
+    let handle = flexi_logger::Logger::try_with_env_or_str("info")
+        .unwrap()
+        .format_for_files(flexi_logger::detailed_format)
+        .format_for_stdout(flexi_logger::colored_detailed_format)
+        .log_to_file(flexi_logger::FileSpec::default().directory(log_directory))
+        .duplicate_to_stdout(flexi_logger::Duplicate::All)
+        .append()
+        .rotate(
+            flexi_logger::Criterion::Age(flexi_logger::Age::Day),
+            flexi_logger::Naming::Timestamps,
+            flexi_logger::Cleanup::KeepLogFiles(3),
+        )
+        .cleanup_in_background_thread(true)
+        .start()
+        .unwrap();
+    log_panics::init();
+
+    handle
 }

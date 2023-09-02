@@ -13,6 +13,7 @@ use gwaihir_client_lib::{
     NetworkInterface, NetworkInterfaceCreator, RemoteUpdate, UniqueUserId, UserStatus, APP_ID,
 };
 
+use log::{debug, error, warn};
 use raw_window_handle::HasRawWindowHandle;
 use serde::{Deserialize, Serialize};
 
@@ -175,7 +176,7 @@ impl eframe::App for GwaihirApp {
                 panic!("The background thread unexpected disconnected!");
             }
             Ok(MonitorToMainMessages::UpdatedSensorOutputs(sensor_outputs)) => {
-                // println!("Publishing update: {:#?}", &sensor_outputs);
+                debug!("Publishing update: {:#?}", &sensor_outputs);
                 self.network.publish_update(sensor_outputs);
             }
         }
@@ -184,7 +185,7 @@ impl eframe::App for GwaihirApp {
             match update {
                 RemoteUpdate::UserStatusUpdated(status) => {
                     if self.subscribed_to_user(&status.user_id) {
-                        // println!("Got user update from DB: {:#?}", &status);
+                        debug!("Got user update from DB: {:#?}", &status);
                         self.current_status.insert(status.user_id.clone(), status);
                     }
                 }
@@ -196,7 +197,6 @@ impl eframe::App for GwaihirApp {
         }
 
         if let Some(icon_data) = self.tray_icon_data.take() {
-            // println!("Checking tray");
             self.tray_icon_data = crate::tray_icon::handle_events(frame, icon_data);
             ctx.request_repaint_after(Duration::from_millis(100000000));
             return;
@@ -286,7 +286,7 @@ fn init_lock_status_sensor(
             match sensor_builder.take().expect("The lock status sensor builder should be ready when we initialize the Template App").register_os_hook(handle) {
                 Ok(builder) => Some(builder.build()),
                 Err(err) => {
-                    eprintln!("{:#?}", err);
+                    error!("{:#?}", err);
                     None
                 }
             }
@@ -313,6 +313,9 @@ where
         Some(std::thread::Builder::new().name("network_interface_initializer".to_string())),
     )
     .unwrap_or_else(move |_e| {
+        warn!(
+            "Defaulting to offline network interface because initialization of the primary failed"
+        );
         Box::new(OfflineNetworkInterface::new(get_remote_update_callback(
             network_tx_clone,
             ctx_clone,

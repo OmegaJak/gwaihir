@@ -5,6 +5,7 @@ use gwaihir_client_lib::{
     AcceptsOnlineStatus, NetworkInterface, NetworkInterfaceCreator, RemoteUpdate, UniqueUserId,
     UserStatus, Username, APP_ID,
 };
+use log::error;
 use module_bindings::*;
 use serde::{Deserialize, Serialize};
 use spacetimedb_sdk::{
@@ -101,7 +102,7 @@ fn subscribe_to_tables() {
 /// Our `on_connect` callback: save our credentials to a file.
 fn on_connected(creds: &Credentials) {
     if let Err(e) = save_credentials(&creds_dir(), creds) {
-        eprintln!("Failed to save credentials: {:?}", e);
+        error!("Failed to save credentials: {:?}", e);
     }
 }
 
@@ -148,7 +149,7 @@ where
                 }));
             }
             Err(e) => {
-                eprintln!(
+                error!(
                     "Failed to deserialize sensor data for user ({:?}, {}): {}",
                     new.name,
                     identity_leading_hex(&new.identity),

@@ -1,4 +1,5 @@
 use gwaihir_client_lib::{AcceptsOnlineStatus, UniqueUserId};
+use log::error;
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -34,7 +35,7 @@ impl SensorOutputs {
 impl AcceptsOnlineStatus for SensorOutputs {
     fn set_online_status(&mut self, online: bool) {
         if self.has_online_status() {
-            eprintln!("We attempted to set the online status when we already had one");
+            error!("We attempted to set the online status when we already had one");
         }
 
         self.outputs

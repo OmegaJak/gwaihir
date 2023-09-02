@@ -9,7 +9,7 @@ A tool for friends to automatically share their status with each other.
 ### Windows
 **SpacetimeDB credentials:** `C:\Users\{USER}\.gwaihir`
 
-**egui storage:** `C:\Users\{USER}\AppData\Roaming\gwaihir`
+**primary persistence and logs:** `C:\Users\{USER}\AppData\Roaming\gwaihir`
 
 ## Attributions
 [Eagle icon created by Culmbio - Flaticon](https://www.flaticon.com/free-icons/eagle)

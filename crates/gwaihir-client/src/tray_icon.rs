@@ -1,4 +1,5 @@
 use eframe::Frame;
+use log::info;
 use tray_icon::{
     menu::{Menu, MenuEvent, MenuId, MenuItem},
     ClickType, Icon, TrayIcon, TrayIconBuilder, TrayIconEvent,
@@ -47,7 +48,7 @@ pub fn handle_events(frame: &mut Frame, tray_icon_data: TrayIconData) -> Option<
             click_type: ClickType::Double,
             ..
         }) => {
-            println!("Making visible");
+            info!("Making visible");
             frame.set_visible(true);
             return None;
         }
