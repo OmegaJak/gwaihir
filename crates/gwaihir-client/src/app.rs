@@ -2,6 +2,7 @@ use std::{
     cell::RefCell,
     cmp::Ordering,
     collections::HashMap,
+    path::PathBuf,
     rc::Rc,
     sync::mpsc::{self, Receiver, Sender, TryRecvError},
     thread::JoinHandle,
@@ -14,6 +15,7 @@ use gwaihir_client_lib::{
 };
 
 use log::{debug, error, warn};
+use log_err::LogErrResult;
 use raw_window_handle::HasRawWindowHandle;
 use serde::{Deserialize, Serialize};
 
@@ -61,6 +63,7 @@ pub struct GwaihirApp {
     set_name_input: String,
 
     persistence: Persistence,
+    log_file_location: PathBuf,
 }
 
 impl GwaihirApp {
@@ -71,6 +74,7 @@ impl GwaihirApp {
         tx_to_monitor_thread: Sender<MainToMonitorMessages>,
         rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
         sensor_monitor_thread_join_handle: JoinHandle<()>,
+        log_file_location: PathBuf,
     ) -> Self
     where
         N: NetworkInterface<SensorOutputs>
@@ -112,6 +116,7 @@ impl GwaihirApp {
             set_name_input: String::new(),
 
             persistence,
+            log_file_location,
         }
     }
 
@@ -212,6 +217,11 @@ impl eframe::App for GwaihirApp {
                         let tray_icon_data = hide_to_tray(frame);
                         self.tray_icon_data = Some(tray_icon_data);
                         ui.close_menu();
+                    }
+
+                    if ui.button("Open log").clicked() {
+                        opener::open(self.log_file_location.clone())
+                            .log_expect("Failed to open file using default OS handler");
                     }
 
                     if ui.button("Quit").clicked() {

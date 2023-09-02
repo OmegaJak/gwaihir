@@ -1,6 +1,8 @@
 #![warn(clippy::all, rust_2018_idioms)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+use std::path::PathBuf;
+
 use crate::sensor_monitor_thread::{create_sensor_monitor_thread, MainToMonitorMessages};
 pub use app::GwaihirApp;
 use directories_next::ProjectDirs;
@@ -19,7 +21,7 @@ mod ui_extension_methods;
 mod widgets;
 
 fn main() -> eframe::Result<()> {
-    let _logger = init_logging();
+    let logger = init_logging();
     info!("Starting Gwaihir");
 
     let mut native_options = eframe::NativeOptions::default();
@@ -27,6 +29,7 @@ fn main() -> eframe::Result<()> {
     let registered_builder =
         LockStatusSensorBuilder::new().set_event_loop_builder(&mut native_options);
     let (monitor_handle, tx_to_monitor, rx_from_monitor) = create_sensor_monitor_thread();
+    let log_file_location = get_log_file_location(&logger);
     eframe::run_native(
         "Gwaihir",
         native_options,
@@ -41,6 +44,7 @@ fn main() -> eframe::Result<()> {
                 tx_to_monitor,
                 rx_from_monitor,
                 monitor_handle,
+                log_file_location,
             ))
         }),
     )?;
@@ -74,4 +78,13 @@ fn init_logging() -> LoggerHandle {
     log_panics::init();
 
     handle
+}
+
+fn get_log_file_location(logger: &LoggerHandle) -> PathBuf {
+    logger
+        .existing_log_files()
+        .unwrap()
+        .into_iter()
+        .find(|p| p.ends_with("gwaihir_rCURRENT.log"))
+        .unwrap()
 }

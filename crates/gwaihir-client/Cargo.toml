@@ -13,24 +13,28 @@ eframe = { git = "https://github.com/emilk/egui", branch = "master", default-fea
     "glow",          # Use the glow rendering backend. Alternative: "wgpu".
     "persistence",   # Enable restoring app state when restarting the app.
 ] }
+serde = { version = "1", features = ["derive"] }
+winit = "0.28.6"
+thiserror = "1.0.44"
+lodepng = "3.7.2"
+nutype = { version = "0.4.0-beta.2", features = ["serde"] }
+auto-launch = { git = "https://github.com/OmegaJak/auto-launch", branch = "report_task_manager_disabled_as_disabled" } # Until https://github.com/zzzgydi/auto-launch/pull/8 is merged and available
+
+# OS Interactions
+windows = { version = "0.48.0", features = ["Win32_System_RemoteDesktop", "Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_Foundation"] }
+raw-window-handle = "0.5.2"
+tray-icon = "0.8.0"
+winreg = "0.50.0"
+directories-next = "2.0.0"
+opener = "0.6.1"
+
+# Logging
 log = "0.4"
 flexi_logger = "0.26.0"
 log-panics = "2.1.0"
-windows = { version = "0.48.0", features = ["Win32_System_RemoteDesktop", "Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_Foundation"] }
+log_err = "1.1.1"
 
-# You only need serde if you want app persistence:
-serde = { version = "1", features = ["derive"] }
-raw-window-handle = "0.5.2"
-winit = "0.28.6"
-tray-icon = "0.8.0"
-thiserror = "1.0.44"
-winreg = "0.50.0"
-lodepng = "3.7.2"
-auto-launch = { git = "https://github.com/OmegaJak/auto-launch", branch = "report_task_manager_disabled_as_disabled" } # Until https://github.com/zzzgydi/auto-launch/pull/8 is merged and available
-nutype = { version = "0.4.0-beta.2", features = ["serde"] }
-directories-next = "2.0.0"
-
-# local:
+# Local
 gwaihir-client-lib = { path = "../gwaihir-client-lib" }
 networking-spacetimedb = { path = "../networking-spacetimedb" }
 
