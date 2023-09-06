@@ -1,5 +1,9 @@
-use gwaihir_client_lib::chrono::{DateTime, Utc};
+use chrono_humanize::HumanTime;
+use egui::{CollapsingHeader, RichText};
+use gwaihir_client_lib::chrono::{DateTime, Local, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
+
+use crate::ui_extension_methods::UIExtensionMethods;
 
 use super::sensor_output::SensorWidget;
 
@@ -31,9 +35,64 @@ pub trait SameWindow {
 }
 
 impl SensorWidget for WindowActivity {
-    fn show(&self, ui: &mut egui::Ui, _id: &gwaihir_client_lib::UniqueUserId) {
-        ui.label("HELLOO??");
-        ui.label(format!("{:#?}", self));
+    fn show(&self, ui: &mut egui::Ui, id: &gwaihir_client_lib::UniqueUserId) {
+        let time_using_current: HumanTime = HumanTime::from(
+            self.current_window
+                .started_using
+                .signed_duration_since(Local::now()),
+        );
+        ui.horizontal_with_no_item_spacing(|ui| {
+            ui.label("Current window: ");
+            ui.label(RichText::new(format!("{}", self.current_window.app_name)).strong());
+            ui.label(" (started using ");
+            ui.label(format!("{}", time_using_current))
+                .on_hover_text_at_pointer(format!(
+                    "{}",
+                    self.current_window.started_using.naive_local()
+                ));
+            ui.label(")");
+        });
+
+        if !self.previously_active_windows.is_empty() {
+            CollapsingHeader::new("Previous Windows")
+                .default_open(false)
+                .id_source(format!("{}_previous_windows", id.as_ref()))
+                .show(ui, |ui| {
+                    for previous_window in self.previously_active_windows.iter() {
+                        ui.horizontal_with_no_item_spacing(|ui| {
+                            ui.label(
+                                RichText::new(format!("{} ", previous_window.app_name)).strong(),
+                            );
+                            ui.label("from ");
+                            ui.label(format!(
+                                "{} to ",
+                                self.format_datetime(
+                                    previous_window.started_using.with_timezone(&Local)
+                                )
+                            ))
+                            .on_hover_text_at_pointer(format!("{}", previous_window.started_using));
+                            ui.label(format!(
+                                "{}",
+                                self.format_datetime(
+                                    previous_window.stopped_using.with_timezone(&Local)
+                                )
+                            ))
+                            .on_hover_text_at_pointer(format!("{}", previous_window.stopped_using));
+                        });
+                    }
+                });
+        }
+    }
+}
+
+impl WindowActivity {
+    fn format_datetime(&self, datetime: DateTime<Local>) -> String {
+        let time_format = "%l:%M%P";
+        if datetime.date_naive() == Local::now().date_naive() {
+            return datetime.format(time_format).to_string();
+        } else {
+            return datetime.format(&format!("%D {}", time_format)).to_string();
+        }
     }
 }
 

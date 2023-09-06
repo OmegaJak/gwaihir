@@ -1,6 +1,5 @@
 use active_win_pos_rs::get_active_window;
 use bounded_vec_deque::BoundedVecDeque;
-use gwaihir_client_lib::chrono::{DateTime, Utc};
 use log::error;
 
 use super::{
