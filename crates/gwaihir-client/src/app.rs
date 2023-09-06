@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     offline_network_interface::OfflineNetworkInterface,
+    periodic_repaint_thread::create_periodic_repaint_thread,
     sensor_monitor_thread::{MainToMonitorMessages, MonitorToMainMessages},
     sensors::{
         lock_status_sensor::{EventLoopRegisteredLockStatusSensorBuilder, LockStatusSensor},
@@ -51,10 +52,12 @@ pub struct GwaihirApp {
     tray_icon_data: Option<TrayIconData>,
 
     sensor_monitor_thread_join_handle: Option<JoinHandle<()>>,
-
     tx_to_monitor_thread: Sender<MainToMonitorMessages>,
     rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
     current_status: HashMap<UniqueUserId, UserStatus<SensorOutputs>>,
+
+    periodic_repaint_thread_join_handle: Option<JoinHandle<()>>,
+    periodic_repaint_thread_shutdown_sender: Sender<()>,
 
     network: Box<dyn NetworkInterface<SensorOutputs>>,
     network_rx: Receiver<gwaihir_client_lib::RemoteUpdate<SensorOutputs>>,
@@ -98,6 +101,9 @@ impl GwaihirApp {
             })
             .unwrap_or_default();
 
+        let (periodic_repaint_thread_join_handle, periodic_repaint_thread_shutdown_sender) =
+            create_periodic_repaint_thread(cc.egui_ctx.clone(), Duration::from_secs(10));
+
         let (network_tx, network_rx) = mpsc::channel();
         let network: Box<dyn NetworkInterface<SensorOutputs>> =
             init_network_interface::<N>(network_tx, cc.egui_ctx.clone());
@@ -108,10 +114,12 @@ impl GwaihirApp {
             current_status: HashMap::new(),
 
             sensor_monitor_thread_join_handle: Some(sensor_monitor_thread_join_handle),
-
             network,
             network_rx,
             current_user_id: None,
+
+            periodic_repaint_thread_join_handle: Some(periodic_repaint_thread_join_handle),
+            periodic_repaint_thread_shutdown_sender,
 
             set_name_input: String::new(),
 
@@ -167,6 +175,13 @@ impl eframe::App for GwaihirApp {
         if let Some(join_handle) = self.sensor_monitor_thread_join_handle.take() {
             self.tx_to_monitor_thread
                 .send(MainToMonitorMessages::Shutdown)
+                .unwrap();
+            join_handle.join().ok();
+        }
+
+        if let Some(join_handle) = self.periodic_repaint_thread_join_handle.take() {
+            self.periodic_repaint_thread_shutdown_sender
+                .send(())
                 .unwrap();
             join_handle.join().ok();
         }
