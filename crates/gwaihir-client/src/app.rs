@@ -56,8 +56,7 @@ pub struct GwaihirApp {
     rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
     current_status: HashMap<UniqueUserId, UserStatus<SensorOutputs>>,
 
-    periodic_repaint_thread_join_handle: Option<JoinHandle<()>>,
-    periodic_repaint_thread_shutdown_sender: Sender<()>,
+    periodic_repaint_thread_join_handle: JoinHandle<()>,
 
     network: Box<dyn NetworkInterface<SensorOutputs>>,
     network_rx: Receiver<gwaihir_client_lib::RemoteUpdate<SensorOutputs>>,
@@ -101,7 +100,7 @@ impl GwaihirApp {
             })
             .unwrap_or_default();
 
-        let (periodic_repaint_thread_join_handle, periodic_repaint_thread_shutdown_sender) =
+        let periodic_repaint_thread_join_handle =
             create_periodic_repaint_thread(cc.egui_ctx.clone(), Duration::from_secs(10));
 
         let (network_tx, network_rx) = mpsc::channel();
@@ -118,8 +117,7 @@ impl GwaihirApp {
             network_rx,
             current_user_id: None,
 
-            periodic_repaint_thread_join_handle: Some(periodic_repaint_thread_join_handle),
-            periodic_repaint_thread_shutdown_sender,
+            periodic_repaint_thread_join_handle,
 
             set_name_input: String::new(),
 
@@ -175,13 +173,6 @@ impl eframe::App for GwaihirApp {
         if let Some(join_handle) = self.sensor_monitor_thread_join_handle.take() {
             self.tx_to_monitor_thread
                 .send(MainToMonitorMessages::Shutdown)
-                .unwrap();
-            join_handle.join().ok();
-        }
-
-        if let Some(join_handle) = self.periodic_repaint_thread_join_handle.take() {
-            self.periodic_repaint_thread_shutdown_sender
-                .send(())
                 .unwrap();
             join_handle.join().ok();
         }

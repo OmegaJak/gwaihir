@@ -1,7 +1,7 @@
 use std::{
-    sync::mpsc::{channel, Receiver, Sender},
+    sync::mpsc::{channel, Sender},
     thread::JoinHandle,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use egui::Context;
@@ -10,17 +10,11 @@ use egui::Context;
 pub fn create_periodic_repaint_thread(
     egui_ctx: Context,
     duration_between_repaints: Duration,
-) -> (JoinHandle<()>, Sender<()>) {
-    let (shutdown_tx, shutdown_rx) = channel();
+) -> JoinHandle<()> {
     let handle = std::thread::spawn(move || loop {
-        match shutdown_rx.try_recv() {
-            Err(std::sync::mpsc::TryRecvError::Empty) => (),
-            _ => return,
-        }
-
         egui_ctx.request_repaint();
         std::thread::sleep(duration_between_repaints);
     });
 
-    (handle, shutdown_tx)
+    handle
 }
