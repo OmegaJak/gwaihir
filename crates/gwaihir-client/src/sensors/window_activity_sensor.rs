@@ -10,7 +10,7 @@ use super::{
     Sensor,
 };
 
-const ACTIVE_WINDOW_HISTORY_LENGTH: usize = 3;
+const ACTIVE_WINDOW_HISTORY_LENGTH: usize = 7;
 
 pub struct WindowActivitySensor {
     current_active_window: Option<ActiveWindow>,
@@ -24,8 +24,6 @@ impl Sensor for WindowActivitySensor {
                 self.current_active_window = Some(
                     if let Some(current_active_window) = self.current_active_window.take() {
                         if !current_active_window.same_window_as(&active_window) {
-                            self.previously_active_windows
-                                .retain(|v| !v.same_window_as(&active_window));
                             self.previously_active_windows
                                 .push_front(current_active_window.to_no_longer_active());
                             active_window.into()
