@@ -3,13 +3,16 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     lock_status::LockStatus, microphone_usage::MicrophoneUsage, online_status::OnlineStatus,
+    window_activity::WindowActivity,
 };
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub enum SensorOutput {
+    Empty,
     LockStatus(LockStatus),
     MicrophoneUsage(MicrophoneUsage),
     OnlineStatus(OnlineStatus),
+    WindowActivity(WindowActivity),
 }
 
 pub trait SensorWidget {
@@ -19,9 +22,11 @@ pub trait SensorWidget {
 impl SensorWidget for SensorOutput {
     fn show(&self, ui: &mut egui::Ui, id: &UniqueUserId) {
         match self {
+            SensorOutput::Empty => (),
             SensorOutput::LockStatus(status) => status.show(ui, id),
             SensorOutput::MicrophoneUsage(usage) => usage.show(ui, id),
             SensorOutput::OnlineStatus(online) => online.show(ui, id),
+            SensorOutput::WindowActivity(activity) => activity.show(ui, id),
         }
     }
 }
