@@ -56,7 +56,7 @@ pub struct GwaihirApp {
     rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
     current_status: HashMap<UniqueUserId, UserStatus<SensorOutputs>>,
 
-    periodic_repaint_thread_join_handle: JoinHandle<()>,
+    _periodic_repaint_thread_join_handle: JoinHandle<()>,
 
     network: Box<dyn NetworkInterface<SensorOutputs>>,
     network_rx: Receiver<gwaihir_client_lib::RemoteUpdate<SensorOutputs>>,
@@ -117,7 +117,7 @@ impl GwaihirApp {
             network_rx,
             current_user_id: None,
 
-            periodic_repaint_thread_join_handle,
+            _periodic_repaint_thread_join_handle: periodic_repaint_thread_join_handle,
 
             set_name_input: String::new(),
 

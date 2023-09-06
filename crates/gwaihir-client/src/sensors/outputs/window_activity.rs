@@ -48,7 +48,7 @@ impl SensorWidget for WindowActivity {
             ui.label(format!("{}", time_using_current))
                 .on_hover_text_at_pointer(format!(
                     "{}",
-                    self.current_window.started_using.naive_local()
+                    self.current_window.started_using.with_timezone(&Local)
                 ));
             ui.label(")");
         });
@@ -70,14 +70,20 @@ impl SensorWidget for WindowActivity {
                                     previous_window.started_using.with_timezone(&Local)
                                 )
                             ))
-                            .on_hover_text_at_pointer(format!("{}", previous_window.started_using));
+                            .on_hover_text_at_pointer(format!(
+                                "{}",
+                                previous_window.started_using.with_timezone(&Local)
+                            ));
                             ui.label(format!(
                                 "{}",
                                 self.format_datetime(
                                     previous_window.stopped_using.with_timezone(&Local)
                                 )
                             ))
-                            .on_hover_text_at_pointer(format!("{}", previous_window.stopped_using));
+                            .on_hover_text_at_pointer(format!(
+                                "{}",
+                                previous_window.stopped_using.with_timezone(&Local)
+                            ));
                         });
                     }
                 });
