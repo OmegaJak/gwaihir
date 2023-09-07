@@ -14,7 +14,7 @@ use gwaihir_client_lib::{
     NetworkInterface, NetworkInterfaceCreator, RemoteUpdate, UniqueUserId, UserStatus, APP_ID,
 };
 
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 use log_err::LogErrResult;
 use raw_window_handle::HasRawWindowHandle;
 use serde::{Deserialize, Serialize};
@@ -171,10 +171,12 @@ impl eframe::App for GwaihirApp {
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         if let Some(join_handle) = self.sensor_monitor_thread_join_handle.take() {
+            info!("Sending shutdown message to monitor thread");
             self.tx_to_monitor_thread
                 .send(MainToMonitorMessages::Shutdown)
                 .unwrap();
             join_handle.join().ok();
+            info!("Sensor monitor thread successfully shut down")
         }
     }
 
