@@ -21,19 +21,10 @@ impl Sensor for WindowActivitySensor {
     fn get_output(&mut self) -> super::outputs::sensor_output::SensorOutput {
         match get_active_window() {
             Ok(active_window) => {
-                self.current_active_window = Some(
-                    if let Some(current_active_window) = self.current_active_window.take() {
-                        if !current_active_window.same_window_as(&active_window) {
-                            self.previously_active_windows
-                                .push_front(current_active_window.to_no_longer_active());
-                            active_window.into()
-                        } else {
-                            current_active_window
-                        }
-                    } else {
-                        active_window.into()
-                    },
-                )
+                let previously_active_window = self.update_currently_active_window(active_window);
+                if let Some(window) = previously_active_window {
+                    self.previously_active_windows.push_front(window);
+                }
             }
             Err(()) => {
                 error!("Failed to get the active window");
@@ -61,5 +52,23 @@ impl WindowActivitySensor {
         } else {
             SensorOutput::Empty
         }
+    }
+
+    fn update_currently_active_window(
+        &mut self,
+        active_window: active_win_pos_rs::ActiveWindow,
+    ) -> Option<PreviouslyActiveWindow> {
+        if let Some(current_active_window) = self.current_active_window.take() {
+            if !current_active_window.same_window_as(&active_window) {
+                self.current_active_window = Some(active_window.into());
+                return Some(current_active_window.to_no_longer_active());
+            } else {
+                self.current_active_window = Some(current_active_window);
+            }
+        } else {
+            self.current_active_window = Some(active_window.into());
+        }
+
+        None
     }
 }
