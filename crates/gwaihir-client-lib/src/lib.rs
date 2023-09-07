@@ -1,6 +1,5 @@
 use chrono::{DateTime, Utc};
 use nutype::nutype;
-use serde::{Deserialize, Serialize};
 
 pub use chrono;
 

@@ -1,9 +1,9 @@
 use chrono_humanize::HumanTime;
-use egui::{text::LayoutJob, CollapsingHeader, RichText, TextFormat};
-use gwaihir_client_lib::chrono::{DateTime, Local, NaiveDateTime, Utc};
+use egui::{CollapsingHeader, RichText};
+use gwaihir_client_lib::chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::ui_extension_methods::UIExtensionMethods;
+use crate::ui_extension_methods::{nicely_formatted_datetime, UIExtensionMethods};
 
 use super::sensor_output::SensorWidget;
 
@@ -55,7 +55,7 @@ impl SensorWidget for WindowActivity {
                         ui.label("from ");
                         ui.label(format!(
                             "{} to ",
-                            self.format_datetime(
+                            nicely_formatted_datetime(
                                 previous_window.started_using.with_timezone(&Local)
                             )
                         ))
@@ -65,7 +65,7 @@ impl SensorWidget for WindowActivity {
                         ));
                         ui.label(format!(
                             "{}",
-                            self.format_datetime(
+                            nicely_formatted_datetime(
                                 previous_window.stopped_using.with_timezone(&Local)
                             )
                         ))
@@ -76,17 +76,6 @@ impl SensorWidget for WindowActivity {
                     });
                 }
             });
-    }
-}
-
-impl WindowActivity {
-    fn format_datetime(&self, datetime: DateTime<Local>) -> String {
-        let time_format = "%l:%M%P";
-        if datetime.date_naive() == Local::now().date_naive() {
-            return datetime.format(time_format).to_string();
-        } else {
-            return datetime.format(&format!("%D {}", time_format)).to_string();
-        }
     }
 }
 

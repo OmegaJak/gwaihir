@@ -9,9 +9,11 @@ use std::{
     time::Duration,
 };
 
-use egui::{epaint::ahash::HashSet, TextEdit, Widget};
+use chrono_humanize::HumanTime;
+use egui::{epaint::ahash::HashSet, RichText, TextEdit, Widget};
 use gwaihir_client_lib::{
-    NetworkInterface, NetworkInterfaceCreator, RemoteUpdate, UniqueUserId, UserStatus, APP_ID,
+    chrono::Local, NetworkInterface, NetworkInterfaceCreator, RemoteUpdate, UniqueUserId,
+    UserStatus, APP_ID,
 };
 
 use log::{debug, error, info, warn};
@@ -28,6 +30,7 @@ use crate::{
         outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
     },
     tray_icon::{hide_to_tray, TrayIconData},
+    ui_extension_methods::nicely_formatted_datetime,
     widgets::auto_launch_checkbox::AutoLaunchCheckboxUiExtension,
 };
 
@@ -253,6 +256,15 @@ impl eframe::App for GwaihirApp {
                         id,
                     );
                     ui.heading(status.display_name());
+                    ui.label(RichText::new(format!(
+                        " {} ",
+                        HumanTime::from(status.last_update)
+                    )))
+                    .on_hover_text_at_pointer(format!(
+                        "Last updated: {}",
+                        nicely_formatted_datetime(status.last_update.with_timezone(&Local),)
+                    ));
+
                     if let Some(current_user_id) = &self.current_user_id {
                         if id == current_user_id {
                             let text_edit_response = TextEdit::singleline(&mut self.set_name_input)

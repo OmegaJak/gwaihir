@@ -1,8 +1,4 @@
-use std::{
-    sync::mpsc::{channel, Sender},
-    thread::JoinHandle,
-    time::Duration,
-};
+use std::{thread::JoinHandle, time::Duration};
 
 use egui::Context;
 
