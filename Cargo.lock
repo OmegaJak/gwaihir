@@ -1146,7 +1146,7 @@ checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 [[package]]
 name = "ecolor"
 version = "0.22.0"
-source = "git+https://github.com/emilk/egui?branch=master#627e1b3d5054df9961b5a467ac7c7b866a04d913"
+source = "git+https://github.com/OmegaJak/egui?branch=expose_richtext_for_easier_layoutjobs#feeb0eb141e7c502b7b7aeb7ccd62ad5bd837729"
 dependencies = [
  "bytemuck",
  "serde",
@@ -1155,7 +1155,7 @@ dependencies = [
 [[package]]
 name = "eframe"
 version = "0.22.0"
-source = "git+https://github.com/emilk/egui?branch=master#627e1b3d5054df9961b5a467ac7c7b866a04d913"
+source = "git+https://github.com/OmegaJak/egui?branch=expose_richtext_for_easier_layoutjobs#feeb0eb141e7c502b7b7aeb7ccd62ad5bd837729"
 dependencies = [
  "bytemuck",
  "cocoa 0.24.1",
@@ -1170,6 +1170,7 @@ dependencies = [
  "js-sys",
  "log",
  "objc",
+ "parking_lot",
  "percent-encoding",
  "raw-window-handle",
  "ron",
@@ -1186,7 +1187,7 @@ dependencies = [
 [[package]]
 name = "egui"
 version = "0.22.0"
-source = "git+https://github.com/emilk/egui?branch=master#627e1b3d5054df9961b5a467ac7c7b866a04d913"
+source = "git+https://github.com/OmegaJak/egui?branch=expose_richtext_for_easier_layoutjobs#feeb0eb141e7c502b7b7aeb7ccd62ad5bd837729"
 dependencies = [
  "accesskit",
  "ahash",
@@ -1200,16 +1201,16 @@ dependencies = [
 [[package]]
 name = "egui-winit"
 version = "0.22.0"
-source = "git+https://github.com/emilk/egui?branch=master#627e1b3d5054df9961b5a467ac7c7b866a04d913"
+source = "git+https://github.com/OmegaJak/egui?branch=expose_richtext_for_easier_layoutjobs#feeb0eb141e7c502b7b7aeb7ccd62ad5bd837729"
 dependencies = [
  "accesskit_winit",
  "arboard",
  "egui",
- "instant",
  "log",
  "raw-window-handle",
  "serde",
  "smithay-clipboard",
+ "web-time",
  "webbrowser",
  "winit",
 ]
@@ -1217,7 +1218,7 @@ dependencies = [
 [[package]]
 name = "egui_glow"
 version = "0.22.0"
-source = "git+https://github.com/emilk/egui?branch=master#627e1b3d5054df9961b5a467ac7c7b866a04d913"
+source = "git+https://github.com/OmegaJak/egui?branch=expose_richtext_for_easier_layoutjobs#feeb0eb141e7c502b7b7aeb7ccd62ad5bd837729"
 dependencies = [
  "bytemuck",
  "egui",
@@ -1237,7 +1238,7 @@ checksum = "a26ae43d7bcc3b814de94796a5e736d4029efb0ee900c12e2d54c993ad1a1e07"
 [[package]]
 name = "emath"
 version = "0.22.0"
-source = "git+https://github.com/emilk/egui?branch=master#627e1b3d5054df9961b5a467ac7c7b866a04d913"
+source = "git+https://github.com/OmegaJak/egui?branch=expose_richtext_for_easier_layoutjobs#feeb0eb141e7c502b7b7aeb7ccd62ad5bd837729"
 dependencies = [
  "bytemuck",
  "serde",
@@ -1303,7 +1304,7 @@ dependencies = [
 [[package]]
 name = "epaint"
 version = "0.22.0"
-source = "git+https://github.com/emilk/egui?branch=master#627e1b3d5054df9961b5a467ac7c7b866a04d913"
+source = "git+https://github.com/OmegaJak/egui?branch=expose_richtext_for_easier_layoutjobs#feeb0eb141e7c502b7b7aeb7ccd62ad5bd837729"
 dependencies = [
  "ab_glyph",
  "ahash",
@@ -4402,6 +4403,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b85cbef8c220a6abc02aefd892dfc0fc23afb1c6a426316ec33253a3877249b"
 dependencies = [
  "js-sys",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "web-time"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19353897b48e2c4d849a2d73cb0aeb16dc2be4e00c565abfc11eb65a806e47de"
+dependencies = [
+ "js-sys",
+ "once_cell",
  "wasm-bindgen",
 ]
 

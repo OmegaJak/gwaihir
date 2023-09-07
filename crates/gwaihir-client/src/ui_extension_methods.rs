@@ -1,4 +1,6 @@
-use egui::{CollapsingHeader, CollapsingResponse, InnerResponse, Ui, WidgetText};
+use egui::{
+    text::LayoutJob, CollapsingHeader, CollapsingResponse, InnerResponse, RichText, Ui, WidgetText,
+};
 
 pub trait UIExtensionMethods {
     fn collapsing_default_open<R>(
@@ -6,10 +8,13 @@ pub trait UIExtensionMethods {
         heading: impl Into<WidgetText>,
         add_contents: impl FnOnce(&mut Ui) -> R,
     ) -> CollapsingResponse<R>;
+
     fn horizontal_with_no_item_spacing<R>(
         &mut self,
         add_contents: impl FnOnce(&mut Ui) -> R,
     ) -> InnerResponse<R>;
+
+    fn create_default_layout_job(&self, rich_texts: Vec<RichText>) -> LayoutJob;
 }
 
 impl UIExtensionMethods for Ui {
@@ -31,5 +36,19 @@ impl UIExtensionMethods for Ui {
         let response = self.horizontal(add_contents);
 
         response
+    }
+
+    fn create_default_layout_job(&self, rich_texts: Vec<RichText>) -> LayoutJob {
+        let mut layout_job = LayoutJob::default();
+        for rich_text in rich_texts.into_iter() {
+            rich_text.append_to(
+                &mut layout_job,
+                self.style(),
+                egui::FontSelection::Default,
+                egui::Align::Center,
+            )
+        }
+
+        layout_job
     }
 }
