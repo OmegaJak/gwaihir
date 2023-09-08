@@ -29,14 +29,13 @@ impl SensorWidget for LockStatus {
 
 impl LockStatus {
     fn show_details(&self, id: &UniqueUserId, ui: &mut egui::Ui) {
-        let mut header_text = RichText::new("Currently Unlocked").color(Color32::DARK_GREEN);
-        if self.num_locks > self.num_unlocks {
-            header_text = RichText::new("Currently Locked").color(Color32::RED);
-        }
+        let header_text = if self.num_locks > self.num_unlocks {
+            RichText::new("Currently Locked").color(Color32::RED)
+        } else {
+            RichText::new("Currently Unlocked").color(Color32::DARK_GREEN)
+        };
 
-        let layout_job = ui.create_default_layout_job(vec![header_text]);
-
-        CollapsingHeader::new(layout_job)
+        CollapsingHeader::new(header_text)
             .id_source(format!("{}_locks", id.as_ref()))
             .show(ui, |ui| {
                 ui.label(format!("Times Locked: {}", self.num_locks));
