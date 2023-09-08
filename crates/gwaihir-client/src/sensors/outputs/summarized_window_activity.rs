@@ -105,22 +105,7 @@ impl SummarizedWindowActivity {
             )
         }
 
-        let mut recent_usage = time_totals
-            .into_iter()
-            .map(|(k, v)| AppUsage {
-                app_name: k,
-                recent_usage: Self::round_to_nearest_second(v),
-            })
-            .filter(|a| !a.recent_usage.is_zero())
-            .collect::<Vec<_>>();
-        recent_usage.sort_by(|a, b| {
-            if a.recent_usage == b.recent_usage {
-                a.app_name.cmp(&b.app_name)
-            } else {
-                b.recent_usage.cmp(&a.recent_usage)
-            }
-        });
-        recent_usage.truncate(DEFAULT_MAX_NUM_APPS_IN_SUMMARY);
+        let recent_usage = Self::humanize_to_recent_usage(time_totals);
         SummarizedWindowActivity {
             current_window: activity.current_window.clone(),
             recent_usage,
@@ -142,7 +127,7 @@ impl SummarizedWindowActivity {
 
         let stopped_using = stopped_using.unwrap_or(now);
 
-        let current_duration = stopped_using - started_using; // Lose precision beyond seconds to avoid spamming updates
+        let current_duration = stopped_using - started_using;
         entry
             .and_modify(|existing_duration| {
                 *existing_duration = current_duration.checked_add(existing_duration).unwrap();
@@ -150,7 +135,27 @@ impl SummarizedWindowActivity {
             .or_insert(current_duration);
     }
 
-    fn round_to_nearest_second(duration: Duration) -> Duration {
+    fn humanize_to_recent_usage(time_totals: HashMap<String, Duration>) -> Vec<AppUsage> {
+        let mut recent_usage = time_totals
+            .into_iter()
+            .map(|(k, v)| AppUsage {
+                app_name: k,
+                recent_usage: Self::round_to_nearest_10_seconds(v),
+            })
+            .filter(|a| !a.recent_usage.is_zero())
+            .collect::<Vec<_>>();
+        recent_usage.sort_by(|a, b| {
+            if a.recent_usage == b.recent_usage {
+                a.app_name.cmp(&b.app_name)
+            } else {
+                b.recent_usage.cmp(&a.recent_usage)
+            }
+        });
+        recent_usage.truncate(DEFAULT_MAX_NUM_APPS_IN_SUMMARY);
+        recent_usage
+    }
+
+    fn round_to_nearest_10_seconds(duration: Duration) -> Duration {
         Duration::seconds(((duration.to_std().unwrap().as_secs_f64() / 10.0).round() * 10.0) as i64)
     }
 }

@@ -16,8 +16,7 @@ pub struct WindowActivityInterpreter {
 
 impl Sensor for WindowActivityInterpreter {
     fn get_output(&mut self) -> SensorOutput {
-        let window_activity = self.window_activity_sensor.update();
-        if let Some(window_activity) = window_activity {
+        if let Some(window_activity) = self.window_activity_sensor.update() {
             let now = Utc::now();
             let cutoff = now - *DEFAULT_TIME_TO_KEEP_WINDOW_ACTIVITY;
             SummarizedWindowActivity::summarize(&window_activity, now, cutoff).into()
