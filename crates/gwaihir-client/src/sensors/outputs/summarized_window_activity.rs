@@ -18,6 +18,8 @@ use super::{
     window_activity::{ActiveWindow, WindowActivity},
 };
 
+const DEFAULT_MAX_NUM_APPS_IN_SUMMARY: usize = 5;
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct SummarizedWindowActivity {
     pub current_window: ActiveWindow,
@@ -58,6 +60,7 @@ impl SensorWidget for SummarizedWindowActivity {
 
                 for app_usage in self.recent_usage.iter() {
                     ui.horizontal_with_no_item_spacing(|ui| {
+                        ui.label("\t");
                         ui.label(RichText::new(app_usage.app_name.clone()).strong());
                         ui.label(" for ");
                         ui.label(RichText::new(format!(
@@ -110,6 +113,7 @@ impl SummarizedWindowActivity {
                 b.recent_usage.cmp(&a.recent_usage)
             }
         });
+        recent_usage.truncate(DEFAULT_MAX_NUM_APPS_IN_SUMMARY);
         SummarizedWindowActivity {
             current_window: activity.current_window.clone(),
             recent_usage,
@@ -160,6 +164,7 @@ pub mod tests {
         // includes current
         // doesn't include 0s (before or after rounding)
         // sorts consistently (UNTESTED)
+        // only keeps the top DEFAULT_MAX_NUM_APPS_IN_SUMMARY apps (UNTESTED)
         let cutoff = DateTime::<Utc>::from_utc(
             NaiveDateTime::from_timestamp_millis(1694119546000).unwrap(),
             Utc,

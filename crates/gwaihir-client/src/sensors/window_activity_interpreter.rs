@@ -8,7 +8,7 @@ use super::{
 };
 
 pub const DEFAULT_TIME_TO_KEEP_WINDOW_ACTIVITY: Lazy<Duration> =
-    Lazy::new(|| Duration::seconds(30));
+    Lazy::new(|| Duration::seconds(60 * 10));
 
 pub struct WindowActivityInterpreter {
     window_activity_sensor: WindowActivitySensor,
