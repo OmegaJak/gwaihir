@@ -8,7 +8,7 @@ use std::{
 use crate::sensors::{
     microphone_usage_sensor::MicrophoneUsageSensor,
     outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
-    window_activity_sensor::WindowActivitySensor,
+    window_activity_interpreter::WindowActivityInterpreter,
     Sensor,
 };
 
@@ -66,7 +66,10 @@ impl SensorMonitor {
                     Box::new(MicrophoneUsageSensor::new()),
                     SensorOutput::MicrophoneUsage(Default::default()),
                 ),
-                (Box::new(WindowActivitySensor::new()), SensorOutput::Empty),
+                (
+                    Box::new(WindowActivityInterpreter::new()),
+                    SensorOutput::Empty,
+                ),
             ],
             last_sent_outputs: Vec::new(),
         }

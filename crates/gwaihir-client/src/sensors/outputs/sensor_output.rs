@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     lock_status::LockStatus, microphone_usage::MicrophoneUsage, online_status::OnlineStatus,
-    window_activity::WindowActivity,
+    summarized_window_activity::SummarizedWindowActivity,
 };
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -12,7 +12,7 @@ pub enum SensorOutput {
     LockStatus(LockStatus),
     MicrophoneUsage(MicrophoneUsage),
     OnlineStatus(OnlineStatus),
-    WindowActivity(WindowActivity),
+    SummarizedWindowActivity(SummarizedWindowActivity),
 }
 
 pub trait SensorWidget {
@@ -26,7 +26,7 @@ impl SensorWidget for SensorOutput {
             SensorOutput::LockStatus(status) => status.show(ui, id),
             SensorOutput::MicrophoneUsage(usage) => usage.show(ui, id),
             SensorOutput::OnlineStatus(online) => online.show(ui, id),
-            SensorOutput::WindowActivity(activity) => activity.show(ui, id),
+            SensorOutput::SummarizedWindowActivity(activity) => activity.show(ui, id),
         }
     }
 }

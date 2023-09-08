@@ -1,24 +1,29 @@
+use std::collections::VecDeque;
+
 use active_win_pos_rs::get_active_window;
-use bounded_vec_deque::BoundedVecDeque;
+use gwaihir_client_lib::chrono::{Duration, Utc};
 use log::error;
 
-use super::{
-    outputs::{
-        sensor_output::SensorOutput,
-        window_activity::{ActiveWindow, PreviouslyActiveWindow, SameWindow, WindowActivity},
-    },
-    Sensor,
+use super::outputs::window_activity::{
+    ActiveWindow, PreviouslyActiveWindow, SameWindow, WindowActivity,
 };
 
-const ACTIVE_WINDOW_HISTORY_LENGTH: usize = 7;
-
 pub struct WindowActivitySensor {
+    time_to_keep_activity: Duration,
     current_active_window: Option<ActiveWindow>,
-    previously_active_windows: BoundedVecDeque<PreviouslyActiveWindow>,
+    previously_active_windows: VecDeque<PreviouslyActiveWindow>,
 }
 
-impl Sensor for WindowActivitySensor {
-    fn get_output(&mut self) -> super::outputs::sensor_output::SensorOutput {
+impl WindowActivitySensor {
+    pub fn new(time_to_keep_activity: Duration) -> Self {
+        Self {
+            time_to_keep_activity,
+            current_active_window: None,
+            previously_active_windows: VecDeque::new(),
+        }
+    }
+
+    pub fn update(&mut self) -> Option<WindowActivity> {
         match get_active_window() {
             Ok(active_window) => {
                 let previously_active_window = self.update_currently_active_window(active_window);
@@ -31,27 +36,25 @@ impl Sensor for WindowActivitySensor {
             }
         }
 
+        self.remove_old_activity();
         self.get_window_activity()
     }
-}
 
-impl WindowActivitySensor {
-    pub fn new() -> Self {
-        Self {
-            current_active_window: None,
-            previously_active_windows: BoundedVecDeque::new(ACTIVE_WINDOW_HISTORY_LENGTH),
-        }
-    }
-
-    fn get_window_activity(&self) -> SensorOutput {
+    pub fn get_window_activity(&self) -> Option<WindowActivity> {
         if let Some(current_window) = self.current_active_window.as_ref() {
-            SensorOutput::WindowActivity(WindowActivity {
+            Some(WindowActivity {
                 current_window: current_window.clone(),
                 previously_active_windows: self.previously_active_windows.iter().cloned().collect(),
             })
         } else {
-            SensorOutput::Empty
+            None
         }
+    }
+
+    fn remove_old_activity(&mut self) {
+        let cutoff = Utc::now() - self.time_to_keep_activity;
+        self.previously_active_windows
+            .retain_mut(|w| w.stopped_using > cutoff)
     }
 
     fn update_currently_active_window(

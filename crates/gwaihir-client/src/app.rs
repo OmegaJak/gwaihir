@@ -290,7 +290,7 @@ impl eframe::App for GwaihirApp {
                 );
 
                 status.sensor_outputs.show_first(
-                    |o| matches!(o, SensorOutput::WindowActivity(_)),
+                    |o| matches!(o, SensorOutput::SummarizedWindowActivity(_)),
                     ui,
                     id,
                 );
