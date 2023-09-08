@@ -20,8 +20,7 @@ impl Sensor for WindowActivityInterpreter {
         if let Some(window_activity) = window_activity {
             let now = Utc::now();
             let cutoff = now - *DEFAULT_TIME_TO_KEEP_WINDOW_ACTIVITY;
-            let summary = SummarizedWindowActivity::summarize(&window_activity, now, cutoff);
-            SensorOutput::SummarizedWindowActivity(summary)
+            SummarizedWindowActivity::summarize(&window_activity, now, cutoff).into()
         } else {
             SensorOutput::Empty
         }

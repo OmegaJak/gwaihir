@@ -13,6 +13,7 @@ use crate::{
     ui_extension_methods::UIExtensionMethods,
 };
 
+use super::sensor_output::SensorOutput;
 use super::{
     sensor_output::SensorWidget,
     window_activity::{ActiveWindow, WindowActivity},
@@ -33,6 +34,12 @@ pub struct AppUsage {
 
     #[serde_as(as = "DurationSeconds<i64>")]
     pub recent_usage: Duration,
+}
+
+impl From<SummarizedWindowActivity> for SensorOutput {
+    fn from(value: SummarizedWindowActivity) -> Self {
+        SensorOutput::SummarizedWindowActivity(value)
+    }
 }
 
 impl SensorWidget for SummarizedWindowActivity {
