@@ -1,6 +1,5 @@
 use gwaihir_client_lib::{
-    chrono::{DateTime, Utc},
-    NetworkInterface, NetworkInterfaceCreator, UniqueUserId, UserStatus, Username,
+    chrono::Utc, NetworkInterface, NetworkInterfaceCreator, UniqueUserId, UserStatus, Username,
 };
 
 pub struct OfflineNetworkInterface<T> {
@@ -23,7 +22,7 @@ impl<T> NetworkInterface<T> for OfflineNetworkInterface<T> {
             UserStatus {
                 user_id: UniqueUserId::new("1234abcd"),
                 username: Username::new("⚠⚠ OFFLINE ⚠⚠"),
-                last_update: DateTime::<Utc>::MIN_UTC,
+                last_update: Utc::now(),
                 sensor_outputs,
             },
         ));
