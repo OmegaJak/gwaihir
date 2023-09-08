@@ -3678,9 +3678,9 @@ dependencies = [
  "log",
  "once_cell",
  "scoped-tls",
- "spacetimedb-bindings-macro",
+ "spacetimedb-bindings-macro 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "spacetimedb-bindings-sys",
- "spacetimedb-lib",
+ "spacetimedb-lib 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -3696,6 +3696,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "spacetimedb-bindings-macro"
+version = "0.6.1"
+source = "git+https://github.com/clockworklabs/SpacetimeDB.git#c010bfadcac34df4860fb9b8ff0cd1d0c548014a"
+dependencies = [
+ "bitflags 2.4.0",
+ "humantime",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.29",
+]
+
+[[package]]
 name = "spacetimedb-bindings-sys"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3704,8 +3716,7 @@ checksum = "6448feac3c8eea403c8cb1cf315958aec4e57c713c002ea8b9064fab9fea9fd9"
 [[package]]
 name = "spacetimedb-client-api-messages"
 version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7f742d62a9e5dec845a54b39bb1848fb5cb617ccc516d71e3866fae41bc051b"
+source = "git+https://github.com/clockworklabs/SpacetimeDB.git#c010bfadcac34df4860fb9b8ff0cd1d0c548014a"
 dependencies = [
  "prost",
  "prost-build",
@@ -3719,6 +3730,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8297e4e5843d346bd7844366e3cdf3b1dfd9259b466166d4e9c8588106b967b5"
 dependencies = [
  "anyhow",
+ "enum-as-inner",
+ "hex",
+ "itertools",
+ "sha3",
+ "spacetimedb-bindings-macro 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spacetimedb-sats 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "thiserror",
+]
+
+[[package]]
+name = "spacetimedb-lib"
+version = "0.6.1"
+source = "git+https://github.com/clockworklabs/SpacetimeDB.git#c010bfadcac34df4860fb9b8ff0cd1d0c548014a"
+dependencies = [
+ "anyhow",
+ "bitflags 2.4.0",
  "chrono",
  "enum-as-inner",
  "hex",
@@ -3726,9 +3753,10 @@ dependencies = [
  "serde",
  "serde_with 2.3.3",
  "sha3",
- "spacetimedb-bindings-macro",
- "spacetimedb-sats",
+ "spacetimedb-bindings-macro 0.6.1 (git+https://github.com/clockworklabs/SpacetimeDB.git)",
+ "spacetimedb-sats 0.6.1 (git+https://github.com/clockworklabs/SpacetimeDB.git)",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]
@@ -3740,18 +3768,31 @@ dependencies = [
  "arrayvec",
  "decorum",
  "enum-as-inner",
+ "itertools",
+ "spacetimedb-bindings-macro 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "thiserror",
+]
+
+[[package]]
+name = "spacetimedb-sats"
+version = "0.6.1"
+source = "git+https://github.com/clockworklabs/SpacetimeDB.git#c010bfadcac34df4860fb9b8ff0cd1d0c548014a"
+dependencies = [
+ "arrayvec",
+ "decorum",
+ "enum-as-inner",
  "hex",
  "itertools",
  "serde",
- "spacetimedb-bindings-macro",
+ "spacetimedb-bindings-macro 0.6.1 (git+https://github.com/clockworklabs/SpacetimeDB.git)",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]
 name = "spacetimedb-sdk"
 version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b86674a83d5a0b22d61a90c9801e056cd63cc7a958ff56ef416661890e4a6436"
+source = "git+https://github.com/clockworklabs/SpacetimeDB.git#c010bfadcac34df4860fb9b8ff0cd1d0c548014a"
 dependencies = [
  "anyhow",
  "anymap",
@@ -3765,8 +3806,8 @@ dependencies = [
  "log",
  "prost",
  "spacetimedb-client-api-messages",
- "spacetimedb-lib",
- "spacetimedb-sats",
+ "spacetimedb-lib 0.6.1 (git+https://github.com/clockworklabs/SpacetimeDB.git)",
+ "spacetimedb-sats 0.6.1 (git+https://github.com/clockworklabs/SpacetimeDB.git)",
  "tokio",
  "tokio-tungstenite",
 ]

@@ -30,6 +30,7 @@ pub struct Username(String);
 
 pub enum RemoteUpdate<T> {
     UserStatusUpdated(UserStatus<T>),
+    Disconnected,
 }
 
 #[derive(Clone, Debug)]
@@ -58,7 +59,10 @@ pub trait NetworkInterfaceCreator<T, NI>
 where
     NI: NetworkInterface<T>,
 {
-    fn new(update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static) -> NI;
+    fn new(
+        update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static,
+        on_disconnect_callback: impl FnOnce() + Send + 'static,
+    ) -> NI;
 }
 
 pub trait NetworkInterface<T> {

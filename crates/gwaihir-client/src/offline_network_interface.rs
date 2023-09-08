@@ -9,6 +9,7 @@ pub struct OfflineNetworkInterface<T> {
 impl<T> NetworkInterfaceCreator<T, OfflineNetworkInterface<T>> for OfflineNetworkInterface<T> {
     fn new(
         update_callback: impl Fn(gwaihir_client_lib::RemoteUpdate<T>) + Send + Clone + 'static,
+        _on_disconnect_callback: impl FnOnce() + Send + 'static,
     ) -> Self {
         Self {
             update_callback: Box::new(update_callback),

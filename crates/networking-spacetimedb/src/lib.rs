@@ -12,7 +12,7 @@ use spacetimedb_sdk::{
     identity::{
         identity, load_credentials, once_on_connect, save_credentials, Credentials, Identity,
     },
-    subscribe,
+    once_on_disconnect, subscribe,
     table::{TableType, TableWithPrimaryKey},
 };
 
@@ -28,8 +28,11 @@ impl<T> NetworkInterfaceCreator<T, SpacetimeDBInterface> for SpacetimeDBInterfac
 where
     T: Serialize + for<'a> Deserialize<'a> + AcceptsOnlineStatus,
 {
-    fn new(update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static) -> Self {
-        register_callbacks(update_callback);
+    fn new(
+        update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static,
+        on_disconnect_callback: impl FnOnce() + Send + 'static,
+    ) -> Self {
+        register_callbacks(update_callback, on_disconnect_callback);
         connect_to_db();
         subscribe_to_tables();
 
@@ -56,12 +59,15 @@ where
 }
 
 /// Register all the callbacks our app will use to respond to database events.
-fn register_callbacks<T>(update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static)
-where
+fn register_callbacks<T>(
+    update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static,
+    on_disconnect_callback: impl FnOnce() + Send + 'static,
+) where
     T: for<'a> Deserialize<'a> + AcceptsOnlineStatus,
 {
     // // When we receive our `Credentials`, save them to a file.
     once_on_connect(on_connected);
+    once_on_disconnect(on_disconnect_callback);
 
     let callback_clone = update_callback.clone();
     User::on_insert(move |a, _| {

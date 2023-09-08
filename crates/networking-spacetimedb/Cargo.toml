@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 hex = "0.4.3"
-spacetimedb-sdk = "0.6.1"
+spacetimedb-sdk = { git = "https://github.com/clockworklabs/SpacetimeDB.git" } # Until the changes in https://github.com/clockworklabs/SpacetimeDB/pull/235 are released, probably the next release after 0.6.1
 serde = { version = "1" }
 log = "0.4"
 

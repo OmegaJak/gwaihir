@@ -10,7 +10,7 @@ use std::{
 };
 
 use chrono_humanize::HumanTime;
-use egui::{epaint::ahash::HashSet, RichText, TextEdit, Widget};
+use egui::{epaint::ahash::HashSet, Color32, RichText, TextEdit, Widget};
 use gwaihir_client_lib::{
     chrono::Local, NetworkInterface, NetworkInterfaceCreator, RemoteUpdate, UniqueUserId,
     UserStatus, APP_ID,
@@ -55,6 +55,7 @@ impl Default for Persistence {
 
 pub struct GwaihirApp {
     tray_icon_data: Option<TrayIconData>,
+    show_disconnected_warning: bool,
 
     sensor_monitor_thread_join_handle: Option<JoinHandle<()>>,
     tx_to_monitor_thread: Sender<MainToMonitorMessages>,
@@ -116,6 +117,7 @@ impl GwaihirApp {
             tx_to_monitor_thread,
             rx_from_monitor_thread,
             current_status: HashMap::new(),
+            show_disconnected_warning: false,
 
             sensor_monitor_thread_join_handle: Some(sensor_monitor_thread_join_handle),
             network,
@@ -207,6 +209,7 @@ impl eframe::App for GwaihirApp {
                         self.current_status.insert(status.user_id.clone(), status);
                     }
                 }
+                RemoteUpdate::Disconnected => self.show_disconnected_warning = true,
             };
         }
 
@@ -248,6 +251,14 @@ impl eframe::App for GwaihirApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
+            if self.show_disconnected_warning {
+                ui.label(
+                    RichText::new("⚠⚠ DISCONNECTED FROM SPACETIMEDB ⚠⚠")
+                        .heading()
+                        .color(Color32::RED),
+                );
+            }
+
             let user_status_list = self.get_filtered_sorted_user_status_list();
             for (id, status) in user_status_list.iter() {
                 ui.horizontal(|ui| {
@@ -344,8 +355,10 @@ where
     let ctx_clone = egui_ctx.clone();
     run_with_timeout(
         move || {
-            Box::new(N::new(get_remote_update_callback(network_tx, egui_ctx)))
-                as Box<dyn NetworkInterface<SensorOutputs> + Send>
+            Box::new(N::new(
+                get_remote_update_callback(network_tx.clone(), egui_ctx.clone()),
+                get_on_disconnect_callback(network_tx, egui_ctx),
+            )) as Box<dyn NetworkInterface<SensorOutputs> + Send>
         },
         Duration::from_secs(5),
         Some(std::thread::Builder::new().name("network_interface_initializer".to_string())),
@@ -354,10 +367,10 @@ where
         warn!(
             "Defaulting to offline network interface because initialization of the primary failed"
         );
-        Box::new(OfflineNetworkInterface::new(get_remote_update_callback(
-            network_tx_clone,
-            ctx_clone,
-        )))
+        Box::new(OfflineNetworkInterface::new(
+            get_remote_update_callback(network_tx_clone.clone(), ctx_clone.clone()),
+            get_on_disconnect_callback(network_tx_clone, ctx_clone),
+        ))
     })
 }
 
@@ -367,6 +380,16 @@ fn get_remote_update_callback(
 ) -> impl Fn(RemoteUpdate<SensorOutputs>) + Clone {
     move |update| {
         network_tx.send(update).unwrap();
+        ctx_clone.request_repaint();
+    }
+}
+
+fn get_on_disconnect_callback(
+    network_tx: Sender<RemoteUpdate<SensorOutputs>>,
+    ctx_clone: egui::Context,
+) -> impl FnOnce() {
+    move || {
+        network_tx.send(RemoteUpdate::Disconnected).unwrap();
         ctx_clone.request_repaint();
     }
 }
