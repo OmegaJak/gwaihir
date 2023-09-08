@@ -19,8 +19,8 @@ impl Sensor for MicrophoneUsageSensor {
 }
 
 impl MicrophoneUsageSensor {
-    pub fn new() -> MicrophoneUsageSensor {
-        MicrophoneUsageSensor {
+    pub fn new() -> Self {
+        Self {
             last_check_time: Instant::now() - Duration::from_millis(500), // Ew
             most_recent_data: Default::default(),
         }

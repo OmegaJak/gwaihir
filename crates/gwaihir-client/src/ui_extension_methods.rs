@@ -1,4 +1,7 @@
-use egui::{CollapsingHeader, CollapsingResponse, Ui, WidgetText};
+use egui::{
+    text::LayoutJob, CollapsingHeader, CollapsingResponse, InnerResponse, RichText, Ui, WidgetText,
+};
+use gwaihir_client_lib::chrono::{DateTime, Local};
 
 pub trait UIExtensionMethods {
     fn collapsing_default_open<R>(
@@ -6,6 +9,13 @@ pub trait UIExtensionMethods {
         heading: impl Into<WidgetText>,
         add_contents: impl FnOnce(&mut Ui) -> R,
     ) -> CollapsingResponse<R>;
+
+    fn horizontal_with_no_item_spacing<R>(
+        &mut self,
+        add_contents: impl FnOnce(&mut Ui) -> R,
+    ) -> InnerResponse<R>;
+
+    fn create_default_layout_job(&self, rich_texts: Vec<RichText>) -> LayoutJob;
 }
 
 impl UIExtensionMethods for Ui {
@@ -17,5 +27,38 @@ impl UIExtensionMethods for Ui {
         CollapsingHeader::new(heading)
             .default_open(true)
             .show(self, add_contents)
+    }
+
+    fn horizontal_with_no_item_spacing<R>(
+        &mut self,
+        add_contents: impl FnOnce(&mut Ui) -> R,
+    ) -> InnerResponse<R> {
+        self.spacing_mut().item_spacing.x = 0.0;
+        let response = self.horizontal(add_contents);
+
+        response
+    }
+
+    fn create_default_layout_job(&self, rich_texts: Vec<RichText>) -> LayoutJob {
+        let mut layout_job = LayoutJob::default();
+        for rich_text in rich_texts.into_iter() {
+            rich_text.append_to(
+                &mut layout_job,
+                self.style(),
+                egui::FontSelection::Default,
+                egui::Align::Center,
+            )
+        }
+
+        layout_job
+    }
+}
+
+pub fn nicely_formatted_datetime(datetime: DateTime<Local>) -> String {
+    let time_format = "%l:%M%P";
+    if datetime.date_naive() == Local::now().date_naive() {
+        return datetime.format(time_format).to_string();
+    } else {
+        return datetime.format(&format!("%D {}", time_format)).to_string();
     }
 }

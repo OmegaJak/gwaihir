@@ -8,6 +8,7 @@ use std::{
 use crate::sensors::{
     microphone_usage_sensor::MicrophoneUsageSensor,
     outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
+    window_activity_interpreter::WindowActivityInterpreter,
     Sensor,
 };
 
@@ -60,10 +61,16 @@ impl SensorMonitor {
             tx_to_main,
             egui_ctx: None,
 
-            sensors: vec![(
-                Box::new(MicrophoneUsageSensor::new()),
-                SensorOutput::MicrophoneUsage(Default::default()),
-            )],
+            sensors: vec![
+                (
+                    Box::new(MicrophoneUsageSensor::new()),
+                    SensorOutput::MicrophoneUsage(Default::default()),
+                ),
+                (
+                    Box::new(WindowActivityInterpreter::new()),
+                    SensorOutput::Empty,
+                ),
+            ],
             last_sent_outputs: Vec::new(),
         }
     }
