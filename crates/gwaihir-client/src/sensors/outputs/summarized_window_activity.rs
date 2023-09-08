@@ -8,10 +8,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serde_with::DurationSeconds;
 
-use crate::{
-    sensors::window_activity_interpreter::DEFAULT_TIME_TO_KEEP_WINDOW_ACTIVITY,
-    ui_extension_methods::UIExtensionMethods,
-};
+use crate::sensors::window_activity_interpreter::DEFAULT_TIME_TO_KEEP_WINDOW_ACTIVITY;
+use crate::ui::ui_extension_methods::UIExtensionMethods;
 
 use super::sensor_output::SensorOutput;
 use super::{

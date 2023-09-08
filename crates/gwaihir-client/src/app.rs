@@ -30,8 +30,10 @@ use crate::{
         outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
     },
     tray_icon::{hide_to_tray, TrayIconData},
-    ui_extension_methods::nicely_formatted_datetime,
-    widgets::auto_launch_checkbox::AutoLaunchCheckboxUiExtension,
+    ui::{
+        time_formatting::nicely_formatted_datetime,
+        widgets::auto_launch_checkbox::AutoLaunchCheckboxUiExtension,
+    },
 };
 
 #[derive(Serialize, Deserialize)]

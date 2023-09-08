@@ -18,8 +18,7 @@ mod periodic_repaint_thread;
 mod sensor_monitor_thread;
 mod sensors;
 mod tray_icon;
-mod ui_extension_methods;
-mod widgets;
+mod ui;
 
 fn main() -> eframe::Result<()> {
     let logger = init_logging();
@@ -69,7 +68,7 @@ fn init_logging() -> LoggerHandle {
         .duplicate_to_stdout(flexi_logger::Duplicate::All)
         .append()
         .rotate(
-            flexi_logger::Criterion::Age(flexi_logger::Age::Day),
+            flexi_logger::Criterion::Age(flexi_logger::Age::Hour),
             flexi_logger::Naming::Timestamps,
             flexi_logger::Cleanup::KeepLogFiles(3),
         )
