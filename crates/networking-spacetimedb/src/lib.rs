@@ -20,7 +20,7 @@ use spacetimedb_sdk::{
 const SPACETIMEDB_URI: &str = "https://testnet.spacetimedb.com";
 
 /// The module name we chose when we published our module.
-const DB_NAME: &str = "gwaihir-test2";
+const DB_NAME: &str = "gwaihir-test";
 
 pub struct SpacetimeDBInterface {}
 
