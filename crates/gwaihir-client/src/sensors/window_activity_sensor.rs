@@ -1,30 +1,37 @@
 use std::collections::VecDeque;
 
-use active_win_pos_rs::get_active_window;
 use gwaihir_client_lib::chrono::{Duration, Utc};
 use log::error;
 
-use super::outputs::window_activity::{
-    ActiveWindow, PreviouslyActiveWindow, SameWindow, WindowActivity,
+use super::{
+    active_window_provider::{ActiveWindowProvider, RawActiveWindow},
+    outputs::window_activity::{
+        ActiveWindow, PreviouslyActiveWindow, WindowActivity, WindowExtensions,
+    },
 };
 
-pub struct WindowActivitySensor {
+pub struct WindowActivitySensor<T> {
     time_to_keep_activity: Duration,
     current_active_window: Option<ActiveWindow>,
     previously_active_windows: VecDeque<PreviouslyActiveWindow>,
+    active_window_provider: T,
 }
 
-impl WindowActivitySensor {
-    pub fn new(time_to_keep_activity: Duration) -> Self {
+impl<T> WindowActivitySensor<T>
+where
+    T: ActiveWindowProvider,
+{
+    pub fn new(time_to_keep_activity: Duration, active_window_provider: T) -> Self {
         Self {
             time_to_keep_activity,
             current_active_window: None,
             previously_active_windows: VecDeque::new(),
+            active_window_provider,
         }
     }
 
     pub fn update(&mut self) -> Option<WindowActivity> {
-        match get_active_window() {
+        match self.active_window_provider.get_active_window() {
             Ok(active_window) => {
                 let previously_active_window = self.update_currently_active_window(active_window);
                 if let Some(window) = previously_active_window {
@@ -59,17 +66,17 @@ impl WindowActivitySensor {
 
     fn update_currently_active_window(
         &mut self,
-        active_window: active_win_pos_rs::ActiveWindow,
+        new_active_window: RawActiveWindow,
     ) -> Option<PreviouslyActiveWindow> {
         if let Some(current_active_window) = self.current_active_window.take() {
-            if !current_active_window.same_window_as(&active_window) {
-                self.current_active_window = Some(active_window.into());
+            if !current_active_window.same_window_as(&new_active_window) {
+                self.current_active_window = Some(new_active_window.into());
                 return Some(current_active_window.to_no_longer_active());
             } else {
                 self.current_active_window = Some(current_active_window);
             }
         } else {
-            self.current_active_window = Some(active_window.into());
+            self.current_active_window = Some(new_active_window.into());
         }
 
         None

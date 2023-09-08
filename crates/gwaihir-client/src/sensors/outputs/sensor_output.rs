@@ -30,3 +30,15 @@ impl SensorWidget for SensorOutput {
         }
     }
 }
+
+impl SensorOutput {
+    pub fn should_send_to_remote(&self) -> bool {
+        match self {
+            SensorOutput::Empty => false,
+            SensorOutput::LockStatus(_) => false,
+            SensorOutput::MicrophoneUsage(_) => true,
+            SensorOutput::OnlineStatus(_) => true,
+            SensorOutput::SummarizedWindowActivity(_) => true,
+        }
+    }
+}

@@ -1,6 +1,10 @@
 use gwaihir_client_lib::chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::sensors::active_window_provider::RawActiveWindow;
+
+pub const LOCK_SCREEN_WINDOW_NAME: &str = "Locked";
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct WindowActivity {
     pub current_window: ActiveWindow,
@@ -9,58 +13,78 @@ pub struct WindowActivity {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct ActiveWindow {
-    pub app_name: String,
+    pub window_name: WindowName,
     pub started_using: DateTime<Utc>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct PreviouslyActiveWindow {
-    pub app_name: String,
+    pub window_name: WindowName,
     pub started_using: DateTime<Utc>,
     pub stopped_using: DateTime<Utc>,
 }
 
-pub trait RepresentsWindow {
-    fn app_name(&self) -> &str;
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
+pub enum WindowName {
+    Locked,
+    Normal(String),
 }
 
-pub trait SameWindow {
+impl From<WindowName> for String {
+    fn from(value: WindowName) -> Self {
+        match value {
+            WindowName::Locked => LOCK_SCREEN_WINDOW_NAME.to_string(),
+            WindowName::Normal(name) => name,
+        }
+    }
+}
+
+impl WindowName {
+    pub fn to_string(self) -> String {
+        self.into()
+    }
+}
+
+pub trait RepresentsWindow {
+    fn window_name(&self) -> &WindowName;
+}
+
+pub trait WindowExtensions {
+    fn is_lock_window(&self) -> bool;
     fn same_window_as(&self, other: &impl RepresentsWindow) -> bool;
 }
 
-impl From<active_win_pos_rs::ActiveWindow> for ActiveWindow {
-    fn from(window: active_win_pos_rs::ActiveWindow) -> Self {
+impl From<RawActiveWindow> for ActiveWindow {
+    fn from(window: RawActiveWindow) -> Self {
         Self {
-            app_name: window.app_name,
+            window_name: window.window_name,
             started_using: Utc::now(),
         }
     }
 }
 
 impl RepresentsWindow for ActiveWindow {
-    fn app_name(&self) -> &str {
-        &self.app_name
+    fn window_name(&self) -> &WindowName {
+        &self.window_name
     }
 }
 
 impl ActiveWindow {
     pub fn to_no_longer_active(self) -> PreviouslyActiveWindow {
         PreviouslyActiveWindow {
-            app_name: self.app_name,
+            window_name: self.window_name,
             started_using: self.started_using,
             stopped_using: Utc::now(),
         }
     }
 }
 
-impl RepresentsWindow for active_win_pos_rs::ActiveWindow {
-    fn app_name(&self) -> &str {
-        &self.app_name
-    }
-}
-
-impl<T: RepresentsWindow> SameWindow for T {
+impl<T: RepresentsWindow> WindowExtensions for T {
     fn same_window_as(&self, other: &impl RepresentsWindow) -> bool {
-        self.app_name() == other.app_name()
+        self.window_name() == other.window_name()
+    }
+
+    fn is_lock_window(&self) -> bool {
+        matches!(self.window_name(), WindowName::Locked)
     }
 }

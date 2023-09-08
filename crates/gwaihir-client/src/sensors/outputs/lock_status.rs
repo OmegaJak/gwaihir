@@ -26,8 +26,12 @@ impl SensorWidget for LockStatus {
 }
 
 impl LockStatus {
+    pub fn is_locked(&self) -> bool {
+        self.num_locks > self.num_unlocks
+    }
+
     fn show_details(&self, id: &UniqueUserId, ui: &mut egui::Ui) {
-        let header_text = if self.num_locks > self.num_unlocks {
+        let header_text = if self.is_locked() {
             RichText::new("Currently Locked").color(Color32::RED)
         } else {
             RichText::new("Currently Unlocked").color(Color32::DARK_GREEN)

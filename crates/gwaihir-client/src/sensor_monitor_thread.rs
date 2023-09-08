@@ -108,12 +108,20 @@ impl SensorMonitor {
 
     fn send_sensor_msgs_to_main(&mut self) {
         if self.check_sensor_updates() {
+            let snapshot = self.get_sensor_output_snapshot();
             self.tx_to_main
                 .send(MonitorToMainMessages::UpdatedSensorOutputs(SensorOutputs {
-                    outputs: self.get_sensor_output_snapshot(),
+                    outputs: snapshot
+                        .iter()
+                        .filter(|o| o.should_send_to_remote())
+                        .cloned()
+                        .collect(),
                 }))
                 .unwrap();
-            self.last_sent_outputs = self.get_sensor_output_snapshot();
+            for (sensor, _) in self.sensors.iter_mut() {
+                sensor.updated_sensor_outputs(&snapshot);
+            }
+            self.last_sent_outputs = snapshot;
             if let Some(ctx) = self.egui_ctx.as_ref() {
                 ctx.request_repaint();
             }

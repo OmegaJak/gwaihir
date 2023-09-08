@@ -1,6 +1,7 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use chrono_humanize::HumanTime;
+use egui::Color32;
 use egui::{CollapsingHeader, RichText};
 use eternity_rs::Eternity;
 use gwaihir_client_lib::chrono::{DateTime, Duration, Utc};
@@ -12,6 +13,7 @@ use crate::sensors::window_activity_interpreter::DEFAULT_TIME_TO_KEEP_WINDOW_ACT
 use crate::ui::ui_extension_methods::UIExtensionMethods;
 
 use super::sensor_output::SensorOutput;
+use super::window_activity::{RepresentsWindow, WindowExtensions, WindowName};
 use super::{
     sensor_output::SensorWidget,
     window_activity::{ActiveWindow, WindowActivity},
@@ -28,10 +30,16 @@ pub struct SummarizedWindowActivity {
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct AppUsage {
-    pub app_name: String,
+    pub app_name: WindowName,
 
     #[serde_as(as = "DurationSeconds<i64>")]
     pub recent_usage: Duration,
+}
+
+impl RepresentsWindow for AppUsage {
+    fn window_name(&self) -> &WindowName {
+        &self.app_name
+    }
 }
 
 impl From<SummarizedWindowActivity> for SensorOutput {
@@ -43,46 +51,22 @@ impl From<SummarizedWindowActivity> for SensorOutput {
 impl SensorWidget for SummarizedWindowActivity {
     fn show(&self, ui: &mut egui::Ui, id: &gwaihir_client_lib::UniqueUserId) {
         let time_using_current: HumanTime = HumanTime::from(self.current_window.started_using);
+        let header_text = self.get_header_text(ui, time_using_current);
 
-        let layout_job = ui.create_default_layout_job(vec![
-            RichText::new("Using: ").color(ui.style().visuals.text_color()),
-            RichText::new(format!("{} ", self.current_window.app_name)).strong(),
-            RichText::new(format!("(started using {})", time_using_current))
-                .color(ui.style().visuals.text_color()),
-        ]);
-
-        CollapsingHeader::new(layout_job)
+        CollapsingHeader::new(header_text)
             .default_open(false)
             .id_source(format!("{}_previous_windows", id.as_ref()))
             .show(ui, |ui| {
-                ui.label(format!(
-                    "In the past {}:",
-                    DEFAULT_TIME_TO_KEEP_WINDOW_ACTIVITY
-                        .to_std()
-                        .unwrap()
-                        .humanize()
-                ));
-
-                for app_usage in self.recent_usage.iter() {
-                    ui.horizontal_with_no_item_spacing(|ui| {
-                        ui.label("\t");
-                        ui.label(RichText::new(app_usage.app_name.clone()).strong());
-                        ui.label(" for ");
-                        ui.label(RichText::new(format!(
-                            "{}",
-                            app_usage.recent_usage.to_std().unwrap().humanize()
-                        )));
-                    });
-                }
+                self.show_details(ui);
             });
     }
 }
 
 impl SummarizedWindowActivity {
     pub fn summarize(activity: &WindowActivity, now: DateTime<Utc>, cutoff: DateTime<Utc>) -> Self {
-        let mut time_totals: HashMap<String, Duration> = HashMap::new();
+        let mut time_totals: HashMap<WindowName, Duration> = HashMap::new();
         Self::add_time_total(
-            time_totals.entry(activity.current_window.app_name.clone()),
+            time_totals.entry(activity.current_window.window_name.clone()),
             activity.current_window.started_using,
             None,
             now,
@@ -95,7 +79,7 @@ impl SummarizedWindowActivity {
             }
 
             Self::add_time_total(
-                time_totals.entry(window.app_name.clone()),
+                time_totals.entry(window.window_name.clone()),
                 window.started_using,
                 Some(window.stopped_using),
                 now,
@@ -111,7 +95,7 @@ impl SummarizedWindowActivity {
     }
 
     fn add_time_total(
-        entry: Entry<'_, String, Duration>,
+        entry: Entry<'_, WindowName, Duration>,
         started_using: DateTime<Utc>,
         stopped_using: Option<DateTime<Utc>>,
         now: DateTime<Utc>,
@@ -133,7 +117,7 @@ impl SummarizedWindowActivity {
             .or_insert(current_duration);
     }
 
-    fn humanize_to_recent_usage(time_totals: HashMap<String, Duration>) -> Vec<AppUsage> {
+    fn humanize_to_recent_usage(time_totals: HashMap<WindowName, Duration>) -> Vec<AppUsage> {
         let mut recent_usage = time_totals
             .into_iter()
             .map(|(k, v)| AppUsage {
@@ -155,6 +139,58 @@ impl SummarizedWindowActivity {
 
     fn round_to_nearest_10_seconds(duration: Duration) -> Duration {
         Duration::seconds(((duration.to_std().unwrap().as_secs_f64() / 10.0).round() * 10.0) as i64)
+    }
+
+    fn get_header_text(
+        &self,
+        ui: &egui::Ui,
+        time_using_current: HumanTime,
+    ) -> egui::text::LayoutJob {
+        if self.current_window.is_lock_window() {
+            ui.create_default_layout_job(vec![
+                RichText::new("Locked ").color(Color32::RED),
+                RichText::new(format!(" ({})", time_using_current))
+                    .color(ui.visuals().text_color()),
+            ])
+        } else {
+            ui.create_default_layout_job(vec![
+                RichText::new("Using: ").color(ui.visuals().text_color()),
+                RichText::new(format!(
+                    "{} ",
+                    self.current_window.window_name.clone().to_string()
+                ))
+                .strong(),
+                RichText::new(format!("(started using {})", time_using_current))
+                    .color(ui.visuals().text_color()),
+            ])
+        }
+    }
+
+    fn show_details(&self, ui: &mut egui::Ui) {
+        ui.label(format!(
+            "In the past {}:",
+            DEFAULT_TIME_TO_KEEP_WINDOW_ACTIVITY
+                .to_std()
+                .unwrap()
+                .humanize()
+        ));
+
+        for app_usage in self.recent_usage.iter() {
+            let app_name_color = if app_usage.is_lock_window() {
+                Color32::DARK_RED
+            } else {
+                ui.visuals().strong_text_color()
+            };
+            ui.horizontal_with_no_item_spacing(|ui| {
+                ui.label("\t");
+                ui.label(RichText::new(app_usage.app_name.clone()).color(app_name_color));
+                ui.label(" for ");
+                ui.label(RichText::new(format!(
+                    "{}",
+                    app_usage.recent_usage.to_std().unwrap().humanize()
+                )));
+            });
+        }
     }
 }
 
@@ -182,37 +218,37 @@ pub mod tests {
         let now = cutoff + Duration::seconds(100);
         let window_activity = WindowActivity {
             current_window: ActiveWindow {
-                app_name: "Current".to_string(),
+                window_name: WindowName::Normal("Current".to_string()),
                 started_using: cutoff + Duration::seconds(50),
             },
             previously_active_windows: vec![
                 PreviouslyActiveWindow {
-                    app_name: "Fully past cutoff".to_string(),
+                    window_name: WindowName::Normal("Fully past cutoff".to_string()),
                     started_using: cutoff + Duration::seconds(30),
                     stopped_using: cutoff + Duration::seconds(40) + Duration::milliseconds(5600),
                 },
                 PreviouslyActiveWindow {
-                    app_name: "Fully past cutoff".to_string(),
+                    window_name: WindowName::Normal("Fully past cutoff".to_string()),
                     started_using: cutoff + Duration::seconds(10),
                     stopped_using: cutoff + Duration::seconds(20),
                 },
                 PreviouslyActiveWindow {
-                    app_name: "Crossing cutoff".to_string(),
+                    window_name: WindowName::Normal("Crossing cutoff".to_string()),
                     started_using: cutoff - Duration::seconds(10),
                     stopped_using: cutoff + Duration::seconds(10),
                 },
                 PreviouslyActiveWindow {
-                    app_name: "Before cutoff".to_string(),
+                    window_name: WindowName::Normal("Before cutoff".to_string()),
                     started_using: cutoff - Duration::seconds(20),
                     stopped_using: cutoff - Duration::seconds(10),
                 },
                 PreviouslyActiveWindow {
-                    app_name: "Truly Zero".to_string(),
+                    window_name: WindowName::Normal("Truly Zero".to_string()),
                     started_using: cutoff + Duration::seconds(10),
                     stopped_using: cutoff + Duration::seconds(10),
                 },
                 PreviouslyActiveWindow {
-                    app_name: "Rounded to Zero".to_string(),
+                    window_name: WindowName::Normal("Rounded to Zero".to_string()),
                     started_using: cutoff + Duration::seconds(10),
                     stopped_using: cutoff + Duration::seconds(14),
                 },
@@ -220,15 +256,15 @@ pub mod tests {
         };
         let expected_usage = vec![
             AppUsage {
-                app_name: "Current".to_string(),
+                app_name: WindowName::Normal("Current".to_string()),
                 recent_usage: Duration::seconds(50),
             },
             AppUsage {
-                app_name: "Fully past cutoff".to_string(),
+                app_name: WindowName::Normal("Fully past cutoff".to_string()),
                 recent_usage: Duration::seconds(30),
             },
             AppUsage {
-                app_name: "Crossing cutoff".to_string(),
+                app_name: WindowName::Normal("Crossing cutoff".to_string()),
                 recent_usage: Duration::seconds(10),
             },
         ];
