@@ -144,7 +144,7 @@ impl SummarizedWindowActivity {
     }
 
     fn round_to_nearest_second(duration: Duration) -> Duration {
-        Duration::seconds(duration.to_std().unwrap().as_secs_f64().round() as i64)
+        Duration::seconds(((duration.to_std().unwrap().as_secs_f64() / 10.0).round() * 10.0) as i64)
     }
 }
 
@@ -159,7 +159,7 @@ pub mod tests {
         // Tests: (yes this should be split into multiple tests)
         // across cutoff
         // ignored before cutoff
-        // rounds to the nearest second
+        // rounds to the nearest 10 seconds
         // sorts highest to lowest
         // includes current
         // doesn't include 0s (before or after rounding)
@@ -179,7 +179,7 @@ pub mod tests {
                 PreviouslyActiveWindow {
                     app_name: "Fully past cutoff".to_string(),
                     started_using: cutoff + Duration::seconds(30),
-                    stopped_using: cutoff + Duration::seconds(40) + Duration::milliseconds(600),
+                    stopped_using: cutoff + Duration::seconds(40) + Duration::milliseconds(5600),
                 },
                 PreviouslyActiveWindow {
                     app_name: "Fully past cutoff".to_string(),
@@ -204,7 +204,7 @@ pub mod tests {
                 PreviouslyActiveWindow {
                     app_name: "Rounded to Zero".to_string(),
                     started_using: cutoff + Duration::seconds(10),
-                    stopped_using: cutoff + Duration::seconds(10) + Duration::milliseconds(10),
+                    stopped_using: cutoff + Duration::seconds(14),
                 },
             ],
         };
@@ -215,7 +215,7 @@ pub mod tests {
             },
             AppUsage {
                 app_name: "Fully past cutoff".to_string(),
-                recent_usage: Duration::seconds(21),
+                recent_usage: Duration::seconds(30),
             },
             AppUsage {
                 app_name: "Crossing cutoff".to_string(),
