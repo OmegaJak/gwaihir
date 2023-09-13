@@ -313,6 +313,12 @@ impl eframe::App for GwaihirApp {
                     ui,
                     id,
                 );
+
+                status.sensor_outputs.show_first(
+                    |o| matches!(o, SensorOutput::KeyboardMouseActivity(_)),
+                    ui,
+                    id,
+                );
             }
 
             egui::warn_if_debug_build(ui);

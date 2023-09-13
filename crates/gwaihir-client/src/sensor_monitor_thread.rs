@@ -6,6 +6,8 @@ use std::{
 };
 
 use crate::sensors::{
+    keyboard_mouse_event_provider::RdevKeyboardMouseEventProvider,
+    keyboard_mouse_sensor::KeyboardMouseSensor,
     microphone_usage_sensor::MicrophoneUsageSensor,
     outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
     window_activity_interpreter::WindowActivityInterpreter,
@@ -68,6 +70,12 @@ impl SensorMonitor {
                 ),
                 (
                     Box::new(WindowActivityInterpreter::new()),
+                    SensorOutput::Empty,
+                ),
+                (
+                    Box::new(KeyboardMouseSensor::new(
+                        RdevKeyboardMouseEventProvider::new(),
+                    )),
                     SensorOutput::Empty,
                 ),
             ],
