@@ -1,14 +1,8 @@
-use egui::{CollapsingHeader, Color32, RichText, Stroke, Vec2, WidgetText};
-use egui_plot::{
-    log_grid_spacer, uniform_grid_spacer, AxisBools, Bar, BarChart, CoordinatesFormatter, Legend,
-    Line, Plot, PlotPoints,
-};
-use log::warn;
-use serde::{Deserialize, Serialize};
-
-use crate::{sensors::keyboard_mouse_sensor, ui::ui_extension_methods::UIExtensionMethods};
-
 use super::sensor_output::SensorWidget;
+use crate::{sensors::keyboard_mouse_sensor, ui::ui_extension_methods::UIExtensionMethods};
+use egui::{CollapsingHeader, Color32, RichText, Stroke, Vec2};
+use egui_plot::{uniform_grid_spacer, Bar, BarChart, Plot};
+use serde::{Deserialize, Serialize};
 
 const ONE_THIRD: f64 = 1.0 / 3.0;
 const TWO_THIRDS: f64 = 2.0 / 3.0;
@@ -112,23 +106,9 @@ fn show_activity_graph(
         .iter()
         .rev()
         .enumerate()
-        .map(|(i, v)| {
-            let color = if let Some(summary) = data_summary.as_ref() {
-                let usage_level = get_usage_level(*v, summary.min, summary.max);
-                usage_level.map_or(Color32::BLACK, |l| get_usage_level_color(&l))
-            } else {
-                Color32::BLACK
-            };
-            Bar::new(
-                -(bucket_duration_s / 2.0) - ((i as f64) * bucket_duration_s),
-                *v,
-            )
-            .width(bucket_duration_s)
-            .stroke(Stroke::new(1.0, color))
-            .fill(color.linear_multiply(0.2))
-        })
+        .map(|(i, v)| get_bar(i, v, &data_summary, bucket_duration_s))
         .collect();
-    let mut bar_chart = BarChart::new(bars)
+    let bar_chart = BarChart::new(bars)
         .color(Color32::BLUE)
         .name("Normal Distribution");
 
@@ -147,6 +127,31 @@ fn show_activity_graph(
         .allow_boxed_zoom(false)
         .x_grid_spacer(uniform_grid_spacer(|_i| [600.0, 60.0, 10.0]))
         .show(ui, |plot_ui| plot_ui.bar_chart(bar_chart));
+}
+
+fn get_bar(
+    bucket_index: usize,
+    value: &f64,
+    data_summary: &Option<UsageSummary>,
+    bucket_duration_s: f64,
+) -> Bar {
+    let color = get_bar_color(value, data_summary);
+    Bar::new(
+        -(bucket_duration_s / 2.0) - ((bucket_index as f64) * bucket_duration_s),
+        *value,
+    )
+    .width(bucket_duration_s)
+    .stroke(Stroke::new(1.0, color))
+    .fill(color.linear_multiply(0.2))
+}
+
+fn get_bar_color(bar_value: &f64, data_summary: &Option<UsageSummary>) -> Color32 {
+    if let Some(summary) = data_summary.as_ref() {
+        let usage_level = get_usage_level(*bar_value, summary.min, summary.max);
+        usage_level.map_or(Color32::BLACK, |l| get_usage_level_color(&l))
+    } else {
+        Color32::BLACK
+    }
 }
 
 fn get_summary_text(summary: &Option<UsageSummary>) -> RichText {
