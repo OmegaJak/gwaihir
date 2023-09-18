@@ -590,6 +590,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bounded-vec-deque"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2225b558afc76c596898f5f1b3fc35cfce0eb1b13635cbd7d1b2a7177dc10ccd"
+
+[[package]]
 name = "bstr"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1994,6 +2000,7 @@ dependencies = [
  "active-win-pos-rs",
  "assert_matches",
  "auto-launch",
+ "bounded-vec-deque",
  "chrono-humanize",
  "directories-next",
  "eframe",
@@ -2013,7 +2020,6 @@ dependencies = [
  "rdev",
  "serde",
  "serde_with 3.3.0",
- "simple_moving_average",
  "thiserror",
  "tray-icon",
  "windows",
@@ -3651,15 +3657,6 @@ name = "simd-adler32"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d66dc143e6b11c1eddc06d5c423cfc97062865baf299914ab64caa38182078fe"
-
-[[package]]
-name = "simple_moving_average"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdd19d3808aad2604c824399fd270260d634678b010328c9d96851bb0fb63121"
-dependencies = [
- "num-traits",
-]
 
 [[package]]
 name = "sized-chunks"

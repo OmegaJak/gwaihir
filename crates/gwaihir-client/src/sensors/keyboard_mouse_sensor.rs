@@ -2,18 +2,22 @@ use super::{
     keyboard_mouse_event_provider::{
         KeyboardMouseEvent, KeyboardMouseEventProvider, KeyboardMouseEventType,
     },
-    outputs::{keyboard_mouse_activity::KeyboardMouseActivity, sensor_output::SensorOutput},
+    outputs::{
+        keyboard_mouse_activity::{KeyboardMouseActivity, KeyboardMouseActivityData},
+        sensor_output::SensorOutput,
+    },
     Sensor,
 };
-use log::{error, warn};
-use simple_moving_average::{NoSumSMA, SMA};
+use bounded_vec_deque::BoundedVecDeque;
+use log::{error, trace, warn};
 use std::{
     sync::mpsc::{channel, Receiver},
     thread::{self, JoinHandle},
     time::{Duration, SystemTime},
 };
 
-const BUCKET_DURATION: Duration = Duration::from_secs(1);
+const BUCKET_DURATION: Duration = Duration::from_secs(10);
+const NUM_DATAPOINTS_TO_KEEP: usize = 6;
 
 pub struct KeyboardMouseSensor {
     event_rx: Receiver<KeyboardMouseEvent>,
@@ -48,9 +52,9 @@ impl Sensor for KeyboardMouseSensor {
         self.keyboard_average.update_time(now);
 
         SensorOutput::KeyboardMouseActivity(KeyboardMouseActivity {
-            keyboard_usage: self.keyboard_average.average(),
-            mouse_movement: self.mouse_movement_average.average(),
-            mouse_button_usage: self.mouse_button_average.average(),
+            keyboard_usage: self.keyboard_average.sensor_data(),
+            mouse_movement: self.mouse_movement_average.sensor_data(),
+            mouse_button_usage: self.mouse_button_average.sensor_data(),
         })
     }
 }
@@ -86,7 +90,7 @@ struct CalculatorGuy {
     last_event: Option<KeyboardMouseEvent>,
 
     current_bucket_value: f64,
-    moving_average: NoSumSMA<f64, f64, 10>,
+    past_values: BoundedVecDeque<f64>,
 }
 
 impl CalculatorGuy {
@@ -98,12 +102,14 @@ impl CalculatorGuy {
             last_event: None,
 
             current_bucket_value: 0.0,
-            moving_average: NoSumSMA::new(),
+            past_values: BoundedVecDeque::new(NUM_DATAPOINTS_TO_KEEP),
         }
     }
 
-    pub fn average(&self) -> f64 {
-        self.moving_average.get_average()
+    pub fn sensor_data(&mut self) -> KeyboardMouseActivityData {
+        return KeyboardMouseActivityData {
+            data: self.past_values.iter().rev().cloned().collect(),
+        };
     }
 
     pub fn update_time(&mut self, now: SystemTime) {
@@ -129,7 +135,7 @@ impl CalculatorGuy {
     }
 
     fn end_bucket(&mut self) {
-        self.moving_average.add_sample(self.current_bucket_value);
+        self.past_values.push_front(self.current_bucket_value);
         self.current_bucket_value = 0.0;
         (self.current_bucket_start, self.current_bucket_end) = (
             self.current_bucket_end,
@@ -163,7 +169,7 @@ impl Quantifiable for KeyboardMouseEventType {
                     x: last_x,
                     y: last_y,
                 }),
-            ) => f64::sqrt((x - last_x).powi(2) + (y - last_y).powi(2)),
+            ) => f64::sqrt((x - last_x).powi(2) + (y - last_y).powi(2)) / 100.0,
             (EventType::MouseMove { x: _, y: _ }, None) => 0.0,
             (EventType::MouseMove { x: _, y: _ }, _) => {
                 panic!("Somehow a mouse move was compared to something else, this shouldn't be possible");

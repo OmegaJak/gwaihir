@@ -8,6 +8,7 @@ pub struct KeyboardMouseEvent {
     pub event_type: KeyboardMouseEventType,
 }
 
+#[derive(Debug)]
 pub enum KeyboardMouseEventType {
     KeyPress,
     MouseButtonPress(MouseButton),
