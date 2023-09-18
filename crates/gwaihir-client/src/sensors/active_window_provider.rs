@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use super::outputs::window_activity::{ActiveWindow, RepresentsWindow, WindowName};
+use super::outputs::window_activity::{RepresentsWindow, WindowName};
 
 pub struct RawActiveWindow {
     pub window_name: WindowName,

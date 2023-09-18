@@ -198,7 +198,7 @@ impl SummarizedWindowActivity {
 pub mod tests {
     use super::*;
     use crate::sensors::outputs::window_activity::PreviouslyActiveWindow;
-    use gwaihir_client_lib::chrono::NaiveDateTime;
+    use gwaihir_client_lib::chrono::{NaiveDateTime, TimeZone};
 
     #[test]
     pub fn can_summarize() {
@@ -211,10 +211,8 @@ pub mod tests {
         // doesn't include 0s (before or after rounding)
         // sorts consistently (UNTESTED)
         // only keeps the top DEFAULT_MAX_NUM_APPS_IN_SUMMARY apps (UNTESTED)
-        let cutoff = DateTime::<Utc>::from_utc(
-            NaiveDateTime::from_timestamp_millis(1694119546000).unwrap(),
-            Utc,
-        );
+        let cutoff =
+            Utc.from_utc_datetime(&NaiveDateTime::from_timestamp_millis(1694119546000).unwrap());
         let now = cutoff + Duration::seconds(100);
         let window_activity = WindowActivity {
             current_window: ActiveWindow {

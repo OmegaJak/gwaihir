@@ -2,7 +2,8 @@ use gwaihir_client_lib::UniqueUserId;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    lock_status::LockStatus, microphone_usage::MicrophoneUsage, online_status::OnlineStatus,
+    keyboard_mouse_activity::KeyboardMouseActivity, lock_status::LockStatus,
+    microphone_usage::MicrophoneUsage, online_status::OnlineStatus,
     summarized_window_activity::SummarizedWindowActivity,
 };
 
@@ -13,6 +14,7 @@ pub enum SensorOutput {
     MicrophoneUsage(MicrophoneUsage),
     OnlineStatus(OnlineStatus),
     SummarizedWindowActivity(SummarizedWindowActivity),
+    KeyboardMouseActivity(KeyboardMouseActivity),
 }
 
 pub trait SensorWidget {
@@ -27,6 +29,7 @@ impl SensorWidget for SensorOutput {
             SensorOutput::MicrophoneUsage(usage) => usage.show(ui, id),
             SensorOutput::OnlineStatus(online) => online.show(ui, id),
             SensorOutput::SummarizedWindowActivity(activity) => activity.show(ui, id),
+            SensorOutput::KeyboardMouseActivity(activity) => activity.show(ui, id),
         }
     }
 }
@@ -39,6 +42,7 @@ impl SensorOutput {
             SensorOutput::MicrophoneUsage(_) => true,
             SensorOutput::OnlineStatus(_) => true,
             SensorOutput::SummarizedWindowActivity(_) => true,
+            SensorOutput::KeyboardMouseActivity(_) => true,
         }
     }
 }

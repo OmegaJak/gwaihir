@@ -1,6 +1,8 @@
 use crate::sensors::outputs::sensor_output::SensorOutput;
 
-pub(self) mod active_window_provider;
+pub mod active_window_provider;
+pub mod keyboard_mouse_event_provider;
+pub mod keyboard_mouse_sensor;
 pub mod lock_status_sensor;
 pub mod microphone_usage_sensor;
 pub mod outputs;
