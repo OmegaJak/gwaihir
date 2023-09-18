@@ -309,13 +309,13 @@ impl eframe::App for GwaihirApp {
                 );
 
                 status.sensor_outputs.show_first(
-                    |o| matches!(o, SensorOutput::MicrophoneUsage(_)),
+                    |o| matches!(o, SensorOutput::KeyboardMouseActivity(_)),
                     ui,
                     id,
                 );
 
                 status.sensor_outputs.show_first(
-                    |o| matches!(o, SensorOutput::KeyboardMouseActivity(_)),
+                    |o| matches!(o, SensorOutput::MicrophoneUsage(_)),
                     ui,
                     id,
                 );

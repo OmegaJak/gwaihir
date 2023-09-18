@@ -16,8 +16,9 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-const BUCKET_DURATION: Duration = Duration::from_secs(10);
-const NUM_DATAPOINTS_TO_KEEP: usize = 6;
+pub const BUCKET_DURATION_SECONDS: u64 = 10;
+const BUCKET_DURATION: Duration = Duration::from_secs(BUCKET_DURATION_SECONDS);
+const NUM_DATAPOINTS_TO_KEEP: usize = 30;
 
 pub struct KeyboardMouseSensor {
     event_rx: Receiver<KeyboardMouseEvent>,
