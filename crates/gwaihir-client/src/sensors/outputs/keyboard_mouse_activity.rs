@@ -3,6 +3,7 @@ use crate::{sensors::keyboard_mouse_sensor, ui::ui_extension_methods::UIExtensio
 use egui::{CollapsingHeader, Color32, RichText, Stroke, Vec2};
 use egui_plot::{uniform_grid_spacer, Bar, BarChart, Plot};
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 
 const ONE_THIRD: f64 = 1.0 / 3.0;
 const TWO_THIRDS: f64 = 2.0 / 3.0;
@@ -27,10 +28,10 @@ struct UsageSummary {
 }
 
 enum UsageLevel {
-    High,
-    Medium,
-    Low,
     None,
+    Low,
+    Medium,
+    High,
 }
 
 impl SensorWidget for KeyboardMouseActivity {
@@ -74,6 +75,38 @@ impl SensorWidget for KeyboardMouseActivity {
                     id,
                 );
             });
+    }
+}
+
+impl UsageLevel {
+    fn from_fractional(fractional_usage: f64) -> Option<Self> {
+        match fractional_usage {
+            x if x == 0.0 => Some(UsageLevel::None),
+            x if x <= ONE_THIRD => Some(UsageLevel::Low),
+            x if x <= TWO_THIRDS => Some(UsageLevel::Medium),
+            x if x <= 1.0 => Some(UsageLevel::High),
+            _ => None,
+        }
+    }
+
+    fn color(&self) -> Color32 {
+        match self {
+            UsageLevel::None => Color32::from_rgb(0, Color32::DARK_GREEN.g() / 2, 0),
+            UsageLevel::Low => Color32::DARK_GREEN,
+            UsageLevel::Medium => Color32::GOLD,
+            UsageLevel::High => Color32::RED,
+        }
+    }
+}
+
+impl Display for UsageLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UsageLevel::None => write!(f, "None"),
+            UsageLevel::Low => write!(f, "Low"),
+            UsageLevel::Medium => write!(f, "Medium"),
+            UsageLevel::High => write!(f, "High"),
+        }
     }
 }
 
@@ -148,7 +181,7 @@ fn get_bar(
 fn get_bar_color(bar_value: &f64, data_summary: &Option<UsageSummary>) -> Color32 {
     if let Some(summary) = data_summary.as_ref() {
         let usage_level = get_usage_level(*bar_value, summary.min, summary.max);
-        usage_level.map_or(Color32::BLACK, |l| get_usage_level_color(&l))
+        usage_level.map_or(Color32::BLACK, |l| l.color())
     } else {
         Color32::BLACK
     }
@@ -156,26 +189,10 @@ fn get_bar_color(bar_value: &f64, data_summary: &Option<UsageSummary>) -> Color3
 
 fn get_summary_text(summary: &Option<UsageSummary>) -> RichText {
     if let Some(summary) = summary {
-        let color = get_usage_level_color(&summary.level);
-        let level_text = match summary.level {
-            UsageLevel::None => "None",
-            UsageLevel::Low => "Low",
-            UsageLevel::Medium => "Medium",
-            UsageLevel::High => "High",
-        };
-
-        RichText::new(format!("{} ({:.1})", level_text, summary.value)).color(color)
+        RichText::new(format!("{} ({:.1})", summary.level, summary.value))
+            .color(summary.level.color())
     } else {
         RichText::new("ERROR").color(Color32::BLUE)
-    }
-}
-
-fn get_usage_level_color(level: &UsageLevel) -> Color32 {
-    match level {
-        UsageLevel::None => Color32::from_rgb(0, Color32::DARK_GREEN.g() / 2, 0),
-        UsageLevel::Low => Color32::DARK_GREEN,
-        UsageLevel::Medium => Color32::GOLD,
-        UsageLevel::High => Color32::RED,
     }
 }
 
@@ -212,11 +229,5 @@ fn get_usage_level(value: f64, min: f64, max: f64) -> Option<UsageLevel> {
         0.0
     };
 
-    match fractional_usage {
-        x if x == 0.0 => Some(UsageLevel::None),
-        x if x <= ONE_THIRD => Some(UsageLevel::Low),
-        x if x <= TWO_THIRDS => Some(UsageLevel::Medium),
-        x if x <= 1.0 => Some(UsageLevel::High),
-        _ => None,
-    }
+    UsageLevel::from_fractional(fractional_usage)
 }
