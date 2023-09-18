@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::time::{Duration, Instant};
 use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
 use winreg::RegKey;
@@ -55,7 +56,7 @@ fn get_apps_using_microphone(parent_regkey: winreg::RegKey) -> Vec<AppName> {
         .filter_map(|x| x.ok())
         .filter_map(|key| {
             if get_last_microphone_usage_time(&parent_regkey, &key)? == 0 {
-                Some(key.clone().into())
+                Some(redact_private_info(prettify(key.clone())).into())
             } else {
                 None
             }
@@ -71,4 +72,40 @@ fn get_last_microphone_usage_time(parent_regkey: &RegKey, app_name: &str) -> Opt
             .get_value::<u64, _>("LastUsedTimeStop")
             .ok()?,
     )
+}
+
+fn prettify(app_key: String) -> String {
+    app_key.replace("#", "\\")
+}
+
+fn redact_private_info(app_key: String) -> String {
+    log::warn!("{}", app_key);
+    Path::new(&app_key)
+        .file_name()
+        .map_or(app_key.clone(), |os_str| {
+            os_str.to_string_lossy().to_string()
+        })
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    #[test]
+    pub fn redact_given_windows_path_removes_up_to_filename() {
+        let app_key = "C:\\Users\\USERNAME\\appv2\\app.exe";
+
+        let redacted = redact_private_info(app_key.to_string());
+
+        assert_eq!("app.exe".to_string(), redacted);
+    }
+
+    #[test]
+    pub fn redact_given_app_name_keeps_app_name() {
+        let app_key = "windowsstoreapp123";
+
+        let redacted = redact_private_info(app_key.to_string());
+
+        assert_eq!(app_key.to_string(), redacted);
+    }
 }
