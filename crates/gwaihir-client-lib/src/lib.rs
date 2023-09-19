@@ -63,13 +63,14 @@ pub enum NetworkType {
     SpacetimeDB,
 }
 
-pub trait NetworkInterfaceCreator<T, NI>
+pub trait NetworkInterfaceCreator<T, NI, P>
 where
     NI: NetworkInterface<T>,
 {
     fn new(
         update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static,
         on_disconnect_callback: impl FnOnce() + Send + 'static,
+        parameters: P,
     ) -> NI;
 }
 

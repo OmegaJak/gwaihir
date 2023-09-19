@@ -1,3 +1,13 @@
+use chrono_humanize::HumanTime;
+use egui::{epaint::ahash::HashSet, Color32, RichText, TextEdit, Widget};
+use gwaihir_client_lib::{
+    chrono::Local, NetworkInterface, RemoteUpdate, UniqueUserId, UserStatus, APP_ID,
+};
+use log::{debug, error, info, warn};
+use log_err::LogErrResult;
+use networking_spacetimedb::{SpacetimeDBCreationParameters, SpacetimeDBInterface};
+use raw_window_handle::HasRawWindowHandle;
+use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
     cmp::Ordering,
@@ -8,18 +18,6 @@ use std::{
     thread::JoinHandle,
     time::Duration,
 };
-
-use chrono_humanize::HumanTime;
-use egui::{epaint::ahash::HashSet, Color32, RichText, TextEdit, Widget};
-use gwaihir_client_lib::{
-    chrono::Local, NetworkInterface, NetworkInterfaceCreator, RemoteUpdate, UniqueUserId,
-    UserStatus, APP_ID,
-};
-
-use log::{debug, error, info, warn};
-use log_err::LogErrResult;
-use raw_window_handle::HasRawWindowHandle;
-use serde::{Deserialize, Serialize};
 
 use crate::{
     networking::network_manager::NetworkManager,
@@ -39,6 +37,7 @@ use crate::{
 #[derive(Serialize, Deserialize)]
 pub struct Persistence {
     pub ignored_users: HashSet<UniqueUserId>,
+    pub spacetimedb_db_name: String,
 }
 
 impl Persistence {
@@ -49,6 +48,7 @@ impl Default for Persistence {
     fn default() -> Self {
         Self {
             ignored_users: Default::default(),
+            spacetimedb_db_name: "gwaihir-test".to_string(),
         }
     }
 }
@@ -77,20 +77,14 @@ pub struct GwaihirApp {
 
 impl GwaihirApp {
     /// Called once before the first frame.
-    pub fn new<N>(
+    pub fn new(
         cc: &eframe::CreationContext<'_>,
         sensor_builder: Rc<RefCell<Option<EventLoopRegisteredLockStatusSensorBuilder>>>,
         tx_to_monitor_thread: Sender<MainToMonitorMessages>,
         rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
         sensor_monitor_thread_join_handle: JoinHandle<()>,
         log_file_location: PathBuf,
-    ) -> Self
-    where
-        N: NetworkInterface<SensorOutputs>
-            + NetworkInterfaceCreator<SensorOutputs, N>
-            + Send
-            + 'static,
-    {
+    ) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
         let lock_status_sensor = init_lock_status_sensor(cc, sensor_builder);
@@ -110,7 +104,11 @@ impl GwaihirApp {
         let periodic_repaint_thread_join_handle =
             create_periodic_repaint_thread(cc.egui_ctx.clone(), Duration::from_secs(10));
 
-        let network = NetworkManager::new::<N>(cc.egui_ctx.clone());
+        let creation_params = SpacetimeDBCreationParameters {
+            db_name: persistence.spacetimedb_db_name.clone(),
+        };
+        let network =
+            NetworkManager::new::<SpacetimeDBInterface, _>(cc.egui_ctx.clone(), creation_params);
         GwaihirApp {
             tray_icon_data: None,
             tx_to_monitor_thread,
@@ -349,7 +347,8 @@ impl eframe::App for GwaihirApp {
             egui::warn_if_debug_build(ui);
         });
 
-        self.network_window.show(ctx, &mut self.network);
+        self.network_window
+            .show(ctx, &mut self.network, &mut self.persistence);
     }
 }
 

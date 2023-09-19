@@ -1,4 +1,4 @@
-use crate::networking::network_manager::NetworkManager;
+use crate::{app::Persistence, networking::network_manager::NetworkManager};
 use egui::{Align2, ComboBox};
 use gwaihir_client_lib::{NetworkInterface, NetworkType};
 
@@ -20,11 +20,17 @@ impl NetworkWindow {
         self.shown = shown;
     }
 
-    pub fn show(&mut self, ctx: &egui::Context, network_manager: &mut NetworkManager) {
+    pub fn show(
+        &mut self,
+        ctx: &egui::Context,
+        network_manager: &mut NetworkManager,
+        persistence: &mut Persistence,
+    ) {
+        let mut shown = self.shown; // to avoid mutability issues with self
         egui::Window::new("Network")
             .pivot(Align2::CENTER_CENTER)
             .default_pos(ctx.screen_rect().center())
-            .open(&mut self.shown)
+            .open(&mut shown)
             .show(ctx, |ui| {
                 ui.label(format!(
                     "Current network: {}",
@@ -48,9 +54,28 @@ impl NetworkWindow {
                         });
                 });
 
+                self.show_network_specific_config(ui, persistence);
+
                 if ui.button("Update Network").clicked() {
-                    network_manager.reinit_network(self.selected_network_type.clone());
+                    network_manager.reinit_network(
+                        self.selected_network_type.clone(),
+                        persistence.spacetimedb_db_name.clone(),
+                    );
                 }
             });
+
+        self.shown = shown;
+    }
+
+    fn show_network_specific_config(&self, ui: &mut egui::Ui, persistence: &mut Persistence) {
+        match self.selected_network_type {
+            NetworkType::Offline => (),
+            NetworkType::SpacetimeDB => {
+                ui.horizontal(|ui| {
+                    ui.label("DB Name: ");
+                    ui.text_edit_singleline(&mut persistence.spacetimedb_db_name);
+                });
+            }
+        }
     }
 }

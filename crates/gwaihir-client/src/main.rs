@@ -1,16 +1,14 @@
 #![warn(clippy::all, rust_2018_idioms)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use std::path::PathBuf;
-
 use crate::sensor_monitor_thread::{create_sensor_monitor_thread, MainToMonitorMessages};
 pub use app::GwaihirApp;
 use directories_next::ProjectDirs;
 use flexi_logger::LoggerHandle;
 use gwaihir_client_lib::APP_ID;
 use log::info;
-use networking_spacetimedb::SpacetimeDBInterface;
 use sensors::lock_status_sensor::LockStatusSensorBuilder;
+use std::path::PathBuf;
 
 mod app;
 mod networking;
@@ -38,7 +36,7 @@ fn main() -> eframe::Result<()> {
             tx_to_monitor
                 .send(MainToMonitorMessages::SetEguiContext(ctx_clone))
                 .unwrap();
-            Box::new(GwaihirApp::new::<SpacetimeDBInterface>(
+            Box::new(GwaihirApp::new(
                 cc,
                 registered_builder,
                 tx_to_monitor,

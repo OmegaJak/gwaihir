@@ -1,8 +1,8 @@
 use crate::sensors::outputs::sensor_outputs::SensorOutputs;
 use delegate::delegate;
 use gwaihir_client_lib::{NetworkInterface, NetworkInterfaceCreator, NetworkType, RemoteUpdate};
-use log::warn;
-use networking_spacetimedb::SpacetimeDBInterface;
+use log::{info, warn};
+use networking_spacetimedb::{SpacetimeDBCreationParameters, SpacetimeDBInterface};
 use std::{
     sync::mpsc::{self, Receiver, Sender},
     time::Duration,
@@ -18,15 +18,20 @@ pub struct NetworkManager {
 }
 
 impl NetworkManager {
-    pub fn new<N>(egui_ctx: egui::Context) -> Self
+    pub fn new<N, P>(egui_ctx: egui::Context, network_creation_parameters: P) -> Self
     where
         N: NetworkInterface<SensorOutputs>
-            + NetworkInterfaceCreator<SensorOutputs, N>
+            + NetworkInterfaceCreator<SensorOutputs, N, P>
             + Send
             + 'static,
+        P: Send + 'static,
     {
         let (network_tx, network_rx) = mpsc::channel();
-        let network = try_init_network_interface::<N>(network_tx.clone(), egui_ctx.clone());
+        let network = try_init_network_interface::<N, P>(
+            network_tx.clone(),
+            egui_ctx.clone(),
+            network_creation_parameters,
+        );
         Self {
             network,
             network_tx,
@@ -39,14 +44,20 @@ impl NetworkManager {
         self.network_rx.try_recv()
     }
 
-    pub fn reinit_network(&mut self, new_network_type: NetworkType) {
+    pub fn reinit_network(&mut self, new_network_type: NetworkType, spacetimedb_db_name: String) {
         let network_tx = self.network_tx.clone();
         let egui_ctx = self.egui_ctx.clone();
         match new_network_type {
             NetworkType::Offline => self.network = get_offline_network(network_tx, egui_ctx),
             NetworkType::SpacetimeDB => {
-                self.network =
-                    try_init_network_interface::<SpacetimeDBInterface>(network_tx, egui_ctx)
+                let creation_params = SpacetimeDBCreationParameters {
+                    db_name: spacetimedb_db_name,
+                };
+                self.network = try_init_network_interface::<SpacetimeDBInterface, _>(
+                    network_tx,
+                    egui_ctx,
+                    creation_params,
+                )
             }
         }
     }
@@ -67,12 +78,17 @@ impl NetworkInterface<SensorOutputs> for NetworkManager {
     }
 }
 
-fn try_init_network_interface<N>(
+fn try_init_network_interface<N, P>(
     network_tx: Sender<RemoteUpdate<SensorOutputs>>,
     egui_ctx: egui::Context,
+    creation_parameters: P,
 ) -> Box<dyn NetworkInterface<SensorOutputs> + Send>
 where
-    N: NetworkInterface<SensorOutputs> + NetworkInterfaceCreator<SensorOutputs, N> + Send + 'static,
+    N: NetworkInterface<SensorOutputs>
+        + NetworkInterfaceCreator<SensorOutputs, N, P>
+        + Send
+        + 'static,
+    P: Send + 'static,
 {
     let network_tx_clone = network_tx.clone();
     let ctx_clone = egui_ctx.clone();
@@ -81,6 +97,7 @@ where
             Box::new(N::new(
                 get_remote_update_callback(network_tx.clone(), egui_ctx.clone()),
                 get_on_disconnect_callback(network_tx, egui_ctx),
+                creation_parameters,
             )) as Box<dyn NetworkInterface<SensorOutputs> + Send>
         },
         Duration::from_secs(5),
@@ -101,6 +118,7 @@ fn get_offline_network(
     Box::new(OfflineNetworkInterface::new(
         get_remote_update_callback(network_tx.clone(), egui_ctx.clone()),
         get_on_disconnect_callback(network_tx, egui_ctx),
+        (),
     ))
 }
 
@@ -119,7 +137,9 @@ fn get_on_disconnect_callback(
     ctx_clone: egui::Context,
 ) -> impl FnOnce() {
     move || {
-        network_tx.send(RemoteUpdate::Disconnected).unwrap();
+        network_tx.send(RemoteUpdate::Disconnected).unwrap_or_else(|_e| {
+			info!("Failed to send disconnect message from network thread, perhaps because the main thread is already shutting down");
+		});
         ctx_clone.request_repaint();
     }
 }

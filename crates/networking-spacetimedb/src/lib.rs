@@ -20,21 +20,24 @@ use spacetimedb_sdk::{
 /// The URL of the SpacetimeDB instance hosting our chat module.
 const SPACETIMEDB_URI: &str = "https://testnet.spacetimedb.com";
 
-/// The module name we chose when we published our module.
-const DB_NAME: &str = "gwaihir-test";
-
 pub struct SpacetimeDBInterface {}
 
-impl<T> NetworkInterfaceCreator<T, SpacetimeDBInterface> for SpacetimeDBInterface
+pub struct SpacetimeDBCreationParameters {
+    pub db_name: String,
+}
+
+impl<T> NetworkInterfaceCreator<T, SpacetimeDBInterface, SpacetimeDBCreationParameters>
+    for SpacetimeDBInterface
 where
     T: Serialize + for<'a> Deserialize<'a> + AcceptsOnlineStatus,
 {
     fn new(
         update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static,
         on_disconnect_callback: impl FnOnce() + Send + 'static,
+        creation_params: SpacetimeDBCreationParameters,
     ) -> Self {
         register_callbacks(update_callback, on_disconnect_callback);
-        connect_to_db();
+        connect_to_db(&creation_params.db_name);
         subscribe_to_tables();
 
         Self {}
@@ -103,10 +106,10 @@ fn register_callbacks<T>(
 }
 
 /// Load credentials from a file and connect to the database.
-fn connect_to_db() {
+fn connect_to_db(db_name: &str) {
     connect(
         SPACETIMEDB_URI,
-        DB_NAME,
+        &db_name,
         load_credentials(&creds_dir()).expect("Error reading stored credentials"),
     )
     .expect("Failed to connect");

@@ -1,4 +1,4 @@
 set shell := ["cmd.exe", "/c"]
 
-spacetime-publish:
-	spacetime publish gwaihir-test
+spacetime-publish db_name:
+	spacetime publish {{db_name}}
