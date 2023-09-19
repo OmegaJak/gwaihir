@@ -34,4 +34,8 @@ impl<T> NetworkInterface<T> for OfflineNetworkInterface<T> {
     fn get_current_user_id(&self) -> Option<gwaihir_client_lib::UniqueUserId> {
         None
     }
+
+    fn get_network_type(&self) -> gwaihir_client_lib::NetworkType {
+        gwaihir_client_lib::NetworkType::Offline
+    }
 }

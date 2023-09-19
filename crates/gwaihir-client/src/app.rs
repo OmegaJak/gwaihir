@@ -4,7 +4,7 @@ use std::{
     collections::HashMap,
     path::PathBuf,
     rc::Rc,
-    sync::mpsc::{self, Receiver, Sender, TryRecvError},
+    sync::mpsc::{Receiver, Sender, TryRecvError},
     thread::JoinHandle,
     time::Duration,
 };
@@ -22,7 +22,7 @@ use raw_window_handle::HasRawWindowHandle;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    offline_network_interface::OfflineNetworkInterface,
+    networking::network_manager::NetworkManager,
     periodic_repaint_thread::create_periodic_repaint_thread,
     sensor_monitor_thread::{MainToMonitorMessages, MonitorToMainMessages},
     sensors::{
@@ -31,7 +31,7 @@ use crate::{
     },
     tray_icon::{hide_to_tray, TrayIconData},
     ui::{
-        time_formatting::nicely_formatted_datetime,
+        network_window::NetworkWindow, time_formatting::nicely_formatted_datetime,
         widgets::auto_launch_checkbox::AutoLaunchCheckboxUiExtension,
     },
 };
@@ -64,14 +64,15 @@ pub struct GwaihirApp {
 
     _periodic_repaint_thread_join_handle: JoinHandle<()>,
 
-    network: Box<dyn NetworkInterface<SensorOutputs>>,
-    network_rx: Receiver<gwaihir_client_lib::RemoteUpdate<SensorOutputs>>,
+    network: NetworkManager,
     current_user_id: Option<UniqueUserId>,
 
     set_name_input: String,
 
     persistence: Persistence,
     log_file_location: PathBuf,
+
+    network_window: NetworkWindow,
 }
 
 impl GwaihirApp {
@@ -109,9 +110,7 @@ impl GwaihirApp {
         let periodic_repaint_thread_join_handle =
             create_periodic_repaint_thread(cc.egui_ctx.clone(), Duration::from_secs(10));
 
-        let (network_tx, network_rx) = mpsc::channel();
-        let network: Box<dyn NetworkInterface<SensorOutputs>> =
-            init_network_interface::<N>(network_tx, cc.egui_ctx.clone());
+        let network = NetworkManager::new::<N>(cc.egui_ctx.clone());
         GwaihirApp {
             tray_icon_data: None,
             tx_to_monitor_thread,
@@ -119,9 +118,10 @@ impl GwaihirApp {
             current_status: HashMap::new(),
             show_disconnected_warning: false,
 
+            network_window: NetworkWindow::new(&network),
+
             sensor_monitor_thread_join_handle: Some(sensor_monitor_thread_join_handle),
             network,
-            network_rx,
             current_user_id: None,
 
             _periodic_repaint_thread_join_handle: periodic_repaint_thread_join_handle,
@@ -221,7 +221,7 @@ impl eframe::App for GwaihirApp {
             }
         }
 
-        while let Ok(update) = self.network_rx.try_recv() {
+        while let Ok(update) = self.network.try_recv() {
             match update {
                 RemoteUpdate::UserStatusUpdated(status) => {
                     if self.subscribed_to_user(&status.user_id) {
@@ -260,6 +260,11 @@ impl eframe::App for GwaihirApp {
                             .log_expect("Failed to open file using default OS handler");
                     }
 
+                    if ui.button("Manage Network").clicked() {
+                        self.network_window.set_shown(true);
+                        ui.close_menu();
+                    }
+
                     if ui.button("Quit").clicked() {
                         frame.close();
                     }
@@ -271,7 +276,7 @@ impl eframe::App for GwaihirApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            if self.show_disconnected_warning {
+            if self.network.is_offline() {
                 ui.label(
                     RichText::new("⚠⚠ DISCONNECTED FROM SPACETIMEDB ⚠⚠")
                         .heading()
@@ -343,6 +348,8 @@ impl eframe::App for GwaihirApp {
 
             egui::warn_if_debug_build(ui);
         });
+
+        self.network_window.show(ctx, &mut self.network);
     }
 }
 
@@ -367,94 +374,5 @@ fn init_lock_status_sensor(
             }
         }
         _ => todo!(),
-    }
-}
-
-fn init_network_interface<N>(
-    network_tx: Sender<RemoteUpdate<SensorOutputs>>,
-    egui_ctx: egui::Context,
-) -> Box<dyn NetworkInterface<SensorOutputs> + Send>
-where
-    N: NetworkInterface<SensorOutputs> + NetworkInterfaceCreator<SensorOutputs, N> + Send + 'static,
-{
-    let network_tx_clone = network_tx.clone();
-    let ctx_clone = egui_ctx.clone();
-    run_with_timeout(
-        move || {
-            Box::new(N::new(
-                get_remote_update_callback(network_tx.clone(), egui_ctx.clone()),
-                get_on_disconnect_callback(network_tx, egui_ctx),
-            )) as Box<dyn NetworkInterface<SensorOutputs> + Send>
-        },
-        Duration::from_secs(5),
-        Some(std::thread::Builder::new().name("network_interface_initializer".to_string())),
-    )
-    .unwrap_or_else(move |_e| {
-        warn!(
-            "Defaulting to offline network interface because initialization of the primary failed"
-        );
-        Box::new(OfflineNetworkInterface::new(
-            get_remote_update_callback(network_tx_clone.clone(), ctx_clone.clone()),
-            get_on_disconnect_callback(network_tx_clone, ctx_clone),
-        ))
-    })
-}
-
-fn get_remote_update_callback(
-    network_tx: Sender<RemoteUpdate<SensorOutputs>>,
-    ctx_clone: egui::Context,
-) -> impl Fn(RemoteUpdate<SensorOutputs>) + Clone {
-    move |update| {
-        network_tx.send(update).unwrap();
-        ctx_clone.request_repaint();
-    }
-}
-
-fn get_on_disconnect_callback(
-    network_tx: Sender<RemoteUpdate<SensorOutputs>>,
-    ctx_clone: egui::Context,
-) -> impl FnOnce() {
-    move || {
-        network_tx.send(RemoteUpdate::Disconnected).unwrap();
-        ctx_clone.request_repaint();
-    }
-}
-
-// https://stackoverflow.com/a/74234262/6581675
-fn run_with_timeout<F, T>(
-    f: F,
-    timeout: Duration,
-    thread_builder: Option<std::thread::Builder>,
-) -> Result<T, ()>
-where
-    F: FnOnce() -> T + Send + 'static,
-    T: Send + 'static,
-{
-    let (tx, rx) = mpsc::channel();
-    let thread_builder = thread_builder.unwrap_or_else(|| std::thread::Builder::new());
-    let handle = thread_builder
-        .spawn(move || {
-            let result = f();
-            match tx.send(result) {
-                Ok(()) => {} // everything good
-                Err(_) => {} // we have been released, don't panic
-            }
-        })
-        .unwrap();
-
-    match rx.recv_timeout(timeout) {
-        Ok(result) => Ok(result),
-        Err(mpsc::RecvTimeoutError::Timeout) => Err(()),
-        Err(mpsc::RecvTimeoutError::Disconnected) => {
-            // thread crashed
-            if handle.is_finished() {
-                let _ = handle.join(); // print crash msg
-            } else {
-                unreachable!(
-                    "it shouldn't be possible for the thread to drop the sender without crashing"
-                )
-            }
-            Err(())
-        }
     }
 }

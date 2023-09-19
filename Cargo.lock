@@ -1102,6 +1102,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "delegate"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ee5df75c70b95bd3aacc8e2fd098797692fb1d54121019c4de481e42f04c8a1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "deranged"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1335,6 +1346,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.37",
+]
+
+[[package]]
+name = "enum-display-derive"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f16ef37b2a9b242295d61a154ee91ae884afff6b8b933b486b12481cc58310ca"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -2027,6 +2049,7 @@ dependencies = [
  "auto-launch",
  "bounded-vec-deque",
  "chrono-humanize",
+ "delegate",
  "directories-next",
  "eframe",
  "egui",
@@ -2058,6 +2081,7 @@ name = "gwaihir-client-lib"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "enum-display-derive",
  "nutype",
  "serde",
 ]

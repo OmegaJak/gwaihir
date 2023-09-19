@@ -9,3 +9,4 @@ edition = "2021"
 serde = { version = "1.0.185", features = ["derive"] }
 chrono = "0.4.26"
 nutype = { version = "0.4.0-beta.2", features = ["serde"] }
+enum-display-derive = "0.1.1"

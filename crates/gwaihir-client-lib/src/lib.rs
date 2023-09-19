@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use chrono::{DateTime, Utc};
 use nutype::nutype;
 
@@ -55,6 +57,12 @@ pub trait AcceptsOnlineStatus {
     fn set_online_status(&mut self, online: bool);
 }
 
+#[derive(enum_display_derive::Display, PartialEq, Clone)]
+pub enum NetworkType {
+    Offline,
+    SpacetimeDB,
+}
+
 pub trait NetworkInterfaceCreator<T, NI>
 where
     NI: NetworkInterface<T>,
@@ -69,4 +77,5 @@ pub trait NetworkInterface<T> {
     fn publish_update(&self, sensor_outputs: T);
     fn set_username(&self, name: String);
     fn get_current_user_id(&self) -> Option<UniqueUserId>;
+    fn get_network_type(&self) -> NetworkType;
 }

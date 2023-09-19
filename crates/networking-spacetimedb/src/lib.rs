@@ -1,7 +1,7 @@
 mod module_bindings;
 
 use gwaihir_client_lib::{
-    chrono::{DateTime, NaiveDateTime, Utc},
+    chrono::{NaiveDateTime, TimeZone, Utc},
     AcceptsOnlineStatus, NetworkInterface, NetworkInterfaceCreator, RemoteUpdate, UniqueUserId,
     UserStatus, Username, APP_ID,
 };
@@ -9,6 +9,7 @@ use log::error;
 use module_bindings::*;
 use serde::{Deserialize, Serialize};
 use spacetimedb_sdk::{
+    disconnect,
     identity::{
         identity, load_credentials, once_on_connect, save_credentials, Credentials, Identity,
     },
@@ -55,6 +56,17 @@ where
 
     fn set_username(&self, name: String) {
         set_name(name)
+    }
+
+    fn get_network_type(&self) -> gwaihir_client_lib::NetworkType {
+        gwaihir_client_lib::NetworkType::SpacetimeDB
+    }
+}
+
+impl Drop for SpacetimeDBInterface {
+    fn drop(&mut self) {
+        log::debug!("Disconnecting from SpacetimeDB because the interface was dropped");
+        disconnect()
     }
 }
 
@@ -139,12 +151,11 @@ where
     if let Some(status) = new.status.clone() {
         match serde_json::from_str::<T>(&status) {
             Ok(mut sensor_data) => {
-                let last_update = DateTime::<Utc>::from_utc(
-                    NaiveDateTime::from_timestamp_micros(
+                let last_update = Utc.from_utc_datetime(
+                    &NaiveDateTime::from_timestamp_micros(
                         new.last_status_update.unwrap().try_into().unwrap(),
                     )
                     .unwrap(),
-                    Utc,
                 );
                 sensor_data.set_online_status(new.online);
                 return Some(RemoteUpdate::UserStatusUpdated(UserStatus {
