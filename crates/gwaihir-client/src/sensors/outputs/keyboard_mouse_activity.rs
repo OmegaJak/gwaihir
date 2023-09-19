@@ -122,7 +122,12 @@ fn show_activity_graph_section(
         .default_open(true)
         .show(ui, |ui| {
             if !activity_data.is_empty() {
-                show_activity_graph(activity_data, data_summary, ui);
+                show_activity_graph(
+                    activity_data,
+                    data_summary,
+                    ui,
+                    format!("{}_{}_plot", id.as_ref(), collapse_header_text),
+                );
             } else {
                 ui.label("No data yet");
             }
@@ -133,6 +138,7 @@ fn show_activity_graph(
     activity_data: &[f64],
     data_summary: Option<UsageSummary>,
     ui: &mut egui::Ui,
+    unique_plot_id: String,
 ) {
     let bucket_duration_s = keyboard_mouse_sensor::BUCKET_DURATION_SECONDS as f64;
     let bars: Vec<_> = activity_data
@@ -143,9 +149,9 @@ fn show_activity_graph(
         .collect();
     let bar_chart = BarChart::new(bars)
         .color(Color32::BLUE)
-        .name("Normal Distribution");
+        .name("Activity History");
 
-    Plot::new("Normal Distribution Demo")
+    Plot::new(unique_plot_id)
         .clamp_grid(false)
         .set_margin_fraction(Vec2::new(0.0, 0.1))
         .include_y(1.0) // so we have something when there's no data
@@ -158,6 +164,7 @@ fn show_activity_graph(
         .allow_zoom(false)
         .allow_drag(false)
         .allow_boxed_zoom(false)
+        .allow_scroll(false)
         .x_grid_spacer(uniform_grid_spacer(|_i| [600.0, 60.0, 10.0]))
         .show(ui, |plot_ui| plot_ui.bar_chart(bar_chart));
 }
