@@ -9,9 +9,9 @@ use super::{
     Sensor,
 };
 use bounded_vec_deque::BoundedVecDeque;
-use log::{error, warn};
+use log::{error, info, warn};
 use std::{
-    sync::mpsc::{channel, Receiver},
+    sync::mpsc::{channel, Receiver, Sender},
     thread::{self, JoinHandle},
     time::{Duration, SystemTime},
 };
@@ -21,7 +21,7 @@ const BUCKET_DURATION: Duration = Duration::from_secs(BUCKET_DURATION_SECONDS);
 const NUM_BUCKETS_TO_KEEP: usize = 30;
 
 pub struct KeyboardMouseSensor {
-    event_rx: Receiver<KeyboardMouseEvent>,
+    rx_from_listener: Receiver<KeyboardMouseEvent>,
     keyboard_quantifier: KeyboardMouseEventHistoricalQuantifier,
     mouse_movement_quantifier: KeyboardMouseEventHistoricalQuantifier,
     mouse_button_quantifier: KeyboardMouseEventHistoricalQuantifier,
@@ -29,9 +29,11 @@ pub struct KeyboardMouseSensor {
     _listener_thread_handle: JoinHandle<()>,
 }
 
+pub struct ShutdownMessage {}
+
 impl Sensor for KeyboardMouseSensor {
     fn get_output(&mut self) -> super::outputs::sensor_output::SensorOutput {
-        for event in self.event_rx.try_iter() {
+        for event in self.rx_from_listener.try_iter() {
             match event.event_type {
                 KeyboardMouseEventType::KeyPress => self.keyboard_quantifier.handle_event(event),
                 KeyboardMouseEventType::MouseButtonPress(_) => {
@@ -61,26 +63,40 @@ impl Sensor for KeyboardMouseSensor {
 }
 
 impl KeyboardMouseSensor {
-    pub fn new(event_provider: impl KeyboardMouseEventProvider + Send + 'static) -> Self {
-        let (tx, rx) = channel();
+    pub fn new(
+        event_provider: impl KeyboardMouseEventProvider + Send + 'static,
+    ) -> (Self, Sender<ShutdownMessage>) {
+        let (tx_to_main, rx_from_listener) = channel();
+        let (tx_to_listener, rx_from_main) = channel();
         let listener_handle = thread::spawn(move || {
+            let mut has_shutdown = false;
             event_provider
                 .listen(move |event| {
-                    tx.send(event)
-                        .unwrap_or_else(|e| error!("Failed to send keyboard/mouse event: {:?}", e))
+                    if let Ok(_msg) = rx_from_main.try_recv() {
+                        info!("Keyboard/mouse listener received shutdown");
+                        has_shutdown = true;
+                    }
+
+                    if !has_shutdown {
+                        tx_to_main.send(event)
+                        .expect(&format!("Failed to send keyboard/mouse event from listener thread, the other end must have hung up"));
+                    }
                 })
                 .unwrap()
         });
 
         let now = SystemTime::now();
-        Self {
-            event_rx: rx,
-            keyboard_quantifier: KeyboardMouseEventHistoricalQuantifier::new(now.clone()),
-            mouse_movement_quantifier: KeyboardMouseEventHistoricalQuantifier::new(now.clone()),
-            mouse_button_quantifier: KeyboardMouseEventHistoricalQuantifier::new(now),
+        (
+            Self {
+                rx_from_listener,
+                keyboard_quantifier: KeyboardMouseEventHistoricalQuantifier::new(now.clone()),
+                mouse_movement_quantifier: KeyboardMouseEventHistoricalQuantifier::new(now.clone()),
+                mouse_button_quantifier: KeyboardMouseEventHistoricalQuantifier::new(now),
 
-            _listener_thread_handle: listener_handle,
-        }
+                _listener_thread_handle: listener_handle,
+            },
+            tx_to_listener,
+        )
     }
 }
 

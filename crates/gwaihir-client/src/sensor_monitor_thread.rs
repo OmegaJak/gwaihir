@@ -1,20 +1,19 @@
+use crate::sensors::lock_status_sensor::LockStatusSensor;
+use crate::sensors::{
+    keyboard_mouse_event_provider::RdevKeyboardMouseEventProvider,
+    keyboard_mouse_sensor::{KeyboardMouseSensor, ShutdownMessage},
+    microphone_usage_sensor::MicrophoneUsageSensor,
+    outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
+    window_activity_interpreter::WindowActivityInterpreter,
+    Sensor,
+};
+use log::{info, warn};
 use std::{
     ops::ControlFlow,
     sync::mpsc::{channel, Receiver, Sender, TryRecvError},
     thread::{sleep, JoinHandle},
     time::Duration,
 };
-
-use crate::sensors::{
-    keyboard_mouse_event_provider::RdevKeyboardMouseEventProvider,
-    keyboard_mouse_sensor::KeyboardMouseSensor,
-    microphone_usage_sensor::MicrophoneUsageSensor,
-    outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
-    window_activity_interpreter::WindowActivityInterpreter,
-    Sensor,
-};
-
-use crate::sensors::lock_status_sensor::LockStatusSensor;
 
 const THREAD_SLEEP_DURATION_MS: u64 = 50;
 
@@ -32,6 +31,7 @@ pub enum MonitorToMainMessages {
 struct SensorMonitor {
     rx_from_main: Receiver<MainToMonitorMessages>,
     tx_to_main: Sender<MonitorToMainMessages>,
+    tx_to_keyboard_mouse_listener: Sender<ShutdownMessage>,
     egui_ctx: Option<egui::Context>,
 
     sensors: Vec<(Box<dyn Sensor>, SensorOutput)>,
@@ -58,10 +58,14 @@ impl SensorMonitor {
         rx_from_main: Receiver<MainToMonitorMessages>,
         tx_to_main: Sender<MonitorToMainMessages>,
     ) -> Self {
+        let (keyboard_mouse_sensor, tx_to_keyboard_mouse_listener) =
+            KeyboardMouseSensor::new(RdevKeyboardMouseEventProvider::new());
         SensorMonitor {
             rx_from_main,
             tx_to_main,
             egui_ctx: None,
+
+            tx_to_keyboard_mouse_listener,
 
             sensors: vec![
                 (
@@ -72,12 +76,7 @@ impl SensorMonitor {
                     Box::new(WindowActivityInterpreter::new()),
                     SensorOutput::Empty,
                 ),
-                (
-                    Box::new(KeyboardMouseSensor::new(
-                        RdevKeyboardMouseEventProvider::new(),
-                    )),
-                    SensorOutput::Empty,
-                ),
+                (Box::new(keyboard_mouse_sensor), SensorOutput::Empty),
             ],
             last_sent_outputs: Vec::new(),
         }
@@ -147,7 +146,15 @@ impl SensorMonitor {
 
     fn process_msg(&mut self, msg: MainToMonitorMessages) -> ControlFlow<()> {
         match msg {
-            MainToMonitorMessages::Shutdown => return ControlFlow::Break(()),
+            MainToMonitorMessages::Shutdown => {
+                info!("Sending shutdown message to keyboard/mouse listener");
+                self.tx_to_keyboard_mouse_listener
+                    .send(ShutdownMessage {})
+                    .unwrap_or_else(|_e| {
+                        warn!("Failed to send shutdown message to keyboard/mouse listener")
+                    });
+                return ControlFlow::Break(());
+            }
             MainToMonitorMessages::SetEguiContext(ctx) => {
                 self.egui_ctx = Some(ctx);
             }
