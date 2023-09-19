@@ -2068,6 +2068,7 @@ dependencies = [
  "raw-window-handle",
  "rdev",
  "serde",
+ "serde_json",
  "serde_with 3.3.0",
  "thiserror",
  "tray-icon",

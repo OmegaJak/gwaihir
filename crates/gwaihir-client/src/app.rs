@@ -30,6 +30,7 @@ use crate::{
     tray_icon::{hide_to_tray, TrayIconData},
     ui::{
         network_window::NetworkWindow, time_formatting::nicely_formatted_datetime,
+        transmission_spy::TransmissionSpy,
         widgets::auto_launch_checkbox::AutoLaunchCheckboxUiExtension,
     },
 };
@@ -73,6 +74,7 @@ pub struct GwaihirApp {
     log_file_location: PathBuf,
 
     network_window: NetworkWindow,
+    transmission_spy: TransmissionSpy,
 }
 
 impl GwaihirApp {
@@ -117,6 +119,7 @@ impl GwaihirApp {
             show_disconnected_warning: false,
 
             network_window: NetworkWindow::new(&network),
+            transmission_spy: TransmissionSpy::new(),
 
             sensor_monitor_thread_join_handle: Some(sensor_monitor_thread_join_handle),
             network,
@@ -215,6 +218,7 @@ impl eframe::App for GwaihirApp {
             }
             Ok(MonitorToMainMessages::UpdatedSensorOutputs(sensor_outputs)) => {
                 debug!("Publishing update: {:#?}", &sensor_outputs);
+                self.transmission_spy.record_update(sensor_outputs.clone());
                 self.network.publish_update(sensor_outputs);
             }
         }
@@ -260,6 +264,11 @@ impl eframe::App for GwaihirApp {
 
                     if ui.button("Manage Network").clicked() {
                         self.network_window.set_shown(true);
+                        ui.close_menu();
+                    }
+
+                    if ui.button("View Sent Data").clicked() {
+                        self.transmission_spy.set_shown(true);
                         ui.close_menu();
                     }
 
@@ -349,6 +358,7 @@ impl eframe::App for GwaihirApp {
 
         self.network_window
             .show(ctx, &mut self.network, &mut self.persistence);
+        self.transmission_spy.show(ctx);
     }
 }
 

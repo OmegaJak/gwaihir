@@ -10,7 +10,7 @@ hex = "0.4.3"
 spacetimedb-sdk = { git = "https://github.com/clockworklabs/SpacetimeDB.git" } # Until the changes in https://github.com/clockworklabs/SpacetimeDB/pull/235 are released, probably the next release after 0.6.1
 serde = { version = "1" }
 log = "0.4"
+serde_json = "1.0.105"
 
 # local:
 gwaihir-client-lib = { path = "../gwaihir-client-lib" }
-serde_json = "1.0.105"
