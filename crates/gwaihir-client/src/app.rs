@@ -164,6 +164,33 @@ impl GwaihirApp {
 
         user_status_list
     }
+
+    fn gracefully_shutdown_sensor_monitor_thread(&mut self) {
+        if let Some(join_handle) = self.sensor_monitor_thread_join_handle.take() {
+            info!("Sending shutdown message to monitor thread");
+            self.tx_to_monitor_thread
+                .send(MainToMonitorMessages::Shutdown)
+                .unwrap();
+            let mut attempts: u8 = 0;
+            const SLEEP_DURATION: Duration = Duration::from_millis(20);
+            const MAX_ATTEMPTS: u8 = 10;
+            while !join_handle.is_finished() && attempts < MAX_ATTEMPTS {
+                std::thread::sleep(SLEEP_DURATION);
+                attempts += 1;
+            }
+
+            if join_handle.is_finished() {
+                join_handle.join().ok();
+                info!("Sensor monitor thread successfully shut down (after sleeping for {}ms {} time(s))", SLEEP_DURATION.as_millis(), attempts)
+            } else {
+                warn!(
+                    "Sensor monitor thread was still not finished after {} attempts ({}ms between each)! Terminating application without joining thread...",
+                    attempts,
+                    SLEEP_DURATION.as_millis()
+                );
+            }
+        }
+    }
 }
 
 impl eframe::App for GwaihirApp {
@@ -177,14 +204,7 @@ impl eframe::App for GwaihirApp {
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
-        if let Some(join_handle) = self.sensor_monitor_thread_join_handle.take() {
-            info!("Sending shutdown message to monitor thread");
-            self.tx_to_monitor_thread
-                .send(MainToMonitorMessages::Shutdown)
-                .unwrap();
-            join_handle.join().ok();
-            info!("Sensor monitor thread successfully shut down")
-        }
+        self.gracefully_shutdown_sensor_monitor_thread();
     }
 
     /// Called each time the UI needs repainting, which may be many times per second.
