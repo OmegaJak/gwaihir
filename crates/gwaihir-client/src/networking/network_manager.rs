@@ -1,7 +1,4 @@
-use crate::{
-    offline_network_interface::OfflineNetworkInterface,
-    sensors::outputs::sensor_outputs::SensorOutputs,
-};
+use crate::sensors::outputs::sensor_outputs::SensorOutputs;
 use delegate::delegate;
 use gwaihir_client_lib::{NetworkInterface, NetworkInterfaceCreator, NetworkType, RemoteUpdate};
 use log::warn;
@@ -10,6 +7,8 @@ use std::{
     sync::mpsc::{self, Receiver, Sender},
     time::Duration,
 };
+
+use super::offline_network_interface::OfflineNetworkInterface;
 
 pub struct NetworkManager {
     network: Box<dyn NetworkInterface<SensorOutputs>>,

@@ -14,7 +14,6 @@ use sensors::lock_status_sensor::LockStatusSensorBuilder;
 
 mod app;
 mod networking;
-mod offline_network_interface;
 mod periodic_repaint_thread;
 mod sensor_monitor_thread;
 mod sensors;
