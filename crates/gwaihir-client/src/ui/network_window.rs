@@ -1,5 +1,6 @@
+use super::widgets::show_centered_window;
 use crate::{app::Persistence, networking::network_manager::NetworkManager};
-use egui::{Align2, ComboBox};
+use egui::ComboBox;
 use gwaihir_client_lib::{NetworkInterface, NetworkType};
 
 pub struct NetworkWindow {
@@ -26,45 +27,38 @@ impl NetworkWindow {
         network_manager: &mut NetworkManager,
         persistence: &mut Persistence,
     ) {
-        let mut shown = self.shown; // to avoid mutability issues with self
-        egui::Window::new("Network")
-            .pivot(Align2::CENTER_CENTER)
-            .default_pos(ctx.screen_rect().center())
-            .open(&mut shown)
-            .show(ctx, |ui| {
-                ui.label(format!(
-                    "Current network: {}",
-                    network_manager.get_network_type()
-                ));
-                ui.horizontal(|ui| {
-                    ui.label("Network: ");
-                    ComboBox::from_id_source("network_type_selector")
-                        .selected_text(self.selected_network_type.to_string())
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(
-                                &mut self.selected_network_type,
-                                NetworkType::Offline,
-                                NetworkType::Offline.to_string(),
-                            );
-                            ui.selectable_value(
-                                &mut self.selected_network_type,
-                                NetworkType::SpacetimeDB,
-                                NetworkType::SpacetimeDB.to_string(),
-                            );
-                        });
-                });
-
-                self.show_network_specific_config(ui, persistence);
-
-                if ui.button("Update Network").clicked() {
-                    network_manager.reinit_network(
-                        self.selected_network_type.clone(),
-                        persistence.spacetimedb_db_name.clone(),
-                    );
-                }
+        self.shown = show_centered_window(self.shown, "Network", ctx, |ui| {
+            ui.label(format!(
+                "Current network: {}",
+                network_manager.get_network_type()
+            ));
+            ui.horizontal(|ui| {
+                ui.label("Network: ");
+                ComboBox::from_id_source("network_type_selector")
+                    .selected_text(self.selected_network_type.to_string())
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(
+                            &mut self.selected_network_type,
+                            NetworkType::Offline,
+                            NetworkType::Offline.to_string(),
+                        );
+                        ui.selectable_value(
+                            &mut self.selected_network_type,
+                            NetworkType::SpacetimeDB,
+                            NetworkType::SpacetimeDB.to_string(),
+                        );
+                    });
             });
 
-        self.shown = shown;
+            self.show_network_specific_config(ui, persistence);
+
+            if ui.button("Update Network").clicked() {
+                network_manager.reinit_network(
+                    self.selected_network_type.clone(),
+                    persistence.spacetimedb_db_name.clone(),
+                );
+            }
+        });
     }
 
     fn show_network_specific_config(&self, ui: &mut egui::Ui, persistence: &mut Persistence) {
