@@ -79,7 +79,6 @@ fn prettify(app_key: String) -> String {
 }
 
 fn redact_private_info(app_key: String) -> String {
-    log::warn!("{}", app_key);
     Path::new(&app_key)
         .file_name()
         .map_or(app_key.clone(), |os_str| {
