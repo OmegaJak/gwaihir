@@ -9,7 +9,7 @@ use super::{
     Sensor,
 };
 use bounded_vec_deque::BoundedVecDeque;
-use log::{error, info, warn};
+use log::{info, warn};
 use std::{
     sync::mpsc::{channel, Receiver, Sender},
     thread::{self, JoinHandle},

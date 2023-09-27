@@ -8,6 +8,7 @@ use crate::sensors::{
     Sensor,
 };
 use log::{info, warn};
+use std::time::Instant;
 use std::{
     ops::ControlFlow,
     sync::mpsc::{channel, Receiver, Sender, TryRecvError},
@@ -16,6 +17,7 @@ use std::{
 };
 
 const THREAD_SLEEP_DURATION_MS: u64 = 50;
+const UNCHANGING_SEND_UPDATE_TIME_S: Duration = Duration::from_secs(60 * 5);
 
 pub enum MainToMonitorMessages {
     Shutdown,
@@ -36,6 +38,7 @@ struct SensorMonitor {
 
     sensors: Vec<(Box<dyn Sensor>, SensorOutput)>,
     last_sent_outputs: Vec<SensorOutput>,
+    last_sent_time: Instant,
 }
 
 pub fn create_sensor_monitor_thread() -> (
@@ -79,6 +82,7 @@ impl SensorMonitor {
                 (Box::new(keyboard_mouse_sensor), SensorOutput::Empty),
             ],
             last_sent_outputs: Vec::new(),
+            last_sent_time: Instant::now(),
         }
     }
 
@@ -114,7 +118,9 @@ impl SensorMonitor {
     }
 
     fn send_sensor_msgs_to_main(&mut self) {
-        if self.check_sensor_updates() {
+        if self.check_sensor_updates()
+            || Instant::now().duration_since(self.last_sent_time) > UNCHANGING_SEND_UPDATE_TIME_S
+        {
             let snapshot = self.get_sensor_output_snapshot();
             self.tx_to_main
                 .send(MonitorToMainMessages::UpdatedSensorOutputs(SensorOutputs {
@@ -128,6 +134,7 @@ impl SensorMonitor {
             for (sensor, _) in self.sensors.iter_mut() {
                 sensor.updated_sensor_outputs(&snapshot);
             }
+            self.last_sent_time = Instant::now();
             self.last_sent_outputs = snapshot;
             if let Some(ctx) = self.egui_ctx.as_ref() {
                 ctx.request_repaint();
