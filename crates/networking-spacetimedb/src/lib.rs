@@ -1,11 +1,16 @@
 mod module_bindings;
 
+use std::sync::{
+    atomic::{self, AtomicBool},
+    Arc,
+};
+
 use gwaihir_client_lib::{
     chrono::{NaiveDateTime, TimeZone, Utc},
     AcceptsOnlineStatus, NetworkInterface, NetworkInterfaceCreator, RemoteUpdate, UniqueUserId,
     UserStatus, Username, APP_ID,
 };
-use log::error;
+use log::{error, info, warn};
 use module_bindings::*;
 use serde::{Deserialize, Serialize};
 use spacetimedb_sdk::{
@@ -13,14 +18,17 @@ use spacetimedb_sdk::{
     identity::{
         identity, load_credentials, once_on_connect, save_credentials, Credentials, Identity,
     },
-    once_on_disconnect, subscribe,
+    on_disconnect, subscribe,
     table::{TableType, TableWithPrimaryKey},
 };
 
 /// The URL of the SpacetimeDB instance hosting our chat module.
 const SPACETIMEDB_URI: &str = "https://testnet.spacetimedb.com";
 
-pub struct SpacetimeDBInterface {}
+pub struct SpacetimeDBInterface {
+    is_connected: Arc<AtomicBool>,
+    creation_parameters: SpacetimeDBCreationParameters,
+}
 
 pub struct SpacetimeDBCreationParameters {
     pub db_name: String,
@@ -33,14 +41,23 @@ where
 {
     fn new(
         update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static,
-        on_disconnect_callback: impl FnOnce() + Send + 'static,
+        mut on_disconnect_callback: impl FnMut() + Send + 'static,
         creation_params: SpacetimeDBCreationParameters,
     ) -> Self {
-        register_callbacks(update_callback, on_disconnect_callback);
-        connect_to_db(&creation_params.db_name);
+        let mut interface = Self {
+            is_connected: Arc::new(AtomicBool::new(false)),
+            creation_parameters: creation_params,
+        };
+        let is_connected_clone = interface.is_connected.clone();
+        register_callbacks(update_callback, move || {
+            info!("Disconnected from SpacetimeDB!");
+            is_connected_clone.store(false, atomic::Ordering::Relaxed);
+            on_disconnect_callback();
+        });
+        interface.connect_to_db();
         subscribe_to_tables();
 
-        Self {}
+        interface
     }
 }
 
@@ -64,6 +81,37 @@ where
     fn get_network_type(&self) -> gwaihir_client_lib::NetworkType {
         gwaihir_client_lib::NetworkType::SpacetimeDB
     }
+
+    fn is_connected(&self) -> bool {
+        self.is_connected.load(atomic::Ordering::Relaxed)
+    }
+
+    fn try_reconnect(&mut self) -> bool {
+        let connected = self.connect_to_db();
+        if connected {
+            subscribe_to_tables();
+        }
+        connected
+    }
+}
+
+impl SpacetimeDBInterface {
+    fn connect_to_db(&mut self) -> bool {
+        match connect(
+            SPACETIMEDB_URI,
+            &self.creation_parameters.db_name,
+            load_credentials(&creds_dir()).expect("Error reading stored credentials"),
+        ) {
+            Ok(_) => {
+                self.is_connected.store(true, atomic::Ordering::Relaxed);
+                true
+            }
+            Err(err) => {
+                warn!("Failed to connect to SpacetimeDB: {}", err);
+                false
+            }
+        }
+    }
 }
 
 impl Drop for SpacetimeDBInterface {
@@ -76,13 +124,13 @@ impl Drop for SpacetimeDBInterface {
 /// Register all the callbacks our app will use to respond to database events.
 fn register_callbacks<T>(
     update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static,
-    on_disconnect_callback: impl FnOnce() + Send + 'static,
+    on_disconnect_callback: impl FnMut() + Send + 'static,
 ) where
     T: for<'a> Deserialize<'a> + AcceptsOnlineStatus,
 {
     // // When we receive our `Credentials`, save them to a file.
     once_on_connect(on_connected);
-    once_on_disconnect(on_disconnect_callback);
+    on_disconnect(on_disconnect_callback);
 
     let callback_clone = update_callback.clone();
     User::on_insert(move |a, _| {
@@ -91,28 +139,11 @@ fn register_callbacks<T>(
         }
     });
 
-    // When a user's status changes, print a notification.
     User::on_update(move |a, b, c| {
         if let Some(update) = on_user_updated(a, b, c) {
             update_callback(update);
         }
     });
-
-    // // When we receive the message backlog, print it in timestamp order.
-    // on_subscription_applied(on_sub_applied);
-
-    // // When we fail to set our name, print a warning.
-    // on_set_name(on_name_set);
-}
-
-/// Load credentials from a file and connect to the database.
-fn connect_to_db(db_name: &str) {
-    connect(
-        SPACETIMEDB_URI,
-        &db_name,
-        load_credentials(&creds_dir()).expect("Error reading stored credentials"),
-    )
-    .expect("Failed to connect");
 }
 
 /// Register subscriptions for all rows of both tables.

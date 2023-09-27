@@ -5,16 +5,19 @@ use log::{info, warn};
 use networking_spacetimedb::{SpacetimeDBCreationParameters, SpacetimeDBInterface};
 use std::{
     sync::mpsc::{self, Receiver, Sender},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use super::offline_network_interface::OfflineNetworkInterface;
+
+const MIN_TIME_BETWEEN_RECONNECT_ATTEMPTS: Duration = Duration::from_secs(30);
 
 pub struct NetworkManager {
     network: Box<dyn NetworkInterface<SensorOutputs>>,
     network_tx: Sender<RemoteUpdate<SensorOutputs>>,
     network_rx: Receiver<RemoteUpdate<SensorOutputs>>,
     egui_ctx: egui::Context,
+    last_offline_check: Option<Instant>,
 }
 
 impl NetworkManager {
@@ -37,11 +40,31 @@ impl NetworkManager {
             network_tx,
             network_rx,
             egui_ctx: egui_ctx.clone(),
+            last_offline_check: None,
         }
     }
 
-    pub fn try_recv(&self) -> Result<RemoteUpdate<SensorOutputs>, mpsc::TryRecvError> {
+    pub fn try_recv(&mut self) -> Result<RemoteUpdate<SensorOutputs>, mpsc::TryRecvError> {
         self.network_rx.try_recv()
+    }
+
+    pub fn try_reconnect_if_needed(&mut self) {
+        if self.is_offline() && self.last_offline_check.is_none()
+            || self.last_offline_check.is_some_and(|last_check| {
+                Instant::now().duration_since(last_check) > MIN_TIME_BETWEEN_RECONNECT_ATTEMPTS
+            })
+        {
+            let success = self.network.try_reconnect();
+            if success {
+                info!("Successfully reconnected to the network");
+            } else {
+                warn!(
+                    "Failed to reconnect to the network, trying again in ~{}s",
+                    MIN_TIME_BETWEEN_RECONNECT_ATTEMPTS.as_secs()
+                );
+            }
+            self.last_offline_check = Some(Instant::now());
+        }
     }
 
     pub fn reinit_network(&mut self, new_network_type: NetworkType, spacetimedb_db_name: String) {
@@ -63,7 +86,7 @@ impl NetworkManager {
     }
 
     pub fn is_offline(&self) -> bool {
-        self.network.get_network_type() == NetworkType::Offline
+        !self.network.is_connected()
     }
 }
 
@@ -74,6 +97,8 @@ impl NetworkInterface<SensorOutputs> for NetworkManager {
             fn set_username(&self, name: String);
             fn get_current_user_id(&self) -> Option<gwaihir_client_lib::UniqueUserId>;
             fn get_network_type(&self) -> gwaihir_client_lib::NetworkType;
+            fn is_connected(&self) -> bool;
+            fn try_reconnect(&mut self) -> bool;
         }
     }
 }
@@ -96,7 +121,7 @@ where
         move || {
             Box::new(N::new(
                 get_remote_update_callback(network_tx.clone(), egui_ctx.clone()),
-                get_on_disconnect_callback(network_tx, egui_ctx),
+                get_on_disconnect_callback(egui_ctx),
                 creation_parameters,
             )) as Box<dyn NetworkInterface<SensorOutputs> + Send>
         },
@@ -117,7 +142,7 @@ fn get_offline_network(
 ) -> Box<OfflineNetworkInterface<SensorOutputs>> {
     Box::new(OfflineNetworkInterface::new(
         get_remote_update_callback(network_tx.clone(), egui_ctx.clone()),
-        get_on_disconnect_callback(network_tx, egui_ctx),
+        get_on_disconnect_callback(egui_ctx),
         (),
     ))
 }
@@ -132,14 +157,8 @@ fn get_remote_update_callback(
     }
 }
 
-fn get_on_disconnect_callback(
-    network_tx: Sender<RemoteUpdate<SensorOutputs>>,
-    ctx_clone: egui::Context,
-) -> impl FnOnce() {
+fn get_on_disconnect_callback(ctx_clone: egui::Context) -> impl FnMut() {
     move || {
-        network_tx.send(RemoteUpdate::Disconnected).unwrap_or_else(|_e| {
-			info!("Failed to send disconnect message from network thread, perhaps because the main thread is already shutting down");
-		});
         ctx_clone.request_repaint();
     }
 }

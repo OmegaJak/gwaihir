@@ -56,7 +56,6 @@ impl Default for Persistence {
 
 pub struct GwaihirApp {
     tray_icon_data: Option<TrayIconData>,
-    show_disconnected_warning: bool,
 
     sensor_monitor_thread_join_handle: Option<JoinHandle<()>>,
     tx_to_monitor_thread: Sender<MainToMonitorMessages>,
@@ -116,7 +115,6 @@ impl GwaihirApp {
             tx_to_monitor_thread,
             rx_from_monitor_thread,
             current_status: HashMap::new(),
-            show_disconnected_warning: false,
 
             network_window: NetworkWindow::new(&network),
             transmission_spy: TransmissionSpy::new(),
@@ -223,6 +221,7 @@ impl eframe::App for GwaihirApp {
             }
         }
 
+        self.network.try_reconnect_if_needed();
         while let Ok(update) = self.network.try_recv() {
             match update {
                 RemoteUpdate::UserStatusUpdated(status) => {
@@ -231,7 +230,6 @@ impl eframe::App for GwaihirApp {
                         self.current_status.insert(status.user_id.clone(), status);
                     }
                 }
-                RemoteUpdate::Disconnected => self.show_disconnected_warning = true,
             };
         }
 
@@ -284,11 +282,7 @@ impl eframe::App for GwaihirApp {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             if self.network.is_offline() {
-                ui.label(
-                    RichText::new("⚠⚠ DISCONNECTED FROM SPACETIMEDB ⚠⚠")
-                        .heading()
-                        .color(Color32::RED),
-                );
+                ui.label(RichText::new("⚠⚠ OFFLINE ⚠⚠").heading().color(Color32::RED));
             }
 
             let user_status_list = self.get_filtered_sorted_user_status_list();
