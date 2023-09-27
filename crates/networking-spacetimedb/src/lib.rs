@@ -51,7 +51,7 @@ where
         let is_connected_clone = interface.is_connected.clone();
         register_callbacks(update_callback, move || {
             info!("Disconnected from SpacetimeDB!");
-            is_connected_clone.store(false, atomic::Ordering::Relaxed);
+            is_connected_clone.store(false, atomic::Ordering::SeqCst);
             on_disconnect_callback();
         });
         interface.connect_to_db();
@@ -83,7 +83,7 @@ where
     }
 
     fn is_connected(&self) -> bool {
-        self.is_connected.load(atomic::Ordering::Relaxed)
+        self.is_connected.load(atomic::Ordering::SeqCst)
     }
 
     fn try_reconnect(&mut self) -> bool {
@@ -103,7 +103,7 @@ impl SpacetimeDBInterface {
             load_credentials(&creds_dir()).expect("Error reading stored credentials"),
         ) {
             Ok(_) => {
-                self.is_connected.store(true, atomic::Ordering::Relaxed);
+                self.is_connected.store(true, atomic::Ordering::SeqCst);
                 true
             }
             Err(err) => {
