@@ -175,7 +175,7 @@ where
     T: Send + 'static,
 {
     let (tx, rx) = mpsc::channel();
-    let thread_builder = thread_builder.unwrap_or_else(|| std::thread::Builder::new());
+    let thread_builder = thread_builder.unwrap_or_else(std::thread::Builder::new);
     let handle = thread_builder
         .spawn(move || {
             let result = f();

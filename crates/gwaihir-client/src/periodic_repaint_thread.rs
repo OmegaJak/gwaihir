@@ -7,10 +7,8 @@ pub fn create_periodic_repaint_thread(
     egui_ctx: Context,
     duration_between_repaints: Duration,
 ) -> JoinHandle<()> {
-    let handle = std::thread::spawn(move || loop {
+    std::thread::spawn(move || loop {
         egui_ctx.request_repaint();
         std::thread::sleep(duration_between_repaints);
-    });
-
-    handle
+    })
 }

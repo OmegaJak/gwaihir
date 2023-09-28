@@ -209,7 +209,7 @@ mod tests {
     fn init_monitor_and_flush_initial_messages() -> MonitorAndChannels {
         let mut monitor_and_channels = init_monitor();
         monitor_and_channels.monitor.loop_body();
-        while let Ok(_) = monitor_and_channels.monitor_to_main_rx.try_recv() {}
+        while monitor_and_channels.monitor_to_main_rx.try_recv().is_ok() {}
         monitor_and_channels
     }
 

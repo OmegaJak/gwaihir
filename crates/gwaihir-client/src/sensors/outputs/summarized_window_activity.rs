@@ -185,10 +185,7 @@ impl SummarizedWindowActivity {
                 ui.label("\t");
                 ui.label(RichText::new(app_usage.app_name.clone()).color(app_name_color));
                 ui.label(" for ");
-                ui.label(RichText::new(format!(
-                    "{}",
-                    app_usage.recent_usage.to_std().unwrap().humanize()
-                )));
+                ui.label(RichText::new(app_usage.recent_usage.to_std().unwrap().humanize().to_string()));
             });
         }
     }

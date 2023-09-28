@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::sensors::outputs::sensor_output::SensorWidget;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[derive(Default)]
 pub struct MicrophoneUsage {
     pub usage: Vec<AppName>,
 }
@@ -13,11 +14,7 @@ pub struct MicrophoneUsage {
 #[nutype(derive(Serialize, Deserialize, PartialEq, AsRef, Clone, Into, Debug, From))]
 pub struct AppName(String);
 
-impl Default for MicrophoneUsage {
-    fn default() -> Self {
-        Self { usage: Vec::new() }
-    }
-}
+
 
 impl SensorWidget for MicrophoneUsage {
     fn show(&self, ui: &mut egui::Ui, id: &UniqueUserId) {
@@ -30,7 +27,7 @@ impl SensorWidget for MicrophoneUsage {
                     self.usage.len()
                 ));
                 for app in self.usage.iter() {
-                    let pretty_name = app.as_ref().replace("#", "\\");
+                    let pretty_name = app.as_ref().replace('#', "\\");
                     ui.label(pretty_name);
                 }
             });

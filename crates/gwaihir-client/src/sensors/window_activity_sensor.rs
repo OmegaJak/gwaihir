@@ -48,14 +48,10 @@ where
     }
 
     pub fn get_window_activity(&self) -> Option<WindowActivity> {
-        if let Some(current_window) = self.current_active_window.as_ref() {
-            Some(WindowActivity {
+        self.current_active_window.as_ref().map(|current_window| WindowActivity {
                 current_window: current_window.clone(),
                 previously_active_windows: self.previously_active_windows.iter().cloned().collect(),
             })
-        } else {
-            None
-        }
     }
 
     fn remove_old_activity(&mut self) {

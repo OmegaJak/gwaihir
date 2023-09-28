@@ -79,7 +79,7 @@ impl KeyboardMouseSensor {
 
                     if !has_shutdown {
                         tx_to_main.send(event)
-                        .expect(&format!("Failed to send keyboard/mouse event from listener thread, the other end must have hung up"));
+                        .expect("Failed to send keyboard/mouse event from listener thread, the other end must have hung up");
                     }
                 })
                 .unwrap()
@@ -89,8 +89,8 @@ impl KeyboardMouseSensor {
         (
             Self {
                 rx_from_listener,
-                keyboard_quantifier: KeyboardMouseEventHistoricalQuantifier::new(now.clone()),
-                mouse_movement_quantifier: KeyboardMouseEventHistoricalQuantifier::new(now.clone()),
+                keyboard_quantifier: KeyboardMouseEventHistoricalQuantifier::new(now),
+                mouse_movement_quantifier: KeyboardMouseEventHistoricalQuantifier::new(now),
                 mouse_button_quantifier: KeyboardMouseEventHistoricalQuantifier::new(now),
 
                 _listener_thread_handle: listener_handle,

@@ -33,9 +33,8 @@ impl UIExtensionMethods for Ui {
         add_contents: impl FnOnce(&mut Ui) -> R,
     ) -> InnerResponse<R> {
         self.spacing_mut().item_spacing.x = 0.0;
-        let response = self.horizontal(add_contents);
 
-        response
+        self.horizontal(add_contents)
     }
 
     fn create_default_layout_job(&self, rich_texts: Vec<RichText>) -> LayoutJob {

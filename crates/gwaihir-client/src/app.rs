@@ -98,7 +98,7 @@ impl GwaihirApp {
         let persistence: Persistence = cc
             .storage
             .and_then(|storage| {
-                return eframe::get_value(storage, Persistence::STORAGE_KEY);
+                eframe::get_value(storage, Persistence::STORAGE_KEY)
             })
             .unwrap_or_default();
 
@@ -138,7 +138,7 @@ impl GwaihirApp {
         let mut user_status_list = self
             .current_status
             .iter()
-            .filter(|(id, _)| self.subscribed_to_user(&id))
+            .filter(|(id, _)| self.subscribed_to_user(id))
             .map(|(id, status)| (id.clone(), status.clone()))
             .collect::<Vec<_>>();
 
@@ -317,7 +317,7 @@ impl eframe::App for GwaihirApp {
                                 self.set_name_input = String::new();
                             }
                         } else if ui.button("x").clicked() {
-                            self.persistence.ignored_users.insert((*id).clone().into());
+                            self.persistence.ignored_users.insert((*id).clone());
                         }
                     }
                 });

@@ -138,7 +138,7 @@ fn register_os_hook(
 fn register_msg_hook(
     builder: &mut eframe::EventLoopBuilder<eframe::UserEvent>,
     tx_to_sensor: Sender<SessionEvent>,
-) -> () {
+) {
     builder.with_msg_hook(move |msg| {
         let disable_winit_default_processing = false;
         if msg.is_null() {

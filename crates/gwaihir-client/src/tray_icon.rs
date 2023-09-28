@@ -15,7 +15,7 @@ pub struct MenuIds {
     quit_id: MenuId,
 }
 
-const TRAY_ICON_BYTES: &'static [u8; 1860] = include_bytes!("../assets/eagle_32.png");
+const TRAY_ICON_BYTES: &[u8; 1860] = include_bytes!("../assets/eagle_32.png");
 
 pub fn hide_to_tray(frame: &mut Frame) -> TrayIconData {
     let menu = Menu::new();
@@ -68,7 +68,7 @@ pub fn handle_events(frame: &mut Frame, tray_icon_data: TrayIconData) -> Option<
         _ => (),
     }
 
-    return Some(tray_icon_data);
+    Some(tray_icon_data)
 }
 
 fn icon_from_png_bytes(bytes: &[u8]) -> Icon {

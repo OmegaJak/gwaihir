@@ -19,10 +19,9 @@ impl SensorOutputs {
         ui: &mut egui::Ui,
         id: &UniqueUserId,
     ) {
-        self.outputs
-            .iter()
-            .find(|v| predicate(v))
-            .map(|o| o.show(ui, id));
+        if let Some(o) = self.outputs.iter().find(|v| predicate(v)) {
+            o.show(ui, id)
+        }
     }
 
     fn has_online_status(&self) -> bool {

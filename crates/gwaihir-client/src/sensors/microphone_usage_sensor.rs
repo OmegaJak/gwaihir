@@ -65,17 +65,15 @@ fn get_apps_using_microphone(parent_regkey: winreg::RegKey) -> Vec<AppName> {
 }
 
 fn get_last_microphone_usage_time(parent_regkey: &RegKey, app_name: &str) -> Option<u64> {
-    Some(
-        parent_regkey
+    parent_regkey
             .open_subkey_with_flags(app_name, KEY_READ)
             .ok()?
             .get_value::<u64, _>("LastUsedTimeStop")
-            .ok()?,
-    )
+            .ok()
 }
 
 fn prettify(app_key: String) -> String {
-    app_key.replace("#", "\\")
+    app_key.replace('#', "\\")
 }
 
 fn redact_private_info(app_key: String) -> String {
