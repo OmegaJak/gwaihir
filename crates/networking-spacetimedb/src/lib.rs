@@ -39,7 +39,7 @@ impl<T> NetworkInterfaceCreator<T, SpacetimeDBInterface, SpacetimeDBCreationPara
 where
     T: Serialize + for<'a> Deserialize<'a> + AcceptsOnlineStatus,
 {
-    fn new(
+    fn create(
         update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static,
         mut on_disconnect_callback: impl FnMut() + Send + 'static,
         creation_params: SpacetimeDBCreationParameters,

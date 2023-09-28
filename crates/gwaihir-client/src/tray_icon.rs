@@ -43,29 +43,24 @@ pub fn hide_to_tray(frame: &mut Frame) -> TrayIconData {
 }
 
 pub fn handle_events(frame: &mut Frame, tray_icon_data: TrayIconData) -> Option<TrayIconData> {
-    match TrayIconEvent::receiver().try_recv() {
-        Ok(TrayIconEvent {
-            click_type: ClickType::Double,
-            ..
-        }) => {
-            info!("Making visible");
+    if let Ok(TrayIconEvent {
+        click_type: ClickType::Double,
+        ..
+    }) = TrayIconEvent::receiver().try_recv()
+    {
+        info!("Making visible");
+        frame.set_visible(true);
+        return None;
+    }
+
+    if let Ok(MenuEvent { id: menu_item_id }) = MenuEvent::receiver().try_recv() {
+        if menu_item_id == tray_icon_data.menu_ids.quit_id {
+            frame.close();
+            return None;
+        } else if menu_item_id == tray_icon_data.menu_ids.show_id {
             frame.set_visible(true);
             return None;
         }
-        _ => (),
-    }
-
-    match MenuEvent::receiver().try_recv() {
-        Ok(MenuEvent { id: menu_item_id }) => {
-            if menu_item_id == tray_icon_data.menu_ids.quit_id {
-                frame.close();
-                return None;
-            } else if menu_item_id == tray_icon_data.menu_ids.show_id {
-                frame.set_visible(true);
-                return None;
-            }
-        }
-        _ => (),
     }
 
     Some(tray_icon_data)

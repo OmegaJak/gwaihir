@@ -155,11 +155,7 @@ impl SummarizedWindowActivity {
         } else {
             ui.create_default_layout_job(vec![
                 RichText::new("Using: ").color(ui.visuals().text_color()),
-                RichText::new(format!(
-                    "{} ",
-                    self.current_window.window_name.clone().to_string()
-                ))
-                .strong(),
+                RichText::new(format!("{} ", self.current_window.window_name.clone())).strong(),
                 RichText::new(format!("(started using {})", time_using_current))
                     .color(ui.visuals().text_color()),
             ])

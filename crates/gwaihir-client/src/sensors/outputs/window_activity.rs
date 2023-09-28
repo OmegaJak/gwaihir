@@ -39,9 +39,9 @@ impl From<WindowName> for String {
     }
 }
 
-impl WindowName {
-    pub fn to_string(self) -> String {
-        self.into()
+impl std::fmt::Display for WindowName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", String::from(self.clone()))
     }
 }
 
@@ -70,7 +70,7 @@ impl RepresentsWindow for ActiveWindow {
 }
 
 impl ActiveWindow {
-    pub fn to_no_longer_active(self) -> PreviouslyActiveWindow {
+    pub fn into_no_longer_active(self) -> PreviouslyActiveWindow {
         PreviouslyActiveWindow {
             window_name: self.window_name,
             started_using: self.started_using,

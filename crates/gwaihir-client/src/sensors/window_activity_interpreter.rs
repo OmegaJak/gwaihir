@@ -10,7 +10,7 @@ use super::{
     Sensor,
 };
 
-pub const DEFAULT_TIME_TO_KEEP_WINDOW_ACTIVITY: Lazy<Duration> =
+pub static DEFAULT_TIME_TO_KEEP_WINDOW_ACTIVITY: Lazy<Duration> =
     Lazy::new(|| Duration::seconds(60 * 10));
 
 pub struct WindowActivityInterpreter {

@@ -22,8 +22,10 @@ fn main() -> eframe::Result<()> {
     let logger = init_logging();
     info!("Starting Gwaihir");
 
-    let mut native_options = eframe::NativeOptions::default();
-    native_options.app_id = Some(APP_ID.to_string());
+    let mut native_options = eframe::NativeOptions {
+        app_id: Some(APP_ID.to_string()),
+        ..Default::default()
+    };
     let registered_builder =
         LockStatusSensorBuilder::new().set_event_loop_builder(&mut native_options);
     let (monitor_handle, tx_to_monitor, rx_from_monitor) = create_sensor_monitor_thread();

@@ -66,7 +66,7 @@ pub trait NetworkInterfaceCreator<T, NI, P>
 where
     NI: NetworkInterface<T>,
 {
-    fn new(
+    fn create(
         update_callback: impl Fn(RemoteUpdate<T>) + Send + Clone + 'static,
         on_disconnect_callback: impl FnMut() + Send + 'static,
         parameters: P,

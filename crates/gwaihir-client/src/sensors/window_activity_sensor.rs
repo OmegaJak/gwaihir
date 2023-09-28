@@ -69,7 +69,7 @@ where
         if let Some(current_active_window) = self.current_active_window.take() {
             if !current_active_window.same_window_as(&new_active_window) {
                 self.current_active_window = Some(new_active_window.into());
-                return Some(current_active_window.to_no_longer_active());
+                return Some(current_active_window.into_no_longer_active());
             } else {
                 self.current_active_window = Some(current_active_window);
             }

@@ -120,7 +120,7 @@ where
     let ctx_clone = egui_ctx.clone();
     run_with_timeout(
         move || {
-            Box::new(N::new(
+            Box::new(N::create(
                 get_remote_update_callback(network_tx.clone(), egui_ctx.clone()),
                 get_on_disconnect_callback(egui_ctx),
                 creation_parameters,
@@ -141,7 +141,7 @@ fn get_offline_network(
     network_tx: Sender<RemoteUpdate<SensorOutputs>>,
     egui_ctx: egui::Context,
 ) -> Box<OfflineNetworkInterface<SensorOutputs>> {
-    Box::new(OfflineNetworkInterface::new(
+    Box::new(OfflineNetworkInterface::create(
         get_remote_update_callback(network_tx.clone(), egui_ctx.clone()),
         get_on_disconnect_callback(egui_ctx),
         (),
@@ -179,10 +179,7 @@ where
     let handle = thread_builder
         .spawn(move || {
             let result = f();
-            match tx.send(result) {
-                Ok(()) => {} // everything good
-                Err(_) => {} // we have been released, don't panic
-            }
+            tx.send(result).ok(); // either it went fine, or our handle was released because we took too long
         })
         .unwrap();
 
