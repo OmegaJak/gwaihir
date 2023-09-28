@@ -4,14 +4,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::sensors::outputs::sensor_output::SensorWidget;
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-#[derive(Default)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, Default)]
 pub struct LockStatus {
     pub num_locks: u32,
     pub num_unlocks: u32,
 }
-
-
 
 impl SensorWidget for LockStatus {
     fn show(&self, ui: &mut egui::Ui, id: &UniqueUserId) {

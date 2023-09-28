@@ -217,7 +217,8 @@ fn summarize(activity: &KeyboardMouseActivityData) -> Option<UsageSummary> {
     let max = activity
         .data
         .iter()
-        .max_by(|a, b| a.total_cmp(b)).copied()?;
+        .max_by(|a, b| a.total_cmp(b))
+        .copied()?;
     let most_recent_value = activity.data.last()?;
 
     Some(UsageSummary {

@@ -97,9 +97,7 @@ impl GwaihirApp {
 
         let persistence: Persistence = cc
             .storage
-            .and_then(|storage| {
-                eframe::get_value(storage, Persistence::STORAGE_KEY)
-            })
+            .and_then(|storage| eframe::get_value(storage, Persistence::STORAGE_KEY))
             .unwrap_or_default();
 
         let periodic_repaint_thread_join_handle =
