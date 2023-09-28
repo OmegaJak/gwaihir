@@ -49,12 +49,13 @@ impl NetworkManager {
     }
 
     pub fn try_reconnect_if_needed(&mut self) {
-        if self.is_offline() && self.last_offline_check.is_none()
-            || self.last_offline_check.is_some_and(|last_check| {
+        if self.is_offline()
+            && self.last_offline_check.map_or(true, |last_check| {
                 Instant::now().duration_since(last_check) > MIN_TIME_BETWEEN_RECONNECT_ATTEMPTS
             })
         {
             let success = self.network.try_reconnect();
+            info!("Attempting reconnection to the network");
             if success {
                 info!("Successfully reconnected to the network");
             } else {
