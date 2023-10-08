@@ -1,19 +1,29 @@
-use super::outputs::lock_status::LockStatus;
-use super::outputs::sensor_output::SensorOutput;
-use super::Sensor;
+use crate::sensors::outputs::lock_status::LockStatus;
+use crate::sensors::outputs::sensor_output::SensorOutput;
+use crate::sensors::Sensor;
+use log::error;
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
+use std::sync::mpsc::{self, Receiver, TryRecvError};
 use thiserror::Error;
-use windows::Win32::Foundation::HWND;
-use windows::Win32::System::RemoteDesktop::{
-    WTSRegisterSessionNotification, NOTIFY_FOR_THIS_SESSION,
-};
-use windows::Win32::UI::WindowsAndMessaging::{
-    MSG, WM_WTSSESSION_CHANGE, WTS_SESSION_LOCK, WTS_SESSION_UNLOCK,
-};
-use winit::platform::windows::EventLoopBuilderExtWindows;
 
+#[cfg(target_os = "windows")]
+mod windows;
+#[cfg(target_os = "windows")]
+use windows as sys;
+#[cfg(target_os = "windows")]
+type WindowHandle = raw_window_handle::Win32WindowHandle;
+#[cfg(target_os = "windows")]
+use raw_window_handle::HasRawWindowHandle;
+
+#[cfg(target_os = "linux")]
+mod linux;
+#[cfg(target_os = "linux")]
+use linux as sys;
+#[cfg(target_os = "linux")]
+type WindowHandle = ();
+
+#[allow(unused)]
 pub enum SessionEvent {
     Locked,
     Unlocked,
@@ -26,7 +36,6 @@ pub enum LockStatusSensorError {
 }
 
 type EventLoopBuilder = eframe::EventLoopBuilder<eframe::UserEvent>;
-type WindowHandle = raw_window_handle::Win32WindowHandle;
 
 pub struct LockStatusSensorBuilder {}
 pub struct EventLoopRegisteredLockStatusSensorBuilder {
@@ -65,7 +74,7 @@ impl LockStatusSensorBuilder {
         builder: &mut EventLoopBuilder,
     ) -> EventLoopRegisteredLockStatusSensorBuilder {
         let (tx_to_sensor, rx_from_windows) = mpsc::channel();
-        register_msg_hook(builder, tx_to_sensor);
+        sys::register_msg_hook(builder, tx_to_sensor);
         EventLoopRegisteredLockStatusSensorBuilder {
             sensor_rx: rx_from_windows,
         }
@@ -77,7 +86,7 @@ impl EventLoopRegisteredLockStatusSensorBuilder {
         self,
         handle: WindowHandle,
     ) -> Result<FullyRegisteredLockStatusSensorBuilder, LockStatusSensorError> {
-        register_os_hook(handle)?;
+        sys::register_os_hook(handle)?;
         Ok(FullyRegisteredLockStatusSensorBuilder {
             sensor_rx: self.sensor_rx,
         })
@@ -91,6 +100,28 @@ impl FullyRegisteredLockStatusSensorBuilder {
             lock_status: Default::default(),
         }
     }
+}
+
+#[allow(unreachable_code, unused_variables)]
+pub fn init_lock_status_sensor(
+    cc: &eframe::CreationContext<'_>,
+    sensor_builder: Rc<RefCell<Option<EventLoopRegisteredLockStatusSensorBuilder>>>,
+) -> Option<LockStatusSensor> {
+    #[cfg(target_os = "windows")]
+    return match cc.raw_window_handle() {
+        raw_window_handle::RawWindowHandle::Win32(handle) => {
+            match sensor_builder.take().expect("The lock status sensor builder should be ready when we initialize the Template App").register_os_hook(handle) {
+                Ok(builder) => Some(builder.build()),
+                Err(err) => {
+                    error!("{:#?}", err);
+                    None
+                }
+            }
+        }
+        _ => panic!("Got a window handle other than Win32 on windows!"),
+    };
+
+    None
 }
 
 impl Sensor for LockStatusSensor {
@@ -108,7 +139,7 @@ impl Sensor for LockStatusSensor {
 
 #[cfg(test)]
 impl LockStatusSensor {
-    pub fn new() -> (Self, Sender<SessionEvent>) {
+    pub fn new() -> (Self, mpsc::Sender<SessionEvent>) {
         let (tx, rx) = mpsc::channel();
         (
             LockStatusSensor {
@@ -118,47 +149,4 @@ impl LockStatusSensor {
             tx,
         )
     }
-}
-
-fn register_os_hook(
-    handle: raw_window_handle::Win32WindowHandle,
-) -> Result<(), LockStatusSensorError> {
-    if handle.hwnd.is_null() {
-        return Err(LockStatusSensorError::NullWindowHandle);
-    }
-
-    let hwnd: isize = handle.hwnd as isize;
-    unsafe {
-        WTSRegisterSessionNotification(HWND(hwnd), NOTIFY_FOR_THIS_SESSION);
-    }
-
-    Ok(())
-}
-
-fn register_msg_hook(
-    builder: &mut eframe::EventLoopBuilder<eframe::UserEvent>,
-    tx_to_sensor: Sender<SessionEvent>,
-) {
-    builder.with_msg_hook(move |msg| {
-        let disable_winit_default_processing = false;
-        if msg.is_null() {
-            return disable_winit_default_processing;
-        }
-
-        let msg = msg as *const MSG;
-        unsafe {
-            // https://learn.microsoft.com/en-us/windows/win32/termserv/wm-wtssession-change
-            if (*msg).message == WM_WTSSESSION_CHANGE {
-                if (*msg).wParam.0 == TryInto::<usize>::try_into(WTS_SESSION_LOCK).unwrap() {
-                    tx_to_sensor.send(SessionEvent::Locked).unwrap();
-                }
-
-                if (*msg).wParam.0 == TryInto::<usize>::try_into(WTS_SESSION_UNLOCK).unwrap() {
-                    tx_to_sensor.send(SessionEvent::Unlocked).unwrap();
-                }
-            }
-        }
-
-        disable_winit_default_processing
-    });
 }

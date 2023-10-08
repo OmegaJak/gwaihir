@@ -3,31 +3,16 @@ use std::time::{Duration, Instant};
 use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
 use winreg::RegKey;
 
-use super::outputs::microphone_usage::{AppName, MicrophoneUsage};
-use super::outputs::sensor_output::SensorOutput;
-use super::Sensor;
+use super::MicrophoneUsageSensor;
+use crate::sensors::outputs::microphone_usage::{AppName, MicrophoneUsage};
 
-pub struct MicrophoneUsageSensor {
+pub struct WindowsMicrophoneUsageSensor {
     last_check_time: Instant,
     most_recent_data: MicrophoneUsage,
 }
 
-impl Sensor for MicrophoneUsageSensor {
-    fn get_output(&mut self) -> SensorOutput {
-        self.check_microphone_usage();
-        SensorOutput::MicrophoneUsage(self.most_recent_data.clone())
-    }
-}
-
-impl MicrophoneUsageSensor {
-    pub fn new() -> Self {
-        Self {
-            last_check_time: Instant::now() - Duration::from_millis(500), // Ew
-            most_recent_data: Default::default(),
-        }
-    }
-
-    pub fn check_microphone_usage(&mut self) {
+impl MicrophoneUsageSensor for WindowsMicrophoneUsageSensor {
+    fn check_microphone_usage(&mut self) {
         let now = Instant::now();
         if now.duration_since(self.last_check_time) > Duration::from_millis(500) {
             let all_programs_using_microphone = get_all_programs_using_microphone();
@@ -35,6 +20,19 @@ impl MicrophoneUsageSensor {
             self.most_recent_data = MicrophoneUsage {
                 usage: all_programs_using_microphone,
             }
+        }
+    }
+
+    fn most_recent_data(&self) -> MicrophoneUsage {
+        self.most_recent_data.clone()
+    }
+}
+
+impl WindowsMicrophoneUsageSensor {
+    pub fn new() -> Self {
+        Self {
+            last_check_time: Instant::now() - Duration::from_millis(500), // Ew
+            most_recent_data: Default::default(),
         }
     }
 }

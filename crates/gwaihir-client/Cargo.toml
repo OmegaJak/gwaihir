@@ -28,16 +28,6 @@ once_cell = "1.18.0"
 bounded-vec-deque = "0.1.1"
 delegate = "0.10.0"
 
-# OS Interactions
-windows = { version = "0.48.0", features = ["Win32_System_RemoteDesktop", "Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_Foundation"] }
-raw-window-handle = "0.5.2"
-tray-icon = "0.8.0"
-winreg = "0.50.0"
-directories-next = "2.0.0"
-opener = "0.6.1"
-active-win-pos-rs = "0.8.1"
-rdev = "0.5.3"
-
 # Logging
 log = "0.4"
 flexi_logger = "0.26.0"
@@ -48,9 +38,26 @@ log_err = "1.1.1"
 gwaihir-client-lib = { path = "../gwaihir-client-lib" }
 networking-spacetimedb = { path = "../networking-spacetimedb" }
 
-[dev-dependencies]
-assert_matches = "1.5.0"
-
 # If you fork https://github.com/emilk/egui you can test with:
 # egui = { path = "../egui/crates/egui" }
 # eframe = { path = "../egui/crates/eframe" }
+
+# OS Interactions
+raw-window-handle = "0.5.2"
+tray-icon = "0.8.0"
+directories-next = "2.0.0"
+opener = "0.6.1"
+active-win-pos-rs = "0.8.1"
+rdev = "0.5.3"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.50.0"
+windows = { version = "0.48.0", features = [
+    "Win32_System_RemoteDesktop",
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Foundation",
+] }
+
+[dev-dependencies]
+assert_matches = "1.5.0"

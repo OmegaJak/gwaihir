@@ -1,8 +1,8 @@
 use crate::sensors::lock_status_sensor::LockStatusSensor;
+use crate::sensors::microphone_usage_sensor;
 use crate::sensors::{
     keyboard_mouse_event_provider::RdevKeyboardMouseEventProvider,
     keyboard_mouse_sensor::{KeyboardMouseSensor, ShutdownMessage},
-    microphone_usage_sensor::MicrophoneUsageSensor,
     outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
     window_activity_interpreter::WindowActivityInterpreter,
     Sensor,
@@ -63,6 +63,19 @@ impl SensorMonitor {
     ) -> Self {
         let (keyboard_mouse_sensor, tx_to_keyboard_mouse_listener) =
             KeyboardMouseSensor::new(RdevKeyboardMouseEventProvider::new());
+
+        let mut sensors: Vec<(Box<dyn Sensor>, SensorOutput)> = vec![
+            (
+                Box::new(WindowActivityInterpreter::new()),
+                SensorOutput::Empty,
+            ),
+            (Box::new(keyboard_mouse_sensor), SensorOutput::Empty),
+        ];
+
+        if let Some(sensor) = microphone_usage_sensor::try_get_sensor() {
+            sensors.push((sensor, SensorOutput::MicrophoneUsage(Default::default())));
+        }
+
         SensorMonitor {
             rx_from_main,
             tx_to_main,
@@ -70,17 +83,7 @@ impl SensorMonitor {
 
             tx_to_keyboard_mouse_listener,
 
-            sensors: vec![
-                (
-                    Box::new(MicrophoneUsageSensor::new()),
-                    SensorOutput::MicrophoneUsage(Default::default()),
-                ),
-                (
-                    Box::new(WindowActivityInterpreter::new()),
-                    SensorOutput::Empty,
-                ),
-                (Box::new(keyboard_mouse_sensor), SensorOutput::Empty),
-            ],
+            sensors,
             last_sent_outputs: Vec::new(),
             last_sent_time: Instant::now(),
         }

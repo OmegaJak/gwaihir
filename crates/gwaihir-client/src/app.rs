@@ -3,10 +3,9 @@ use egui::{epaint::ahash::HashSet, Color32, RichText, TextEdit, Widget};
 use gwaihir_client_lib::{
     chrono::Local, NetworkInterface, RemoteUpdate, UniqueUserId, UserStatus, APP_ID,
 };
-use log::{debug, error, info, warn};
+use log::{debug, info, warn};
 use log_err::LogErrResult;
 use networking_spacetimedb::{SpacetimeDBCreationParameters, SpacetimeDBInterface};
-use raw_window_handle::HasRawWindowHandle;
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
@@ -24,7 +23,7 @@ use crate::{
     periodic_repaint_thread::create_periodic_repaint_thread,
     sensor_monitor_thread::{MainToMonitorMessages, MonitorToMainMessages},
     sensors::{
-        lock_status_sensor::{EventLoopRegisteredLockStatusSensorBuilder, LockStatusSensor},
+        lock_status_sensor::{init_lock_status_sensor, EventLoopRegisteredLockStatusSensorBuilder},
         outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
     },
     tray_icon::{hide_to_tray, TrayIconData},
@@ -357,23 +356,5 @@ impl eframe::App for GwaihirApp {
 impl GwaihirApp {
     fn subscribed_to_user(&self, user_id: &UniqueUserId) -> bool {
         !self.persistence.ignored_users.contains(user_id)
-    }
-}
-
-fn init_lock_status_sensor(
-    cc: &eframe::CreationContext<'_>,
-    sensor_builder: Rc<RefCell<Option<EventLoopRegisteredLockStatusSensorBuilder>>>,
-) -> Option<LockStatusSensor> {
-    match cc.raw_window_handle() {
-        raw_window_handle::RawWindowHandle::Win32(handle) => {
-            match sensor_builder.take().expect("The lock status sensor builder should be ready when we initialize the Template App").register_os_hook(handle) {
-                Ok(builder) => Some(builder.build()),
-                Err(err) => {
-                    error!("{:#?}", err);
-                    None
-                }
-            }
-        }
-        _ => todo!(),
     }
 }
