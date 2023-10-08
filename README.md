@@ -11,5 +11,10 @@ A tool for friends to automatically share their status with each other.
 
 **primary persistence and logs:** `C:\Users\{USER}\AppData\Roaming\gwaihir`
 
+### Linux
+**SpacetimeDB credentials:** `~/.gwaihir`
+
+**primary persistence and logs:** `~/.local/share/gwaihir`
+
 ## Attributions
 [Eagle icon created by Culmbio - Flaticon](https://www.flaticon.com/free-icons/eagle)

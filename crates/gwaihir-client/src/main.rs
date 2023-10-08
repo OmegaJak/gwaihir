@@ -54,11 +54,12 @@ fn main() -> eframe::Result<()> {
 }
 
 fn init_logging() -> LoggerHandle {
-    let log_directory = ProjectDirs::from("", "", APP_ID)
-        .unwrap()
-        .data_dir()
-        .join("..")
-        .join("logs");
+    let project_dirs = ProjectDirs::from("", "", APP_ID).unwrap();
+    let log_directory = if project_dirs.data_dir().ends_with("data") {
+        project_dirs.data_dir().join("../logs")
+    } else {
+        project_dirs.data_dir().join("logs")
+    };
 
     let handle = flexi_logger::Logger::try_with_env_or_str("info")
         .unwrap()
