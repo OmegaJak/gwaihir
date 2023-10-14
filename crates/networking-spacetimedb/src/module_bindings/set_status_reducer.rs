@@ -9,6 +9,7 @@ use spacetimedb_sdk::{
     sats::{de::Deserialize, ser::Serialize},
     spacetimedb_lib,
     table::{TableIter, TableType, TableWithPrimaryKey},
+    Address,
 };
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -27,21 +28,21 @@ pub fn set_status(status: String) {
 
 #[allow(unused)]
 pub fn on_set_status(
-    mut __callback: impl FnMut(&Identity, &Status, &String) + Send + 'static,
+    mut __callback: impl FnMut(&Identity, Option<Address>, &Status, &String) + Send + 'static,
 ) -> ReducerCallbackId<SetStatusArgs> {
-    SetStatusArgs::on_reducer(move |__identity, __status, __args| {
+    SetStatusArgs::on_reducer(move |__identity, __addr, __status, __args| {
         let SetStatusArgs { status } = __args;
-        __callback(__identity, __status, status);
+        __callback(__identity, __addr, __status, status);
     })
 }
 
 #[allow(unused)]
 pub fn once_on_set_status(
-    __callback: impl FnOnce(&Identity, &Status, &String) + Send + 'static,
+    __callback: impl FnOnce(&Identity, Option<Address>, &Status, &String) + Send + 'static,
 ) -> ReducerCallbackId<SetStatusArgs> {
-    SetStatusArgs::once_on_reducer(move |__identity, __status, __args| {
+    SetStatusArgs::once_on_reducer(move |__identity, __addr, __status, __args| {
         let SetStatusArgs { status } = __args;
-        __callback(__identity, __status, status);
+        __callback(__identity, __addr, __status, status);
     })
 }
 

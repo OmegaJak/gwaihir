@@ -20,6 +20,7 @@ use spacetimedb_sdk::{
     },
     on_disconnect, subscribe,
     table::{TableType, TableWithPrimaryKey},
+    Address,
 };
 
 /// The URL of the SpacetimeDB instance hosting our chat module.
@@ -54,8 +55,7 @@ where
             is_connected_clone.store(false, atomic::Ordering::SeqCst);
             on_disconnect_callback();
         });
-        interface.connect_to_db();
-        subscribe_to_tables();
+        <SpacetimeDBInterface as NetworkInterface<T>>::try_reconnect(&mut interface);
 
         interface
     }
@@ -152,7 +152,7 @@ fn subscribe_to_tables() {
 }
 
 /// Our `on_connect` callback: save our credentials to a file.
-fn on_connected(creds: &Credentials) {
+fn on_connected(creds: &Credentials, _address: Address) {
     if let Err(e) = save_credentials(&creds_dir(), creds) {
         error!("Failed to save credentials: {:?}", e);
     }
