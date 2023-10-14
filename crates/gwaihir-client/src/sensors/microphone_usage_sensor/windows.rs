@@ -1,38 +1,33 @@
+use crate::sensors::outputs::microphone_usage::{AppName, MicrophoneUsage};
+use gwaihir_client_lib::periodic_checker::{HasPeriodicChecker, PeriodicChecker};
 use std::path::Path;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
 use winreg::RegKey;
 
-use super::MicrophoneUsageSensor;
-use crate::sensors::outputs::microphone_usage::{AppName, MicrophoneUsage};
-
 pub struct WindowsMicrophoneUsageSensor {
-    last_check_time: Instant,
-    most_recent_data: MicrophoneUsage,
+    periodic_checker: PeriodicChecker<MicrophoneUsage>,
 }
 
-impl MicrophoneUsageSensor for WindowsMicrophoneUsageSensor {
-    fn check_microphone_usage(&mut self) {
-        let now = Instant::now();
-        if now.duration_since(self.last_check_time) > Duration::from_millis(500) {
-            let all_programs_using_microphone = get_all_programs_using_microphone();
-            self.last_check_time = now;
-            self.most_recent_data = MicrophoneUsage {
-                usage: all_programs_using_microphone,
-            }
-        }
+impl HasPeriodicChecker<MicrophoneUsage> for WindowsMicrophoneUsageSensor {
+    fn periodic_checker(&self) -> &PeriodicChecker<MicrophoneUsage> {
+        &self.periodic_checker
     }
 
-    fn most_recent_data(&self) -> MicrophoneUsage {
-        self.most_recent_data.clone()
+    fn periodic_checker_mut(&mut self) -> &mut PeriodicChecker<MicrophoneUsage> {
+        &mut self.periodic_checker
     }
 }
 
 impl WindowsMicrophoneUsageSensor {
     pub fn new() -> Self {
         Self {
-            last_check_time: Instant::now() - Duration::from_millis(500), // Ew
-            most_recent_data: Default::default(),
+            periodic_checker: PeriodicChecker::new(
+                Box::new(|| MicrophoneUsage {
+                    usage: get_all_programs_using_microphone(),
+                }),
+                Duration::from_millis(500),
+            ),
         }
     }
 }
