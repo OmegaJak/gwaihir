@@ -267,6 +267,10 @@ impl eframe::App for GwaihirApp {
                         ui.close_menu();
                     }
 
+                    if ui.button("Clear ignored users").clicked() {
+                        self.persistence.ignored_users.clear();
+                    }
+
                     if ui.button("Quit").clicked() {
                         frame.close();
                     }
