@@ -352,7 +352,9 @@ impl eframe::App for GwaihirApp {
         });
 
         self.network_window
-            .show(ctx, &mut self.network, &mut self.persistence);
+            .show(ctx, &mut self.network, &mut self.persistence, || {
+                self.current_status.clear();
+            });
         self.transmission_spy.show(ctx);
     }
 }

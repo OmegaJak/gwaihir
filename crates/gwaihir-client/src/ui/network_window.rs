@@ -26,6 +26,7 @@ impl NetworkWindow {
         ctx: &egui::Context,
         network_manager: &mut NetworkManager,
         persistence: &mut Persistence,
+        clear_user_statuses: impl FnOnce(),
     ) {
         self.shown = show_centered_window(self.shown, "Network", ctx, |ui| {
             ui.label(format!(
@@ -53,6 +54,7 @@ impl NetworkWindow {
             self.show_network_specific_config(ui, persistence);
 
             if ui.button("Update Network").clicked() {
+                clear_user_statuses();
                 network_manager.reinit_network(
                     self.selected_network_type.clone(),
                     persistence.spacetimedb_db_name.clone(),
