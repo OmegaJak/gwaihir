@@ -28,25 +28,11 @@ fn main() -> eframe::Result<()> {
     };
     let registered_builder =
         LockStatusSensorBuilder::new().set_event_loop_builder(&mut native_options);
-    let (monitor_handle, tx_to_monitor, rx_from_monitor) = create_sensor_monitor_thread();
     let log_file_location = get_log_file_location(&logger);
     eframe::run_native(
         "Gwaihir",
         native_options,
-        Box::new(move |cc| {
-            let ctx_clone = cc.egui_ctx.clone();
-            tx_to_monitor
-                .send(MainToMonitorMessages::SetEguiContext(ctx_clone))
-                .unwrap();
-            Box::new(GwaihirApp::new(
-                cc,
-                registered_builder,
-                tx_to_monitor,
-                rx_from_monitor,
-                monitor_handle,
-                log_file_location,
-            ))
-        }),
+        Box::new(move |cc| Box::new(GwaihirApp::new(cc, registered_builder, log_file_location))),
     )?;
 
     info!("Gwaihir closing nominally");

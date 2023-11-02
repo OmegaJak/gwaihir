@@ -1,19 +1,28 @@
-use crate::sensors::lock_status_sensor::LockStatusSensor;
-use crate::sensors::microphone_usage_sensor;
-use crate::sensors::{
-    keyboard_mouse_event_provider::RdevKeyboardMouseEventProvider,
-    keyboard_mouse_sensor::{KeyboardMouseSensor, ShutdownMessage},
-    outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
-    window_activity_interpreter::WindowActivityInterpreter,
-    Sensor,
+use crate::{
+    app::Persistence,
+    sensors::{
+        keyboard_mouse_event_provider::RdevKeyboardMouseEventProvider,
+        keyboard_mouse_sensor::{KeyboardMouseSensor, ShutdownMessage},
+        lock_status_sensor::LockStatusSensor,
+        microphone_usage_sensor,
+        outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
+        window_sensor::{
+            active_window_provider::WindowIdentifiers,
+            window_activity_interpreter::WindowActivityInterpreter,
+            window_title_mapper::WindowTitleMappings,
+        },
+        Sensor,
+    },
 };
 use log::{info, warn};
-use std::time::Instant;
 use std::{
     ops::ControlFlow,
-    sync::mpsc::{channel, Receiver, Sender, TryRecvError},
+    sync::{
+        mpsc::{channel, Receiver, Sender, TryRecvError},
+        Arc, RwLock,
+    },
     thread::{sleep, JoinHandle},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 const THREAD_SLEEP_DURATION_MS: u64 = 50;
@@ -28,6 +37,7 @@ pub enum MainToMonitorMessages {
 #[derive(Debug)]
 pub enum MonitorToMainMessages {
     UpdatedSensorOutputs(SensorOutputs),
+    ObservedWindowTitle(WindowIdentifiers),
 }
 
 struct SensorMonitor {
@@ -41,15 +51,18 @@ struct SensorMonitor {
     last_sent_time: Instant,
 }
 
-pub fn create_sensor_monitor_thread() -> (
+pub fn create_sensor_monitor_thread(
+    persistence: &Persistence,
+) -> (
     JoinHandle<()>,
     Sender<MainToMonitorMessages>,
     Receiver<MonitorToMainMessages>,
 ) {
     let (main_tx, monitor_rx) = channel();
     let (monitor_tx, main_rx) = channel();
+    let window_title_mappings = persistence.window_title_mappings.clone();
     let handle = std::thread::spawn(|| {
-        let mut monitor = SensorMonitor::new(monitor_rx, monitor_tx);
+        let mut monitor = SensorMonitor::new(monitor_rx, monitor_tx, window_title_mappings);
         monitor.run();
     });
 
@@ -60,13 +73,17 @@ impl SensorMonitor {
     fn new(
         rx_from_main: Receiver<MainToMonitorMessages>,
         tx_to_main: Sender<MonitorToMainMessages>,
+        window_title_mappings: Arc<RwLock<WindowTitleMappings>>,
     ) -> Self {
         let (keyboard_mouse_sensor, tx_to_keyboard_mouse_listener) =
             KeyboardMouseSensor::new(RdevKeyboardMouseEventProvider::new());
 
         let mut sensors: Vec<(Box<dyn Sensor>, SensorOutput)> = vec![
             (
-                Box::new(WindowActivityInterpreter::new()),
+                Box::new(WindowActivityInterpreter::new(
+                    tx_to_main.clone(),
+                    window_title_mappings,
+                )),
                 SensorOutput::Empty,
             ),
             (Box::new(keyboard_mouse_sensor), SensorOutput::Empty),
@@ -201,7 +218,12 @@ mod tests {
     fn init_monitor() -> MonitorAndChannels {
         let (main_to_monitor_tx, main_to_monitor_rx) = channel();
         let (monitor_to_main_tx, monitor_to_main_rx) = channel();
-        let monitor = SensorMonitor::new(main_to_monitor_rx, monitor_to_main_tx);
+        let window_title_mappings = Arc::new(RwLock::new(WindowTitleMappings::default()));
+        let monitor = SensorMonitor::new(
+            main_to_monitor_rx,
+            monitor_to_main_tx,
+            window_title_mappings,
+        );
         MonitorAndChannels {
             monitor,
             main_to_monitor_tx,

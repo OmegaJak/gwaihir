@@ -1,8 +1,6 @@
 use gwaihir_client_lib::chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::sensors::active_window_provider::RawActiveWindow;
-
 pub const LOCK_SCREEN_WINDOW_NAME: &str = "Locked";
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -46,7 +44,7 @@ impl std::fmt::Display for WindowName {
 }
 
 pub trait RepresentsWindow {
-    fn window_name(&self) -> &WindowName;
+    fn window_name(&self) -> WindowName;
 }
 
 pub trait WindowExtensions {
@@ -54,18 +52,9 @@ pub trait WindowExtensions {
     fn same_window_as(&self, other: &impl RepresentsWindow) -> bool;
 }
 
-impl From<RawActiveWindow> for ActiveWindow {
-    fn from(window: RawActiveWindow) -> Self {
-        Self {
-            window_name: window.window_name,
-            started_using: Utc::now(),
-        }
-    }
-}
-
 impl RepresentsWindow for ActiveWindow {
-    fn window_name(&self) -> &WindowName {
-        &self.window_name
+    fn window_name(&self) -> WindowName {
+        self.window_name.clone()
     }
 }
 

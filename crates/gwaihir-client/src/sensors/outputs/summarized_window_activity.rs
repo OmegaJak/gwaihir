@@ -1,23 +1,20 @@
-use std::collections::{hash_map::Entry, HashMap};
-
+use super::{
+    sensor_output::{SensorOutput, SensorWidget},
+    window_activity::{
+        ActiveWindow, RepresentsWindow, WindowActivity, WindowExtensions, WindowName,
+    },
+};
+use crate::{
+    sensors::window_sensor::window_activity_interpreter::DEFAULT_TIME_TO_KEEP_WINDOW_ACTIVITY,
+    ui::ui_extension_methods::UIExtensionMethods,
+};
 use chrono_humanize::HumanTime;
-use egui::Color32;
-use egui::{CollapsingHeader, RichText};
+use egui::{CollapsingHeader, Color32, RichText};
 use eternity_rs::Eternity;
 use gwaihir_client_lib::chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use serde_with::DurationSeconds;
-
-use crate::sensors::window_activity_interpreter::DEFAULT_TIME_TO_KEEP_WINDOW_ACTIVITY;
-use crate::ui::ui_extension_methods::UIExtensionMethods;
-
-use super::sensor_output::SensorOutput;
-use super::window_activity::{RepresentsWindow, WindowExtensions, WindowName};
-use super::{
-    sensor_output::SensorWidget,
-    window_activity::{ActiveWindow, WindowActivity},
-};
+use serde_with::{serde_as, DurationSeconds};
+use std::collections::{hash_map::Entry, HashMap};
 
 const DEFAULT_MAX_NUM_APPS_IN_SUMMARY: usize = 5;
 
@@ -32,13 +29,14 @@ pub struct SummarizedWindowActivity {
 pub struct AppUsage {
     pub app_name: WindowName,
 
+    // DurationSeconds to avoid updating more frequently than once a second
     #[serde_as(as = "DurationSeconds<i64>")]
     pub recent_usage: Duration,
 }
 
 impl RepresentsWindow for AppUsage {
-    fn window_name(&self) -> &WindowName {
-        &self.app_name
+    fn window_name(&self) -> WindowName {
+        self.app_name.clone()
     }
 }
 

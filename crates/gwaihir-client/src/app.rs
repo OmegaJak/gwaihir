@@ -13,7 +13,10 @@ use std::{
     collections::HashMap,
     path::PathBuf,
     rc::Rc,
-    sync::mpsc::{Receiver, Sender, TryRecvError},
+    sync::{
+        mpsc::{Receiver, Sender, TryRecvError},
+        Arc, RwLock,
+    },
     thread::JoinHandle,
     time::Duration,
 };
@@ -21,16 +24,20 @@ use std::{
 use crate::{
     networking::network_manager::NetworkManager,
     periodic_repaint_thread::create_periodic_repaint_thread,
-    sensor_monitor_thread::{MainToMonitorMessages, MonitorToMainMessages},
+    sensor_monitor_thread::{
+        create_sensor_monitor_thread, MainToMonitorMessages, MonitorToMainMessages,
+    },
     sensors::{
         lock_status_sensor::{init_lock_status_sensor, EventLoopRegisteredLockStatusSensorBuilder},
         outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
+        window_sensor::window_title_mapper::{WindowTitleMapper, WindowTitleMappings},
     },
     tray_icon::{hide_to_tray, TrayIconData},
     ui::{
         network_window::NetworkWindow, time_formatting::nicely_formatted_datetime,
         transmission_spy::TransmissionSpy,
         widgets::auto_launch_checkbox::AutoLaunchCheckboxUiExtension,
+        window_title_mapping_window::WindowTitleMappingWindow,
     },
 };
 
@@ -38,10 +45,17 @@ use crate::{
 pub struct Persistence {
     pub ignored_users: HashSet<UniqueUserId>,
     pub spacetimedb_db_name: String,
+
+    #[serde(default = "Persistence::default_window_title_mappings")]
+    pub window_title_mappings: Arc<RwLock<WindowTitleMappings>>,
 }
 
 impl Persistence {
     pub const STORAGE_KEY: &str = eframe::APP_KEY;
+
+    fn default_window_title_mappings() -> Arc<RwLock<WindowTitleMappings>> {
+        Arc::new(RwLock::new(WindowTitleMappings::default()))
+    }
 }
 
 impl Default for Persistence {
@@ -49,6 +63,7 @@ impl Default for Persistence {
         Self {
             ignored_users: Default::default(),
             spacetimedb_db_name: "gwaihir-test".to_string(),
+            window_title_mappings: Default::default(),
         }
     }
 }
@@ -73,6 +88,7 @@ pub struct GwaihirApp {
 
     network_window: NetworkWindow,
     transmission_spy: TransmissionSpy,
+    window_title_mapping_window: WindowTitleMappingWindow,
 }
 
 impl GwaihirApp {
@@ -80,20 +96,8 @@ impl GwaihirApp {
     pub fn new(
         cc: &eframe::CreationContext<'_>,
         sensor_builder: Rc<RefCell<Option<EventLoopRegisteredLockStatusSensorBuilder>>>,
-        tx_to_monitor_thread: Sender<MainToMonitorMessages>,
-        rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
-        sensor_monitor_thread_join_handle: JoinHandle<()>,
         log_file_location: PathBuf,
     ) -> Self {
-        // This is also where you can customize the look and feel of egui using
-        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
-        let lock_status_sensor = init_lock_status_sensor(cc, sensor_builder);
-        if let Some(sensor) = lock_status_sensor {
-            tx_to_monitor_thread
-                .send(MainToMonitorMessages::LockStatusSensorInitialized(sensor))
-                .unwrap();
-        }
-
         let persistence: Persistence = cc
             .storage
             .and_then(|storage| eframe::get_value(storage, Persistence::STORAGE_KEY))
@@ -101,6 +105,22 @@ impl GwaihirApp {
 
         let periodic_repaint_thread_join_handle =
             create_periodic_repaint_thread(cc.egui_ctx.clone(), Duration::from_secs(10));
+
+        let ctx_clone = cc.egui_ctx.clone();
+        let (sensor_monitor_thread_join_handle, tx_to_monitor_thread, rx_from_monitor_thread) =
+            create_sensor_monitor_thread(&persistence);
+        tx_to_monitor_thread
+            .send(MainToMonitorMessages::SetEguiContext(ctx_clone))
+            .unwrap();
+        let lock_status_sensor = init_lock_status_sensor(cc, sensor_builder);
+        if let Some(sensor) = lock_status_sensor {
+            tx_to_monitor_thread
+                .send(MainToMonitorMessages::LockStatusSensorInitialized(sensor))
+                .unwrap();
+        }
+
+        let window_title_mapper = WindowTitleMapper::new(persistence.window_title_mappings.clone());
+        let window_title_mapping_window = WindowTitleMappingWindow::new(window_title_mapper);
 
         let creation_params = SpacetimeDBCreationParameters {
             db_name: persistence.spacetimedb_db_name.clone(),
@@ -126,6 +146,7 @@ impl GwaihirApp {
 
             persistence,
             log_file_location,
+            window_title_mapping_window,
         }
     }
 
@@ -206,15 +227,21 @@ impl eframe::App for GwaihirApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        match self.rx_from_monitor_thread.try_recv() {
-            Err(TryRecvError::Empty) => (),
-            Err(TryRecvError::Disconnected) => {
-                panic!("The background thread unexpected disconnected!");
-            }
-            Ok(MonitorToMainMessages::UpdatedSensorOutputs(sensor_outputs)) => {
-                debug!("Publishing update: {:#?}", &sensor_outputs);
-                self.transmission_spy.record_update(sensor_outputs.clone());
-                self.network.publish_update(sensor_outputs);
+        loop {
+            match self.rx_from_monitor_thread.try_recv() {
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => {
+                    panic!("The background thread unexpected disconnected!");
+                }
+                Ok(MonitorToMainMessages::UpdatedSensorOutputs(sensor_outputs)) => {
+                    debug!("Publishing update: {:#?}", &sensor_outputs);
+                    self.transmission_spy.record_update(sensor_outputs.clone());
+                    self.network.publish_update(sensor_outputs);
+                }
+                Ok(MonitorToMainMessages::ObservedWindowTitle(identifiers)) => {
+                    self.window_title_mapping_window
+                        .record_observed_title(identifiers);
+                }
             }
         }
 
@@ -269,6 +296,11 @@ impl eframe::App for GwaihirApp {
 
                     if ui.button("Clear ignored users").clicked() {
                         self.persistence.ignored_users.clear();
+                    }
+
+                    if ui.button("Window Titles").clicked() {
+                        self.window_title_mapping_window.set_shown(true);
+                        ui.close_menu();
                     }
 
                     if ui.button("Quit").clicked() {
@@ -356,6 +388,7 @@ impl eframe::App for GwaihirApp {
                 self.current_status.clear();
             });
         self.transmission_spy.show(ctx);
+        self.window_title_mapping_window.show(ctx);
     }
 }
 

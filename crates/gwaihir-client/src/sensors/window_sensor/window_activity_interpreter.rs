@@ -1,13 +1,22 @@
-use std::{cell::RefCell, rc::Rc};
-
+use super::{
+    active_window_provider::LockAwareWindowProvider, window_activity_sensor::WindowActivitySensor,
+    window_title_mapper::WindowTitleMappings,
+};
+use crate::{
+    sensor_monitor_thread::MonitorToMainMessages,
+    sensors::{
+        outputs::{
+            sensor_output::SensorOutput, summarized_window_activity::SummarizedWindowActivity,
+        },
+        Sensor,
+    },
+};
 use gwaihir_client_lib::chrono::{Duration, Utc};
 use once_cell::sync::Lazy;
-
-use super::{
-    active_window_provider::LockAwareWindowProvider,
-    outputs::{sensor_output::SensorOutput, summarized_window_activity::SummarizedWindowActivity},
-    window_activity_sensor::WindowActivitySensor,
-    Sensor,
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    sync::{mpsc::Sender, Arc, RwLock},
 };
 
 pub static DEFAULT_TIME_TO_KEEP_WINDOW_ACTIVITY: Lazy<Duration> =
@@ -41,12 +50,17 @@ impl Sensor for WindowActivityInterpreter {
 }
 
 impl WindowActivityInterpreter {
-    pub fn new() -> Self {
+    pub fn new(
+        tx_to_main: Sender<MonitorToMainMessages>,
+        window_title_mappings: Arc<RwLock<WindowTitleMappings>>,
+    ) -> Self {
         let active_window_provider = Rc::new(RefCell::new(LockAwareWindowProvider::new()));
         Self {
             window_activity_sensor: WindowActivitySensor::new(
                 *DEFAULT_TIME_TO_KEEP_WINDOW_ACTIVITY,
                 active_window_provider.clone(),
+                tx_to_main,
+                window_title_mappings,
             ),
             lock_aware_active_window_provider: active_window_provider,
         }

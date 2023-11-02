@@ -2057,6 +2057,7 @@ dependencies = [
  "eternity-rs",
  "flexi_logger",
  "gwaihir-client-lib",
+ "linked_hash_set",
  "lodepng",
  "log",
  "log-panics",
@@ -2499,6 +2500,21 @@ checksum = "db23b9e7e2b7831bbd8aac0bbeeeb7b68cbebc162b227e7052e8e55829a09212"
 dependencies = [
  "libc",
  "x11",
+]
+
+[[package]]
+name = "linked-hash-map"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
+
+[[package]]
+name = "linked_hash_set"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47186c6da4d81ca383c7c47c1bfc80f4b95f4720514d860a5407aaf4233f9588"
+dependencies = [
+ "linked-hash-map",
 ]
 
 [[package]]
