@@ -4,6 +4,7 @@
 use crate::sensor_monitor_thread::{create_sensor_monitor_thread, MainToMonitorMessages};
 pub use app::GwaihirApp;
 use directories_next::ProjectDirs;
+use eframe::IconData;
 use flexi_logger::LoggerHandle;
 use gwaihir_client_lib::APP_ID;
 use log::info;
@@ -18,12 +19,15 @@ mod sensors;
 mod tray_icon;
 mod ui;
 
+const ICON_BYTES: &[u8] = include_bytes!("../assets/eagle.png");
+
 fn main() -> eframe::Result<()> {
     let logger = init_logging();
     info!("Starting Gwaihir");
 
     let mut native_options = eframe::NativeOptions {
         app_id: Some(APP_ID.to_string()),
+        icon_data: Some(IconData::try_from_png_bytes(ICON_BYTES).unwrap()),
         ..Default::default()
     };
     let registered_builder =

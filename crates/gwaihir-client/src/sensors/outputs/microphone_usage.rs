@@ -20,7 +20,7 @@ impl SensorWidget for MicrophoneUsage {
             .id_source(format!("{}_mic", id.as_ref()))
             .show(ui, |ui| {
                 ui.label(format!(
-                    "{} app(s) currently listening to the microphone",
+                    "{} app(s) currently listening to the microphone:",
                     self.usage.len()
                 ));
                 for app in self.usage.iter() {

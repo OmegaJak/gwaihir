@@ -1,5 +1,5 @@
 use chrono_humanize::HumanTime;
-use egui::{epaint::ahash::HashSet, Color32, RichText, TextEdit, Widget};
+use egui::{epaint::ahash::HashSet, Color32, RichText, ScrollArea, TextEdit, Widget};
 use gwaihir_client_lib::{
     chrono::Local, NetworkInterface, RemoteUpdate, UniqueUserId, UserStatus, APP_ID,
 };
@@ -187,6 +187,34 @@ impl GwaihirApp {
             }
         }
     }
+
+    fn show_user_context_menu(&mut self, id: &UniqueUserId, ui: &mut egui::Ui) {
+        match &self.current_user_id {
+            Some(current_user_id) => {
+                if id == current_user_id {
+                    ui.horizontal(|ui| {
+                        let text_edit_response = TextEdit::singleline(&mut self.set_name_input)
+                            .desired_width(100.0)
+                            .ui(ui);
+                        if ui.button("Set Username").clicked()
+                            || (text_edit_response.lost_focus()
+                                && ui.input(|i| i.key_pressed(egui::Key::Enter)))
+                        {
+                            self.network.set_username(self.set_name_input.clone());
+                            self.set_name_input = String::new();
+                            ui.close_menu();
+                        }
+                    });
+                } else if ui.button("Ignore").clicked() {
+                    self.persistence.ignored_users.insert((*id).clone());
+                    ui.close_menu();
+                }
+            }
+            None => {
+                ui.label("[[No Options]]");
+            }
+        }
+    }
 }
 
 impl eframe::App for GwaihirApp {
@@ -276,8 +304,10 @@ impl eframe::App for GwaihirApp {
                     }
                 });
 
-                ui.separator();
-                ui.label(format!("Frame: {}", ctx.frame_nr()));
+                if cfg!(debug_assertions) {
+                    ui.separator();
+                    ui.label(format!("Frame: {}", ctx.frame_nr()));
+                }
             });
         });
 
@@ -287,66 +317,55 @@ impl eframe::App for GwaihirApp {
             }
 
             let user_status_list = self.get_filtered_sorted_user_status_list();
-            for (id, status) in user_status_list.iter() {
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 2.0;
+            ScrollArea::vertical().show(ui, |ui| {
+                for (id, status) in user_status_list.iter() {
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 2.0;
+                        status.sensor_outputs.show_first(
+                            |o| matches!(o, SensorOutput::OnlineStatus(_)),
+                            ui,
+                            id,
+                        );
+                        ui.heading(status.display_name())
+                            .context_menu(|ui| {
+                                self.show_user_context_menu(id, ui);
+                            })
+                            .on_hover_text_at_pointer("Right click for options");
+                        ui.label(RichText::new(format!(
+                            " {} ",
+                            HumanTime::from(status.last_update)
+                        )))
+                        .on_hover_text_at_pointer(format!(
+                            "Last updated: {}",
+                            nicely_formatted_datetime(status.last_update.with_timezone(&Local),)
+                        ));
+                    });
+
                     status.sensor_outputs.show_first(
-                        |o| matches!(o, SensorOutput::OnlineStatus(_)),
+                        |o| matches!(o, SensorOutput::LockStatus(_)),
                         ui,
                         id,
                     );
-                    ui.heading(status.display_name());
-                    ui.label(RichText::new(format!(
-                        " {} ",
-                        HumanTime::from(status.last_update)
-                    )))
-                    .on_hover_text_at_pointer(format!(
-                        "Last updated: {}",
-                        nicely_formatted_datetime(status.last_update.with_timezone(&Local),)
-                    ));
 
-                    if let Some(current_user_id) = &self.current_user_id {
-                        if id == current_user_id {
-                            let text_edit_response = TextEdit::singleline(&mut self.set_name_input)
-                                .desired_width(100.0)
-                                .ui(ui);
-                            if ui.button("Set Username").clicked()
-                                || (text_edit_response.lost_focus()
-                                    && ui.input(|i| i.key_pressed(egui::Key::Enter)))
-                            {
-                                self.network.set_username(self.set_name_input.clone());
-                                self.set_name_input = String::new();
-                            }
-                        } else if ui.button("x").clicked() {
-                            self.persistence.ignored_users.insert((*id).clone());
-                        }
-                    }
-                });
+                    status.sensor_outputs.show_first(
+                        |o| matches!(o, SensorOutput::SummarizedWindowActivity(_)),
+                        ui,
+                        id,
+                    );
 
-                status.sensor_outputs.show_first(
-                    |o| matches!(o, SensorOutput::LockStatus(_)),
-                    ui,
-                    id,
-                );
+                    status.sensor_outputs.show_first(
+                        |o| matches!(o, SensorOutput::KeyboardMouseActivity(_)),
+                        ui,
+                        id,
+                    );
 
-                status.sensor_outputs.show_first(
-                    |o| matches!(o, SensorOutput::SummarizedWindowActivity(_)),
-                    ui,
-                    id,
-                );
-
-                status.sensor_outputs.show_first(
-                    |o| matches!(o, SensorOutput::KeyboardMouseActivity(_)),
-                    ui,
-                    id,
-                );
-
-                status.sensor_outputs.show_first(
-                    |o| matches!(o, SensorOutput::MicrophoneUsage(_)),
-                    ui,
-                    id,
-                );
-            }
+                    status.sensor_outputs.show_first(
+                        |o| matches!(o, SensorOutput::MicrophoneUsage(_)),
+                        ui,
+                        id,
+                    );
+                }
+            });
 
             egui::warn_if_debug_build(ui);
         });
