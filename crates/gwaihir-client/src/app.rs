@@ -320,6 +320,7 @@ impl eframe::App for GwaihirApp {
 
                     if ui.button("Create Fake User").clicked() {
                         self.add_fake_user_window.set_shown(true);
+                        ui.close_menu();
                     }
 
                     if ui.button("Quit").clicked() {
