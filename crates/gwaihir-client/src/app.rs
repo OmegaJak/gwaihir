@@ -28,6 +28,7 @@ use crate::{
     },
     tray_icon::{hide_to_tray, TrayIconData},
     ui::{
+        add_fake_user_window::AddFakeUserWindow,
         network_window::NetworkWindow,
         raw_data_window::{RawDataWindow, TimestampedData},
         time_formatting::nicely_formatted_datetime,
@@ -75,6 +76,7 @@ pub struct GwaihirApp {
     network_window: NetworkWindow,
     transmission_spy: RawDataWindow,
     received_data_viewer: RawDataWindow,
+    add_fake_user_window: AddFakeUserWindow,
 }
 
 impl GwaihirApp {
@@ -129,6 +131,8 @@ impl GwaihirApp {
 
             persistence,
             log_file_location,
+
+            add_fake_user_window: AddFakeUserWindow::new(),
         }
     }
 
@@ -314,6 +318,10 @@ impl eframe::App for GwaihirApp {
                         self.persistence.ignored_users.clear();
                     }
 
+                    if ui.button("Create Fake User").clicked() {
+                        self.add_fake_user_window.set_shown(true);
+                    }
+
                     if ui.button("Quit").clicked() {
                         frame.close();
                     }
@@ -391,6 +399,10 @@ impl eframe::App for GwaihirApp {
             });
         self.transmission_spy.show(ctx);
         self.received_data_viewer.show(ctx);
+        self.add_fake_user_window.show(ctx, |user_status| {
+            self.current_status
+                .insert(user_status.user_id.clone(), user_status);
+        });
     }
 }
 
