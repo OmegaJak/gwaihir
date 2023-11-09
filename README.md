@@ -1,5 +1,4 @@
-# Gwaihir
-
+# <img src="/crates/gwaihir-client/assets/eagle.png" width=50> Gwaihir 
 [![dependency status](https://deps.rs/repo/github/omegajak/gwaihir/status.svg)](https://deps.rs/repo/github/omegajak/gwaihir)
 
 A pure-Rust 🦀 desktop app letting trusted friends share their desktop usage with each other to help automatically & remotely answer the question: *“Is now a good time?”*
