@@ -138,7 +138,12 @@ impl SummarizedWindowActivity {
     }
 
     fn round_to_nearest_10_seconds(duration: Duration) -> Duration {
-        Duration::seconds(((duration.to_std().unwrap().as_secs_f64() / 10.0).round() * 10.0) as i64)
+        let std_duration = duration.to_std();
+        if let Ok(duration) = std_duration {
+            Duration::seconds(((duration.as_secs_f64() / 10.0).round() * 10.0) as i64)
+        } else {
+            Duration::seconds(duration.num_seconds())
+        }
     }
 
     fn get_header_text(
