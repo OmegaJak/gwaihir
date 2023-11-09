@@ -28,8 +28,9 @@ use crate::{
     },
     tray_icon::{hide_to_tray, TrayIconData},
     ui::{
-        network_window::NetworkWindow, time_formatting::nicely_formatted_datetime,
-        transmission_spy::TransmissionSpy,
+        network_window::NetworkWindow,
+        raw_data_window::{RawDataWindow, TimestampedData},
+        time_formatting::nicely_formatted_datetime,
         widgets::auto_launch_checkbox::AutoLaunchCheckboxUiExtension,
     },
 };
@@ -72,7 +73,8 @@ pub struct GwaihirApp {
     log_file_location: PathBuf,
 
     network_window: NetworkWindow,
-    transmission_spy: TransmissionSpy,
+    transmission_spy: RawDataWindow,
+    received_data_viewer: RawDataWindow,
 }
 
 impl GwaihirApp {
@@ -114,7 +116,8 @@ impl GwaihirApp {
             current_status: HashMap::new(),
 
             network_window: NetworkWindow::new(&network),
-            transmission_spy: TransmissionSpy::new(),
+            transmission_spy: RawDataWindow::new("Last Sent Data".to_string()),
+            received_data_viewer: RawDataWindow::new("Raw Data".to_string()),
 
             sensor_monitor_thread_join_handle: Some(sensor_monitor_thread_join_handle),
             network,
@@ -129,10 +132,8 @@ impl GwaihirApp {
         }
     }
 
-    fn get_filtered_sorted_user_status_list(
-        &self,
-    ) -> Vec<(UniqueUserId, UserStatus<SensorOutputs>)> {
-        let mut user_status_list = self
+    fn get_filtered_sorted_user_statuses(&self) -> Vec<(UniqueUserId, UserStatus<SensorOutputs>)> {
+        let mut user_statuses = self
             .current_status
             .iter()
             .filter(|(id, _)| self.subscribed_to_user(id))
@@ -140,7 +141,7 @@ impl GwaihirApp {
             .collect::<Vec<_>>();
 
         // Sort to ensure current user is on top
-        user_status_list.sort_by(|(id_a, _), (id_b, _)| {
+        user_statuses.sort_by(|(id_a, _), (id_b, _)| {
             if self
                 .current_user_id
                 .as_ref()
@@ -158,7 +159,7 @@ impl GwaihirApp {
             }
         });
 
-        user_status_list
+        user_statuses
     }
 
     fn gracefully_shutdown_sensor_monitor_thread(&mut self) {
@@ -188,7 +189,12 @@ impl GwaihirApp {
         }
     }
 
-    fn show_user_context_menu(&mut self, id: &UniqueUserId, ui: &mut egui::Ui) {
+    fn show_user_context_menu(
+        &mut self,
+        id: &UniqueUserId,
+        ui: &mut egui::Ui,
+        user_status: &UserStatus<SensorOutputs>,
+    ) {
         match &self.current_user_id {
             Some(current_user_id) => {
                 if id == current_user_id {
@@ -207,6 +213,14 @@ impl GwaihirApp {
                     });
                 } else if ui.button("Ignore").clicked() {
                     self.persistence.ignored_users.insert((*id).clone());
+                    ui.close_menu();
+                }
+
+                if ui.button("View Raw Data").clicked() {
+                    self.received_data_viewer.show_data(
+                        user_status.into(),
+                        format!("Raw Data for {}", user_status.display_name()),
+                    );
                     ui.close_menu();
                 }
             }
@@ -241,7 +255,8 @@ impl eframe::App for GwaihirApp {
             }
             Ok(MonitorToMainMessages::UpdatedSensorOutputs(sensor_outputs)) => {
                 debug!("Publishing update: {:#?}", &sensor_outputs);
-                self.transmission_spy.record_update(sensor_outputs.clone());
+                self.transmission_spy
+                    .set_data(TimestampedData::now(sensor_outputs.clone()));
                 self.network.publish_update(sensor_outputs);
             }
         }
@@ -316,7 +331,7 @@ impl eframe::App for GwaihirApp {
                 ui.label(RichText::new("⚠⚠ OFFLINE ⚠⚠").heading().color(Color32::RED));
             }
 
-            let user_status_list = self.get_filtered_sorted_user_status_list();
+            let user_status_list = self.get_filtered_sorted_user_statuses();
             ScrollArea::vertical().show(ui, |ui| {
                 for (id, status) in user_status_list.iter() {
                     ui.horizontal(|ui| {
@@ -328,7 +343,7 @@ impl eframe::App for GwaihirApp {
                         );
                         ui.heading(status.display_name())
                             .context_menu(|ui| {
-                                self.show_user_context_menu(id, ui);
+                                self.show_user_context_menu(id, ui, status);
                             })
                             .on_hover_text_at_pointer("Right click for options");
                         ui.label(RichText::new(format!(
@@ -375,6 +390,7 @@ impl eframe::App for GwaihirApp {
                 self.current_status.clear();
             });
         self.transmission_spy.show(ctx);
+        self.received_data_viewer.show(ctx);
     }
 }
 
