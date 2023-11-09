@@ -316,6 +316,7 @@ impl eframe::App for GwaihirApp {
 
                     if ui.button("Clear ignored users").clicked() {
                         self.persistence.ignored_users.clear();
+                        ui.close_menu();
                     }
 
                     if ui.button("Create Fake User").clicked() {
