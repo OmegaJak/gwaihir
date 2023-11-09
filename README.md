@@ -51,15 +51,10 @@ Below, specific measures that have already been taken to aid privacy are describ
 
 ## Persistence Locations
 
-### Windows
-**SpacetimeDB credentials:** `C:\Users\{USER}\.gwaihir`
-
-**primary persistence and logs:** `C:\Users\{USER}\AppData\Roaming\gwaihir`
-
-### Linux
-**SpacetimeDB credentials:** `~/.gwaihir`
-
-**primary persistence and logs:** `~/.local/share/gwaihir`
+| OS      | SpacetimeDB credentials    | Primary persistence & logs                |
+| ------- | -------------------------- | ----------------------------------------- |
+| Windows | `C:\Users\{USER}\.gwaihir` | `C:\Users\{USER}\AppData\Roaming\gwaihir` |
+| Linux   | `~/.gwaihir`               | `~/.local/share/gwaihir`                  | 
 
 ## Attributions
 - [Eagle icon created by Culmbio - Flaticon](https://www.flaticon.com/free-icons/eagle)
