@@ -87,11 +87,18 @@ where
     }
 
     fn try_reconnect(&mut self) -> bool {
+        info!("Attempting reconnect to SpacetimeDB");
         let connected = self.connect_to_db();
         if connected {
+            info!("Successfully reconnected");
             subscribe_to_tables();
         }
         connected
+    }
+
+    fn disconnect(&mut self) {
+        info!("Disconnecting from SpacetimeDB");
+        disconnect();
     }
 }
 
@@ -111,13 +118,6 @@ impl SpacetimeDBInterface {
                 false
             }
         }
-    }
-}
-
-impl Drop for SpacetimeDBInterface {
-    fn drop(&mut self) {
-        log::debug!("Disconnecting from SpacetimeDB because the interface was dropped");
-        disconnect()
     }
 }
 

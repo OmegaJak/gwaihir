@@ -82,4 +82,5 @@ pub trait NetworkInterface<T> {
     fn get_network_type(&self) -> NetworkType;
     fn is_connected(&self) -> bool;
     fn try_reconnect(&mut self) -> bool;
+    fn disconnect(&mut self);
 }

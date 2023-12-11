@@ -47,4 +47,6 @@ impl<T> NetworkInterface<T> for OfflineNetworkInterface<T> {
     fn try_reconnect(&mut self) -> bool {
         self.is_connected()
     }
+
+    fn disconnect(&mut self) {}
 }

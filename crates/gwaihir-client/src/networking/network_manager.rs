@@ -71,6 +71,7 @@ impl NetworkManager {
     pub fn reinit_network(&mut self, new_network_type: NetworkType, spacetimedb_db_name: String) {
         let network_tx = self.network_tx.clone();
         let egui_ctx = self.egui_ctx.clone();
+        self.network.disconnect();
         match new_network_type {
             NetworkType::Offline => self.network = get_offline_network(network_tx, egui_ctx),
             NetworkType::SpacetimeDB => {
@@ -100,6 +101,7 @@ impl NetworkInterface<SensorOutputs> for NetworkManager {
             fn get_network_type(&self) -> gwaihir_client_lib::NetworkType;
             fn is_connected(&self) -> bool;
             fn try_reconnect(&mut self) -> bool;
+            fn disconnect(&mut self);
         }
     }
 }
