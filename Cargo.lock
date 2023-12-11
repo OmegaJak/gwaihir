@@ -482,12 +482,6 @@ dependencies = [
 
 [[package]]
 name = "base64"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
-
-[[package]]
-name = "base64"
 version = "0.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ba43ea6f343b788c8764558649e08df62f86c6ef251fdaeb1ffd010a9ae50a2"
@@ -2070,7 +2064,7 @@ dependencies = [
  "rdev",
  "serde",
  "serde_json",
- "serde_with 3.3.0",
+ "serde_with",
  "thiserror",
  "tray-icon",
  "windows",
@@ -2296,6 +2290,15 @@ name = "itertools"
 version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
 dependencies = [
  "either",
 ]
@@ -3249,6 +3252,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "prometheus"
+version = "0.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "449811d15fbdf5ceb5c1144416066429cf82316e2ec8ce0c1f6f8a02e7bbcf8c"
+dependencies = [
+ "cfg-if",
+ "fnv",
+ "lazy_static",
+ "memchr",
+ "parking_lot",
+ "protobuf",
+ "thiserror",
+]
+
+[[package]]
 name = "prost"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3268,7 +3286,7 @@ dependencies = [
  "cfg-if",
  "cmake",
  "heck",
- "itertools",
+ "itertools 0.10.5",
  "lazy_static",
  "log",
  "multimap",
@@ -3287,7 +3305,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b670f45da57fb8542ebdbb6105a925fe571b67f9e7ed9f47a06a84e72b4e7cc"
 dependencies = [
  "anyhow",
- "itertools",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
  "syn 1.0.109",
@@ -3302,6 +3320,12 @@ dependencies = [
  "bytes",
  "prost",
 ]
+
+[[package]]
+name = "protobuf"
+version = "2.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 
 [[package]]
 name = "pulsectl-rs"
@@ -3470,7 +3494,7 @@ version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b91f7eff05f748767f183df4320a63d6936e9c6107d97c9e6bdd9784f4289c94"
 dependencies = [
- "base64 0.21.4",
+ "base64",
  "bitflags 2.4.0",
  "serde",
  "serde_derive",
@@ -3661,47 +3685,19 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "2.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07ff71d2c147a7b57362cead5e22f772cd52f6ab31cfcd9edcd7f6aeb2a0afbe"
-dependencies = [
- "base64 0.13.1",
- "chrono",
- "hex",
- "indexmap 1.9.3",
- "serde",
- "serde_json",
- "serde_with_macros 2.3.3",
- "time",
-]
-
-[[package]]
-name = "serde_with"
 version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ca3b16a3d82c4088f343b7480a93550b3eabe1a358569c2dfe38bbcead07237"
 dependencies = [
- "base64 0.21.4",
+ "base64",
  "chrono",
  "hex",
  "indexmap 1.9.3",
  "indexmap 2.0.0",
  "serde",
  "serde_json",
- "serde_with_macros 3.3.0",
+ "serde_with_macros",
  "time",
-]
-
-[[package]]
-name = "serde_with_macros"
-version = "2.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "881b6f881b17d13214e5d494c939ebab463d01264ce1811e9d4ac3a882e7695f"
-dependencies = [
- "darling",
- "proc-macro2",
- "quote",
- "syn 2.0.37",
 ]
 
 [[package]]
@@ -3798,9 +3794,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.11.0"
+version = "1.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62bb4feee49fdd9f707ef802e22365a35de4b7b299de4763d44bfea899442ff9"
+checksum = "4dccd0940a2dcdf68d092b8cbab7dc0ad8fa938bf95787e1b916b0e3d0e8e970"
 
 [[package]]
 name = "smithay-client-toolkit"
@@ -3861,43 +3857,49 @@ dependencies = [
 
 [[package]]
 name = "spacetimedb"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f34f74ee8f748d8a47422ad975f95836b9dcfb4f2f76bd23cd7ae06692bafdf5"
+checksum = "f21f6f950970982751e6d355ddba9b680784adf455cc27d7589b862b16643a02"
 dependencies = [
  "derive_more",
  "log",
+ "nonempty",
  "once_cell",
  "scoped-tls",
  "spacetimedb-bindings-macro",
  "spacetimedb-bindings-sys",
  "spacetimedb-lib",
+ "spacetimedb-primitives",
 ]
 
 [[package]]
 name = "spacetimedb-bindings-macro"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c39c3d8dce721bdc1c506b4612d15d61a386c44d58187562cfc656641af9f96"
+checksum = "b269d854e2ea04afffd3237fb7f50a2aad5d7b5a3cf59dc0dd285f2e6a930f82"
 dependencies = [
  "bitflags 2.4.0",
  "humantime",
  "proc-macro2",
  "quote",
+ "spacetimedb-primitives",
  "syn 2.0.37",
 ]
 
 [[package]]
 name = "spacetimedb-bindings-sys"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ba30e2e6994f37e873c57c5a9e5d57c2a1b831d7bccccbfa9920d70448078e7"
+checksum = "1fded1e1d13dc8699846e12704b42861232c35f1fba5fcd9c9cc6b4e8672f01d"
+dependencies = [
+ "spacetimedb-primitives",
+]
 
 [[package]]
 name = "spacetimedb-client-api-messages"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a02951c5347ae6bd7710063550b290611f5bde232debb8b49304017ed61b9cae"
+checksum = "828ffad1a502ac5927eb7a7ee793938f16e6509912fee55a1296231d2ed99878"
 dependencies = [
  "prost",
  "prost-build",
@@ -3906,9 +3908,9 @@ dependencies = [
 
 [[package]]
 name = "spacetimedb-lib"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4764632393ac370d3e152f2f8acd6365aaf65fd19dceb431b283bf6a03a216af"
+checksum = "1085e4e3f8b35eb0d0baf8cf53c0b945d73423c5c1cc22c518e317688b7395b6"
 dependencies = [
  "anyhow",
  "bitflags 2.4.0",
@@ -3916,44 +3918,73 @@ dependencies = [
  "derive_more",
  "enum-as-inner",
  "hex",
- "itertools",
+ "itertools 0.11.0",
+ "once_cell",
+ "prometheus",
  "serde",
- "serde_with 2.3.3",
- "sha3",
+ "serde_with",
  "spacetimedb-bindings-macro",
+ "spacetimedb-metrics",
+ "spacetimedb-primitives",
  "spacetimedb-sats",
  "thiserror",
  "tracing",
 ]
 
 [[package]]
-name = "spacetimedb-sats"
-version = "0.7.0"
+name = "spacetimedb-metrics"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25e48cf2af58764d9dabdd95a73d3ae9c5d7380fd0680cbef49a9ed1518f74e6"
+checksum = "a3d271faa86454323e67928e9fec3a3101a18e3cfbb4738bbbed97930e133f7a"
+dependencies = [
+ "itertools 0.11.0",
+ "paste",
+ "prometheus",
+]
+
+[[package]]
+name = "spacetimedb-primitives"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f26e88cf12723e3887b0a6e7a8ac1b05f9ca1420627ac56d27d43a19bd2dccb"
+dependencies = [
+ "bitflags 2.4.0",
+ "nonempty",
+]
+
+[[package]]
+name = "spacetimedb-sats"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d4a4391c68a893012e67415ef56c254487aa11c293681ecfc790ed4b7783f37"
 dependencies = [
  "arrayvec",
+ "bitflags 2.4.0",
  "decorum",
  "derive_more",
  "enum-as-inner",
  "hex",
- "itertools",
+ "itertools 0.11.0",
  "nonempty",
  "serde",
+ "sha3",
+ "smallvec",
  "spacetimedb-bindings-macro",
+ "spacetimedb-metrics",
+ "spacetimedb-primitives",
  "thiserror",
  "tracing",
 ]
 
 [[package]]
 name = "spacetimedb-sdk"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6177766c6c27ff72ddb5cf60012103e8f6143be7036ecb9c38a2ba9569bc9c5"
+checksum = "61cf87b2f4c44c995b5ec3c69487d3638f2d2529d070d2ecbb3b4fe544f677fe"
 dependencies = [
  "anyhow",
  "anymap",
- "base64 0.21.4",
+ "base64",
  "futures",
  "futures-channel",
  "home",
@@ -4002,24 +4033,24 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "strum"
-version = "0.24.1"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
+checksum = "290d54ea6f91c969195bdbcd7442c8c2a2ba87da8bf60a7ee86a235d4bc1e125"
 dependencies = [
  "strum_macros",
 ]
 
 [[package]]
 name = "strum_macros"
-version = "0.24.3"
+version = "0.25.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e385be0d24f186b4ce2f9982191e7101bb737312ad61c1f2f984f34bcf85d59"
+checksum = "23dc1fa9ac9c169a78ba62f0b841814b7abae11bdd047b9c58f893439e309ea0"
 dependencies = [
  "heck",
  "proc-macro2",
  "quote",
  "rustversion",
- "syn 1.0.109",
+ "syn 2.0.37",
 ]
 
 [[package]]
@@ -4224,9 +4255,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-tungstenite"
-version = "0.19.0"
+version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec509ac96e9a0c43427c74f003127d953a265737636129424288d27cb5c4b12c"
+checksum = "212d5dcb2a1ce06d81107c3d0ffa3121fe974b73f068c8282cb1c32328113b6c"
 dependencies = [
  "futures-util",
  "log",
@@ -4329,9 +4360,9 @@ checksum = "49d64318d8311fc2668e48b63969f4343e0a85c4a109aa8460d6672e364b8bd1"
 
 [[package]]
 name = "tungstenite"
-version = "0.19.0"
+version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15fba1a6d6bb030745759a9a2a588bfe8490fc8b4751a277db3a0be1c9ebbf67"
+checksum = "9e3dac10fd62eaf6617d3a904ae222845979aec67c615d1c842b4002c7666fb9"
 dependencies = [
  "byteorder",
  "bytes",

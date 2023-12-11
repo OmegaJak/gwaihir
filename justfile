@@ -1,20 +1,18 @@
 set windows-shell := ["cmd.exe", "/c"]
 
-run:
+default:
+  just --list
+
+run *args:
 	cargo run -p gwaihir
 
-run-release:
-	cargo run -p gwaihir --release
-
-build:
-	cargo build -p gwaihir
-
-build-release:
-	cargo build -p gwaihir --release
+build *args:
+	cargo build -p gwaihir {{args}}
 
 generate-bindings:
 	just crates\networking-spacetimedb/generate-bindings
-	
+
+# Can be used after a testnet wipe or otherwise losing the server to recreate one with the given name
 publish db_name:
 	just crates\spacetimedb-server/spacetime-publish {{db_name}}
 

@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 hex = "0.4.3"
-spacetimedb-sdk ="0.7.0"
+spacetimedb-sdk = "0.8.0"
 serde = { version = "1" }
 log = "0.4"
 serde_json = "1.0.105"
