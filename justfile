@@ -3,9 +3,11 @@ set windows-shell := ["cmd.exe", "/c"]
 default:
   just --list
 
+# Run the Gwaihir executable. Pass --release to run release mode, or any other cargo args as desired.
 run *args:
 	cargo run -p gwaihir
 
+# Build the Gwaihir executable. Pass --release to build release mode, or any other cargo args as desired.
 build *args:
 	cargo build -p gwaihir {{args}}
 
