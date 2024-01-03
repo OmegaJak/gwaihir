@@ -12,6 +12,7 @@ use sensors::lock_status_sensor::LockStatusSensorBuilder;
 use std::path::PathBuf;
 
 mod app;
+pub mod change_matcher;
 mod networking;
 mod periodic_repaint_thread;
 mod sensor_monitor_thread;

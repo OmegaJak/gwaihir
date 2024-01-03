@@ -6,6 +6,7 @@ use gwaihir_client_lib::{
 use log::{debug, info, warn};
 use log_err::LogErrResult;
 use networking_spacetimedb::{SpacetimeDBCreationParameters, SpacetimeDBInterface};
+use notify_rust::Notification;
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
@@ -19,6 +20,7 @@ use std::{
 };
 
 use crate::{
+    change_matcher::{ChangeMatcher, MatchCriteria, Update},
     networking::network_manager::NetworkManager,
     periodic_repaint_thread::create_periodic_repaint_thread,
     sensor_monitor_thread::{MainToMonitorMessages, MonitorToMainMessages},
@@ -77,6 +79,7 @@ pub struct GwaihirApp {
     transmission_spy: RawDataWindow,
     received_data_viewer: RawDataWindow,
     add_fake_user_window: AddFakeUserWindow,
+    change_matcher: ChangeMatcher,
 }
 
 impl GwaihirApp {
@@ -111,6 +114,7 @@ impl GwaihirApp {
         };
         let network =
             NetworkManager::new::<SpacetimeDBInterface, _>(cc.egui_ctx.clone(), creation_params);
+
         GwaihirApp {
             tray_icon_data: None,
             tx_to_monitor_thread,
@@ -133,6 +137,7 @@ impl GwaihirApp {
             log_file_location,
 
             add_fake_user_window: AddFakeUserWindow::new(),
+            change_matcher: ChangeMatcher::default(),
         }
     }
 
@@ -216,7 +221,10 @@ impl GwaihirApp {
                         }
                     });
                 } else if ui.button("Ignore").clicked() {
-                    self.persistence.ignored_users.insert((*id).clone());
+                    self.persistence.ignored_users.insert(id.clone());
+                    ui.close_menu();
+                } else if ui.button("Notify when online (once)").clicked() {
+                    self.change_matcher.match_once_when_online(id.clone());
                     ui.close_menu();
                 }
 
@@ -232,6 +240,30 @@ impl GwaihirApp {
                 ui.label("[[No Options]]");
             }
         }
+    }
+
+    fn send_match_notifications(&self, matches: Vec<MatchCriteria>) {
+        for matched in matches {
+            match matched {
+                MatchCriteria::UserComesOnline(user_id) => {
+                    let display_name = self
+                        .get_user_display_name(&user_id)
+                        .unwrap_or_else(|| "Unknown".to_string());
+                    Notification::new()
+                        .summary(&format!("{} now Online", display_name))
+                        .body(&format!(
+                            "The user \"{}\" has transitioned from offline to online",
+                            display_name
+                        ))
+                        .show()
+                        .unwrap();
+                }
+            }
+        }
+    }
+
+    fn get_user_display_name(&self, user_id: &UniqueUserId) -> Option<String> {
+        self.current_status.get(user_id).map(|s| s.display_name())
     }
 }
 
@@ -271,6 +303,13 @@ impl eframe::App for GwaihirApp {
                 RemoteUpdate::UserStatusUpdated(status) => {
                     if self.subscribed_to_user(&status.user_id) {
                         debug!("Got user update from DB: {:#?}", &status);
+                        if let Some(current) = self.current_status.get(&status.user_id) {
+                            let matches = self.change_matcher.get_matches(
+                                &status.user_id,
+                                Update::new(&current.sensor_outputs, &status.sensor_outputs),
+                            );
+                            self.send_match_notifications(matches);
+                        }
                         self.current_status.insert(status.user_id.clone(), status);
                     }
                 }
@@ -402,8 +441,9 @@ impl eframe::App for GwaihirApp {
         self.transmission_spy.show(ctx);
         self.received_data_viewer.show(ctx);
         self.add_fake_user_window.show(ctx, |user_status| {
-            self.current_status
-                .insert(user_status.user_id.clone(), user_status);
+            self.network
+                .queue_fake_update(RemoteUpdate::UserStatusUpdated(user_status))
+                .log_expect("Failed to queue fake user update");
         });
     }
 }

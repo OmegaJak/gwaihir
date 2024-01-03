@@ -48,6 +48,13 @@ impl NetworkManager {
         self.network_rx.try_recv()
     }
 
+    pub fn queue_fake_update(
+        &mut self,
+        update: RemoteUpdate<SensorOutputs>,
+    ) -> Result<(), mpsc::SendError<RemoteUpdate<SensorOutputs>>> {
+        self.network_tx.send(update)
+    }
+
     pub fn try_reconnect_if_needed(&mut self) {
         if self.is_offline()
             && self.last_offline_check.map_or(true, |last_check| {

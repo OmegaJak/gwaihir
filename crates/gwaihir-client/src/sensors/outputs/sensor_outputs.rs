@@ -29,6 +29,16 @@ impl SensorOutputs {
             .iter()
             .any(|o| matches!(o, SensorOutput::OnlineStatus(_)))
     }
+
+    pub fn get_online_status(&self) -> Option<&OnlineStatus> {
+        for output in self.outputs.iter() {
+            if let SensorOutput::OnlineStatus(status) = output {
+                return Some(status);
+            }
+        }
+
+        None
+    }
 }
 
 impl AcceptsOnlineStatus for SensorOutputs {
