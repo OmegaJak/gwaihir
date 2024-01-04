@@ -1,5 +1,6 @@
 use egui::{
-    text::LayoutJob, CollapsingHeader, CollapsingResponse, InnerResponse, RichText, Ui, WidgetText,
+    text::LayoutJob, CollapsingHeader, CollapsingResponse, InnerResponse, RichText, Ui, Widget,
+    WidgetText,
 };
 
 pub trait UIExtensionMethods {
@@ -15,6 +16,8 @@ pub trait UIExtensionMethods {
     ) -> InnerResponse<R>;
 
     fn create_default_layout_job(&self, rich_texts: Vec<RichText>) -> LayoutJob;
+
+    fn stateless_checkbox(&mut self, checked: bool, text: impl Into<WidgetText>) -> Option<bool>;
 }
 
 impl UIExtensionMethods for Ui {
@@ -49,5 +52,19 @@ impl UIExtensionMethods for Ui {
         }
 
         layout_job
+    }
+
+    /// This looks like a checkbox, but the state is assumed to be stored outside the checkbox itself.
+    /// Thus, changes must be made externally by watching the `Response`.
+    ///
+    /// Returns `Some(true)` if the value was changed to a checked state, `Some(false)` if it was changed to an unchecked state,
+    /// and `None` if the value was not changed
+    fn stateless_checkbox(&mut self, checked: bool, text: impl Into<WidgetText>) -> Option<bool> {
+        let mut value = checked;
+        if egui::Checkbox::new(&mut value, text).ui(self).changed() {
+            return Some(value);
+        }
+
+        None
     }
 }

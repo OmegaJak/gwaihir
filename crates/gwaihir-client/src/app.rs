@@ -34,6 +34,7 @@ use crate::{
         network_window::NetworkWindow,
         raw_data_window::{RawDataWindow, TimestampedData},
         time_formatting::nicely_formatted_datetime,
+        ui_extension_methods::UIExtensionMethods,
         widgets::auto_launch_checkbox::AutoLaunchCheckboxUiExtension,
     },
 };
@@ -223,9 +224,17 @@ impl GwaihirApp {
                 } else if ui.button("Ignore").clicked() {
                     self.persistence.ignored_users.insert(id.clone());
                     ui.close_menu();
-                } else if ui.button("Notify when online (once)").clicked() {
-                    self.change_matcher.match_once_when_online(id.clone());
-                    ui.close_menu();
+                } else if let Some(notify) = ui.stateless_checkbox(
+                    self.change_matcher
+                        .has_criteria_once(user_comes_online_predicate(id)),
+                    "Notify when online (once)",
+                ) {
+                    if notify {
+                        self.change_matcher.match_once_when_online(id.clone());
+                    } else {
+                        self.change_matcher
+                            .remove_match_once(user_comes_online_predicate(id));
+                    }
                 }
 
                 if ui.button("View Raw Data").clicked() {
@@ -265,6 +274,10 @@ impl GwaihirApp {
     fn get_user_display_name(&self, user_id: &UniqueUserId) -> Option<String> {
         self.current_status.get(user_id).map(|s| s.display_name())
     }
+}
+
+fn user_comes_online_predicate(id: &UniqueUserId) -> impl Fn(&MatchCriteria) -> bool + '_ {
+    move |c| matches!(c, MatchCriteria::UserComesOnline(u) if u == id)
 }
 
 impl eframe::App for GwaihirApp {

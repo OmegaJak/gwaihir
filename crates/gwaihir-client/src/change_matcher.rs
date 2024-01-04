@@ -22,6 +22,10 @@ impl ChangeMatcher {
         self.add_match_once(MatchCriteria::UserComesOnline(user_id));
     }
 
+    pub fn remove_match_once(&mut self, predicate: impl Fn(&MatchCriteria) -> bool) {
+        self.match_once.retain(|c| !predicate(c));
+    }
+
     pub fn add_match_once(&mut self, criteria: MatchCriteria) {
         self.match_once.push(criteria);
     }
@@ -43,6 +47,10 @@ impl ChangeMatcher {
         });
 
         matched
+    }
+
+    pub fn has_criteria_once(&self, predicate: impl Fn(&MatchCriteria) -> bool) -> bool {
+        self.match_once.iter().any(predicate)
     }
 }
 
