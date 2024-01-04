@@ -20,7 +20,7 @@ use std::{
 };
 
 use crate::{
-    change_matcher::{ChangeMatcher, MatchCriteria, Update},
+    change_matcher::{ChangeMatcher, MatchCriteria, Matcher, Update},
     networking::network_manager::NetworkManager,
     periodic_repaint_thread::create_periodic_repaint_thread,
     sensor_monitor_thread::{MainToMonitorMessages, MonitorToMainMessages},
@@ -43,6 +43,9 @@ use crate::{
 pub struct Persistence {
     pub ignored_users: HashSet<UniqueUserId>,
     pub spacetimedb_db_name: String,
+
+    #[serde(default)]
+    pub change_matcher: ChangeMatcher,
 }
 
 impl Persistence {
@@ -52,8 +55,9 @@ impl Persistence {
 impl Default for Persistence {
     fn default() -> Self {
         Self {
-            ignored_users: Default::default(),
             spacetimedb_db_name: "gwaihir-test".to_string(),
+            ignored_users: Default::default(),
+            change_matcher: Default::default(),
         }
     }
 }
@@ -80,7 +84,6 @@ pub struct GwaihirApp {
     transmission_spy: RawDataWindow,
     received_data_viewer: RawDataWindow,
     add_fake_user_window: AddFakeUserWindow,
-    change_matcher: ChangeMatcher,
 }
 
 impl GwaihirApp {
@@ -138,7 +141,6 @@ impl GwaihirApp {
             log_file_location,
 
             add_fake_user_window: AddFakeUserWindow::new(),
-            change_matcher: ChangeMatcher::default(),
         }
     }
 
@@ -225,15 +227,31 @@ impl GwaihirApp {
                     self.persistence.ignored_users.insert(id.clone());
                     ui.close_menu();
                 } else if let Some(notify) = ui.stateless_checkbox(
-                    self.change_matcher
-                        .has_criteria_once(user_comes_online_predicate(id)),
+                    self.change_matcher()
+                        .has_matcher(user_comes_online_predicate(true, id)),
                     "Notify when online (once)",
                 ) {
                     if notify {
-                        self.change_matcher.match_once_when_online(id.clone());
+                        self.change_matcher()
+                            .remove_matcher(user_comes_online_predicate(false, id));
+                        self.change_matcher().match_once_when_online(id.clone());
                     } else {
-                        self.change_matcher
-                            .remove_match_once(user_comes_online_predicate(id));
+                        self.change_matcher()
+                            .remove_matcher(user_comes_online_predicate(true, id));
+                    }
+                } else if let Some(notify) = ui.stateless_checkbox(
+                    self.change_matcher()
+                        .has_matcher(user_comes_online_predicate(false, id)),
+                    "Notify when online",
+                ) {
+                    if notify {
+                        self.change_matcher()
+                            .remove_matcher(user_comes_online_predicate(true, id));
+                        self.change_matcher()
+                            .add_match(MatchCriteria::UserComesOnline(id.clone()));
+                    } else {
+                        self.change_matcher()
+                            .remove_matcher(user_comes_online_predicate(false, id));
                     }
                 }
 
@@ -274,10 +292,17 @@ impl GwaihirApp {
     fn get_user_display_name(&self, user_id: &UniqueUserId) -> Option<String> {
         self.current_status.get(user_id).map(|s| s.display_name())
     }
+
+    fn change_matcher(&mut self) -> &mut ChangeMatcher {
+        &mut self.persistence.change_matcher
+    }
 }
 
-fn user_comes_online_predicate(id: &UniqueUserId) -> impl Fn(&MatchCriteria) -> bool + '_ {
-    move |c| matches!(c, MatchCriteria::UserComesOnline(u) if u == id)
+fn user_comes_online_predicate(once: bool, id: &UniqueUserId) -> impl Fn(&Matcher) -> bool + '_ {
+    move |m| {
+        m.drop_after_match == once
+            && matches!(&m.criteria, MatchCriteria::UserComesOnline(u) if u == id)
+    }
 }
 
 impl eframe::App for GwaihirApp {
@@ -317,7 +342,7 @@ impl eframe::App for GwaihirApp {
                     if self.subscribed_to_user(&status.user_id) {
                         debug!("Got user update from DB: {:#?}", &status);
                         if let Some(current) = self.current_status.get(&status.user_id) {
-                            let matches = self.change_matcher.get_matches(
+                            let matches = self.persistence.change_matcher.get_matches(
                                 &status.user_id,
                                 Update::new(&current.sensor_outputs, &status.sensor_outputs),
                             );

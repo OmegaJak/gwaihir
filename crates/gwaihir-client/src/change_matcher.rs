@@ -1,20 +1,23 @@
 use crate::sensors::outputs::sensor_outputs::SensorOutputs;
+use derive_new::new;
 use gwaihir_client_lib::UniqueUserId;
+use serde::{Deserialize, Serialize};
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct ChangeMatcher {
-    match_once: Vec<MatchCriteria>,
+    matchers: Vec<Matcher>,
 }
 
+#[derive(new, Serialize, Deserialize)]
+pub struct Matcher {
+    pub criteria: MatchCriteria,
+    pub drop_after_match: bool,
+}
+
+#[derive(new)]
 pub struct Update<T> {
     original: T,
     updated: T,
-}
-
-impl<T> Update<T> {
-    pub fn new(original: T, updated: T) -> Self {
-        Update { original, updated }
-    }
 }
 
 impl ChangeMatcher {
@@ -22,12 +25,16 @@ impl ChangeMatcher {
         self.add_match_once(MatchCriteria::UserComesOnline(user_id));
     }
 
-    pub fn remove_match_once(&mut self, predicate: impl Fn(&MatchCriteria) -> bool) {
-        self.match_once.retain(|c| !predicate(c));
+    pub fn remove_matcher(&mut self, predicate: impl Fn(&Matcher) -> bool) {
+        self.matchers.retain(|c| !predicate(c));
     }
 
     pub fn add_match_once(&mut self, criteria: MatchCriteria) {
-        self.match_once.push(criteria);
+        self.matchers.push(Matcher::new(criteria, true));
+    }
+
+    pub fn add_match(&mut self, criteria: MatchCriteria) {
+        self.matchers.push(Matcher::new(criteria, false));
     }
 
     pub fn get_matches(
@@ -37,24 +44,24 @@ impl ChangeMatcher {
     ) -> Vec<MatchCriteria> {
         let mut matched: Vec<MatchCriteria> = Vec::new();
 
-        self.match_once.retain(|el| {
-            let matches = el.matches(user_id, &update);
+        self.matchers.retain(|el| {
+            let matches = el.criteria.matches(user_id, &update);
             if matches {
-                matched.push(el.clone());
+                matched.push(el.criteria.clone());
             }
 
-            !matches
+            !el.drop_after_match || !matches
         });
 
         matched
     }
 
-    pub fn has_criteria_once(&self, predicate: impl Fn(&MatchCriteria) -> bool) -> bool {
-        self.match_once.iter().any(predicate)
+    pub fn has_matcher(&self, predicate: impl Fn(&Matcher) -> bool) -> bool {
+        self.matchers.iter().any(predicate)
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum MatchCriteria {
     UserComesOnline(UniqueUserId),
 }
