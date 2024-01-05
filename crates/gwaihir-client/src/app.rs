@@ -20,7 +20,7 @@ use std::{
 };
 
 use crate::{
-    change_matcher::{ChangeMatcher, MatchCriteria, Matcher, Update},
+    change_matcher::{user_comes_online_expression, ChangeMatcher, Matcher, Update},
     networking::network_manager::NetworkManager,
     periodic_repaint_thread::create_periodic_repaint_thread,
     sensor_monitor_thread::{MainToMonitorMessages, MonitorToMainMessages},
@@ -248,7 +248,7 @@ impl GwaihirApp {
                         self.change_matcher()
                             .remove_matcher(user_comes_online_predicate(true, id));
                         self.change_matcher()
-                            .add_match(MatchCriteria::UserComesOnline(id.clone()));
+                            .add_match(user_comes_online_expression(id.clone()));
                     } else {
                         self.change_matcher()
                             .remove_matcher(user_comes_online_predicate(false, id));
@@ -269,23 +269,19 @@ impl GwaihirApp {
         }
     }
 
-    fn send_match_notifications(&self, matches: Vec<MatchCriteria>) {
-        for matched in matches {
-            match matched {
-                MatchCriteria::UserComesOnline(user_id) => {
-                    let display_name = self
-                        .get_user_display_name(&user_id)
-                        .unwrap_or_else(|| "Unknown".to_string());
-                    Notification::new()
-                        .summary(&format!("{} now Online", display_name))
-                        .body(&format!(
-                            "The user \"{}\" has transitioned from offline to online",
-                            display_name
-                        ))
-                        .show()
-                        .unwrap();
-                }
-            }
+    fn send_match_notifications(&self, matches: Vec<UniqueUserId>) {
+        for user_id in matches {
+            let display_name = self
+                .get_user_display_name(&user_id)
+                .unwrap_or_else(|| "Unknown".to_string());
+            Notification::new()
+                .summary(&format!("{} now Online", display_name))
+                .body(&format!(
+                    "The user \"{}\" has transitioned from offline to online",
+                    display_name
+                ))
+                .show()
+                .unwrap();
         }
     }
 
@@ -299,10 +295,7 @@ impl GwaihirApp {
 }
 
 fn user_comes_online_predicate(once: bool, id: &UniqueUserId) -> impl Fn(&Matcher) -> bool + '_ {
-    move |m| {
-        m.drop_after_match == once
-            && matches!(&m.criteria, MatchCriteria::UserComesOnline(u) if u == id)
-    }
+    move |m| m.drop_after_match == once && m.criteria == user_comes_online_expression(id.clone())
 }
 
 impl eframe::App for GwaihirApp {
