@@ -3,7 +3,7 @@ use crate::sensors::outputs::sensor_outputs::SensorOutputs;
 use egui::{ScrollArea, TextEdit};
 use gwaihir_client_lib::{
     chrono::{DateTime, Local},
-    UserStatus,
+    UniqueUserId, UserStatus,
 };
 
 #[derive(Clone)]
@@ -32,6 +32,7 @@ impl From<&UserStatus<SensorOutputs>> for TimestampedData<SensorOutputs> {
 
 pub struct RawDataWindow {
     shown: bool,
+    user_id: Option<UniqueUserId>,
     data: Option<TimestampedData<SensorOutputs>>,
     window_title: String,
 }
@@ -40,19 +41,30 @@ impl RawDataWindow {
     pub fn new(title: String) -> Self {
         Self {
             shown: false,
+            user_id: None,
             data: None,
             window_title: title,
         }
     }
 
-    pub fn show_data(&mut self, data: TimestampedData<SensorOutputs>, window_title: String) {
+    pub fn show_data(
+        &mut self,
+        data: TimestampedData<SensorOutputs>,
+        window_title: String,
+        user_id: UniqueUserId,
+    ) {
         self.set_shown(true);
         self.set_data(data);
+        self.set_user_id(Some(user_id));
         self.window_title = window_title;
     }
 
     pub fn set_data(&mut self, data: TimestampedData<SensorOutputs>) {
         self.data = Some(data);
+    }
+
+    pub fn set_user_id(&mut self, user_id: Option<UniqueUserId>) {
+        self.user_id = user_id;
     }
 
     pub fn set_shown(&mut self, shown: bool) {
@@ -63,6 +75,13 @@ impl RawDataWindow {
         self.shown = show_centered_window(self.shown, self.window_title.clone(), ctx, |ui| {
             if let Some(TimestampedData { time, data }) = self.data.as_ref() {
                 ui.label(format!("Data from {}", time));
+                if let Some(user_id) = &self.user_id {
+                    ui.horizontal(|ui| {
+                        ui.label("User ID: ");
+                        let mut user_id = user_id.to_string();
+                        ui.text_edit_singleline(&mut user_id);
+                    });
+                }
                 if let Ok(mut text) = serde_json::to_string_pretty(data) {
                     ScrollArea::vertical().show(ui, |ui| {
                         TextEdit::multiline(&mut text).show(ui);

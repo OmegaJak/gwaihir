@@ -260,6 +260,7 @@ impl GwaihirApp {
                     self.received_data_viewer.show_data(
                         user_status.into(),
                         format!("Raw Data for {}", user_status.display_name()),
+                        user_status.user_id.clone(),
                     );
                     ui.close_menu();
                 }
@@ -350,6 +351,8 @@ impl eframe::App for GwaihirApp {
 
         if self.current_user_id.is_none() {
             self.current_user_id = self.network.get_current_user_id();
+            self.transmission_spy
+                .set_user_id(self.current_user_id.clone());
         }
 
         if let Some(icon_data) = self.tray_icon_data.take() {
@@ -372,13 +375,13 @@ impl eframe::App for GwaihirApp {
 
                     ui.menu_button("Open", |ui| {
                         if ui.button("Log").clicked() {
-                        opener::open(self.log_file_location.clone())
-                            .log_expect("Failed to open file using default OS handler");
+                            opener::open(self.log_file_location.clone())
+                                .log_expect("Failed to open file using default OS handler");
                         } else if ui.button("Data Directory").clicked() {
                             opener::open(project_dirs().data_dir()).log_expect(
                                 "Failed to open data directory using default OS handler",
                             );
-                    }
+                        }
                     });
 
                     if ui.button("Manage Network").clicked() {
