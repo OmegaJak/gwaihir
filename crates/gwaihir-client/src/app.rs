@@ -23,6 +23,7 @@ use crate::{
     change_matcher::{user_comes_online_expression, ChangeMatcher, Matcher, Update},
     networking::network_manager::NetworkManager,
     periodic_repaint_thread::create_periodic_repaint_thread,
+    project_dirs,
     sensor_monitor_thread::{MainToMonitorMessages, MonitorToMainMessages},
     sensors::{
         lock_status_sensor::{init_lock_status_sensor, EventLoopRegisteredLockStatusSensorBuilder},
@@ -369,10 +370,16 @@ impl eframe::App for GwaihirApp {
                         ui.close_menu();
                     }
 
-                    if ui.button("Open log").clicked() {
+                    ui.menu_button("Open", |ui| {
+                        if ui.button("Log").clicked() {
                         opener::open(self.log_file_location.clone())
                             .log_expect("Failed to open file using default OS handler");
+                        } else if ui.button("Data Directory").clicked() {
+                            opener::open(project_dirs().data_dir()).log_expect(
+                                "Failed to open data directory using default OS handler",
+                            );
                     }
+                    });
 
                     if ui.button("Manage Network").clicked() {
                         self.network_window.set_shown(true);

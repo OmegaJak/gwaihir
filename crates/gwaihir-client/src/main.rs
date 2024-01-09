@@ -59,7 +59,7 @@ fn main() -> eframe::Result<()> {
 }
 
 fn init_logging() -> LoggerHandle {
-    let project_dirs = ProjectDirs::from("", "", APP_ID).unwrap();
+    let project_dirs = project_dirs();
     let log_directory = if project_dirs.data_dir().ends_with("data") {
         project_dirs.data_dir().join("../logs")
     } else {
@@ -84,6 +84,10 @@ fn init_logging() -> LoggerHandle {
     log_panics::init();
 
     handle
+}
+
+pub fn project_dirs() -> ProjectDirs {
+    ProjectDirs::from("", "", APP_ID).unwrap()
 }
 
 fn get_log_file_location(logger: &LoggerHandle) -> PathBuf {
