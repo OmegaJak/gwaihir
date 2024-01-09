@@ -2075,11 +2075,13 @@ dependencies = [
  "pulsectl-rs",
  "raw-window-handle",
  "rdev",
+ "ron",
  "serde",
  "serde_json",
  "serde_with",
  "thiserror",
  "tray-icon",
+ "uuid",
  "windows 0.48.0",
  "winit",
  "winreg 0.50.0",
@@ -4501,6 +4503,16 @@ name = "utf-8"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
+
+[[package]]
+name = "uuid"
+version = "1.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e395fcf16a7a3d8127ec99782007af141946b4795001f876d54fb0d55978560"
+dependencies = [
+ "getrandom",
+ "serde",
+]
 
 [[package]]
 name = "vcpkg"

@@ -1,17 +1,17 @@
-use std::cell::RefCell;
-
 use crate::sensors::outputs::sensor_outputs::SensorOutputs;
 use derive_new::new;
 use gwaihir_client_lib::UniqueUserId;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use thiserror::Error;
+use uuid::Uuid;
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct ChangeMatcher {
-    matchers: Vec<Matcher>,
+    matchers: HashMap<Uuid, Matcher>,
 }
 
-#[derive(new, Serialize, Deserialize)]
+#[derive(new, Serialize, Deserialize, Clone)]
 pub struct Matcher {
     pub criteria: Expression,
     pub drop_after_match: bool,
@@ -29,15 +29,30 @@ impl ChangeMatcher {
     }
 
     pub fn remove_matcher(&mut self, predicate: impl Fn(&Matcher) -> bool) {
-        self.matchers.retain(|c| !predicate(c));
+        self.matchers.retain(|_, c| !predicate(c));
+    }
+
+    pub fn remove_matcher_by_id(&mut self, matcher_id: &Uuid) -> Option<Matcher> {
+        self.matchers.remove(matcher_id)
     }
 
     pub fn add_match_once(&mut self, criteria: Expression) {
-        self.matchers.push(Matcher::new(criteria, true));
+        self.add_matcher(Matcher::new(criteria, true));
     }
 
     pub fn add_match(&mut self, criteria: Expression) {
-        self.matchers.push(Matcher::new(criteria, false));
+        self.add_matcher(Matcher::new(criteria, false));
+    }
+
+    pub fn add_matcher(&mut self, matcher: Matcher) {
+        self.matchers.insert(Uuid::new_v4(), matcher);
+    }
+
+    pub fn get_serialized_matchers(&self) -> Vec<(Uuid, String)> {
+        self.matchers
+            .iter()
+            .map(|(k, v)| (*k, ron::to_string(&v.criteria).unwrap()))
+            .collect()
     }
 
     pub fn get_matches(
@@ -53,7 +68,7 @@ impl ChangeMatcher {
             update,
         };
         self.matchers
-            .retain(|el| match el.criteria.evaluate(&eval_data) {
+            .retain(|_, el| match el.criteria.evaluate(&eval_data) {
                 Ok(val) => {
                     if val {
                         matched.push(user_id.clone())
@@ -71,7 +86,7 @@ impl ChangeMatcher {
     }
 
     pub fn has_matcher(&self, predicate: impl Fn(&Matcher) -> bool) -> bool {
-        self.matchers.iter().any(predicate)
+        self.matchers.iter().any(|(_, v)| predicate(v))
     }
 }
 
@@ -99,14 +114,14 @@ struct EvalData<'a, 'b> {
     update: Update<&'b SensorOutputs>,
 }
 
-#[derive(Serialize, Deserialize, PartialEq)]
+#[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub enum Expression {
     And(ExpressionRef, ExpressionRef),
     Or(ExpressionRef, ExpressionRef),
     Equals(ValuePointer, ValuePointer),
 }
 
-#[derive(Serialize, Deserialize, PartialEq)]
+#[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub enum ValuePointer {
     LastOnlineStatus,
     CurrentOnlineStatus,
@@ -115,18 +130,18 @@ pub enum ValuePointer {
     UserId,
 }
 
-#[derive(Serialize, Deserialize, PartialEq)]
+#[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub enum Value {
     Bool(bool),
     UserId(UniqueUserId),
 }
 
-pub type ExpressionRef = std::rc::Rc<std::cell::RefCell<Expression>>;
+pub type ExpressionRef = std::rc::Rc<Expression>;
 
 type EvalResult<T> = Result<T, EvaluationError>;
 
 fn new_expr_ref(expr: Expression) -> ExpressionRef {
-    ExpressionRef::new(RefCell::new(expr))
+    ExpressionRef::new(expr)
 }
 
 #[derive(Error, Debug)]
@@ -139,10 +154,10 @@ impl Expression {
     fn evaluate(&self, data: &EvalData<'_, '_>) -> EvalResult<bool> {
         match self {
             Expression::And(left, right) => {
-                EvalResult::Ok(left.borrow().evaluate(data)? && right.borrow().evaluate(data)?)
+                EvalResult::Ok(left.evaluate(data)? && right.evaluate(data)?)
             }
             Expression::Or(left, right) => {
-                EvalResult::Ok(left.borrow().evaluate(data)? || right.borrow().evaluate(data)?)
+                EvalResult::Ok(left.evaluate(data)? || right.evaluate(data)?)
             }
             Expression::Equals(left, right) => {
                 let left_value = left.get_value(data);

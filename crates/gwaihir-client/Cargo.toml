@@ -29,6 +29,8 @@ bounded-vec-deque = "0.1.1"
 delegate = "0.10.0"
 notify-rust = "4"
 derive-new = "0.6.0"
+uuid = { version = "1.6.1", features = ["v4", "serde"] }
+ron = "0.8.1" # May only need direct dependency while using RON for notification editing
 
 # Logging
 log = "0.4"

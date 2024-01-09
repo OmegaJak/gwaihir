@@ -33,6 +33,7 @@ use crate::{
     ui::{
         add_fake_user_window::AddFakeUserWindow,
         network_window::NetworkWindow,
+        notifications_window::NotificationsWindow,
         raw_data_window::{RawDataWindow, TimestampedData},
         time_formatting::nicely_formatted_datetime,
         ui_extension_methods::UIExtensionMethods,
@@ -85,6 +86,7 @@ pub struct GwaihirApp {
     transmission_spy: RawDataWindow,
     received_data_viewer: RawDataWindow,
     add_fake_user_window: AddFakeUserWindow,
+    notifications_window: NotificationsWindow,
 }
 
 impl GwaihirApp {
@@ -142,6 +144,7 @@ impl GwaihirApp {
             log_file_location,
 
             add_fake_user_window: AddFakeUserWindow::new(),
+            notifications_window: NotificationsWindow::new(),
         }
     }
 
@@ -377,32 +380,45 @@ impl eframe::App for GwaihirApp {
                         if ui.button("Log").clicked() {
                             opener::open(self.log_file_location.clone())
                                 .log_expect("Failed to open file using default OS handler");
-                        } else if ui.button("Data Directory").clicked() {
+                            ui.close_menu();
+                        }
+
+                        if ui.button("Data Directory").clicked() {
                             opener::open(project_dirs().data_dir()).log_expect(
                                 "Failed to open data directory using default OS handler",
                             );
+                            ui.close_menu();
                         }
                     });
 
-                    if ui.button("Manage Network").clicked() {
-                        self.network_window.set_shown(true);
-                        ui.close_menu();
-                    }
+                    ui.menu_button("Manage", |ui| {
+                        if ui.button("Network").clicked() {
+                            self.network_window.set_shown(true);
+                            ui.close_menu();
+                        }
 
-                    if ui.button("View Sent Data").clicked() {
-                        self.transmission_spy.set_shown(true);
-                        ui.close_menu();
-                    }
+                        if ui.button("Notifications").clicked() {
+                            self.notifications_window.set_shown(true);
+                            ui.close_menu();
+                        }
+                    });
 
-                    if ui.button("Clear ignored users").clicked() {
-                        self.persistence.ignored_users.clear();
-                        ui.close_menu();
-                    }
+                    ui.menu_button("Users", |ui| {
+                        if ui.button("View Sent Data").clicked() {
+                            self.transmission_spy.set_shown(true);
+                            ui.close_menu();
+                        }
 
-                    if ui.button("Create Fake User").clicked() {
-                        self.add_fake_user_window.set_shown(true);
-                        ui.close_menu();
-                    }
+                        if ui.button("Clear ignored users").clicked() {
+                            self.persistence.ignored_users.clear();
+                            ui.close_menu();
+                        }
+
+                        if ui.button("Create Fake User").clicked() {
+                            self.add_fake_user_window.set_shown(true);
+                            ui.close_menu();
+                        }
+                    });
 
                     if ui.button("Quit").clicked() {
                         frame.close();
@@ -486,6 +502,8 @@ impl eframe::App for GwaihirApp {
                 .queue_fake_update(RemoteUpdate::UserStatusUpdated(user_status))
                 .log_expect("Failed to queue fake user update");
         });
+        self.notifications_window
+            .show(ctx, &mut self.persistence.change_matcher);
     }
 }
 
