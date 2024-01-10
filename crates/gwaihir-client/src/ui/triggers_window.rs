@@ -1,15 +1,15 @@
 use super::widgets::show_centered_window;
-use crate::change_matcher::{ChangeMatcher, Matcher};
+use crate::triggers::{Trigger, TriggerManager};
 use egui::Color32;
 
-pub struct NotificationsWindow {
+pub struct TriggersWindow {
     shown: bool,
     new_matcher_input: String,
     new_matcher_drop_after_match: bool,
     err: Option<String>,
 }
 
-impl NotificationsWindow {
+impl TriggersWindow {
     pub fn new() -> Self {
         Self {
             shown: false,
@@ -23,15 +23,15 @@ impl NotificationsWindow {
         self.shown = shown;
     }
 
-    pub fn show(&mut self, ctx: &egui::Context, change_matcher: &mut ChangeMatcher) {
-        self.shown = show_centered_window(self.shown, "Notifications", ctx, |ui| {
+    pub fn show(&mut self, ctx: &egui::Context, change_matcher: &mut TriggerManager) {
+        self.shown = show_centered_window(self.shown, "Triggers", ctx, |ui| {
             ui.heading("Current");
             egui::Grid::new("existing_notifications")
                 .num_columns(1)
                 .striped(true)
                 .show(ui, |ui| {
                     for (id, serialized_matcher_criteria) in
-                        change_matcher.get_serialized_matchers()
+                        change_matcher.get_serialized_triggers()
                     {
                         ui.horizontal(|ui| {
                             ui.label(serialized_matcher_criteria.clone());
@@ -42,7 +42,7 @@ impl NotificationsWindow {
                             }
 
                             if ui.button("X").clicked() {
-                                change_matcher.remove_matcher_by_id(&id);
+                                change_matcher.remove_trigger_by_id(&id);
                             }
                         });
                         ui.end_row();
@@ -60,11 +60,11 @@ impl NotificationsWindow {
             if ui.button("Add").clicked() {
                 match ron::from_str(&self.new_matcher_input) {
                     Ok(criteria) => {
-                        let matcher = Matcher {
+                        let matcher = Trigger {
                             criteria,
-                            drop_after_match: self.new_matcher_drop_after_match,
+                            drop_after_trigger: self.new_matcher_drop_after_match,
                         };
-                        change_matcher.add_matcher(matcher);
+                        change_matcher.add_trigger(matcher);
                         self.new_matcher_input.clear();
                     }
                     Err(err) => self.err = Some(err.to_string()),

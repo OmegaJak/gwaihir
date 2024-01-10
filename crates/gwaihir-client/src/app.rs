@@ -20,7 +20,6 @@ use std::{
 };
 
 use crate::{
-    change_matcher::{user_comes_online_expression, ChangeMatcher, Matcher, Update},
     networking::network_manager::NetworkManager,
     periodic_repaint_thread::create_periodic_repaint_thread,
     project_dirs,
@@ -30,12 +29,13 @@ use crate::{
         outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
     },
     tray_icon::{hide_to_tray, TrayIconData},
+    triggers::{user_comes_online_expression, Trigger, TriggerManager, Update},
     ui::{
         add_fake_user_window::AddFakeUserWindow,
         network_window::NetworkWindow,
-        notifications_window::NotificationsWindow,
         raw_data_window::{RawDataWindow, TimestampedData},
         time_formatting::nicely_formatted_datetime,
+        triggers_window::TriggersWindow,
         ui_extension_methods::UIExtensionMethods,
         widgets::auto_launch_checkbox::AutoLaunchCheckboxUiExtension,
     },
@@ -47,7 +47,7 @@ pub struct Persistence {
     pub spacetimedb_db_name: String,
 
     #[serde(default)]
-    pub change_matcher: ChangeMatcher,
+    pub change_matcher: TriggerManager,
 }
 
 impl Persistence {
@@ -86,7 +86,7 @@ pub struct GwaihirApp {
     transmission_spy: RawDataWindow,
     received_data_viewer: RawDataWindow,
     add_fake_user_window: AddFakeUserWindow,
-    notifications_window: NotificationsWindow,
+    triggers_window: TriggersWindow,
 }
 
 impl GwaihirApp {
@@ -144,7 +144,7 @@ impl GwaihirApp {
             log_file_location,
 
             add_fake_user_window: AddFakeUserWindow::new(),
-            notifications_window: NotificationsWindow::new(),
+            triggers_window: TriggersWindow::new(),
         }
     }
 
@@ -232,30 +232,30 @@ impl GwaihirApp {
                     ui.close_menu();
                 } else if let Some(notify) = ui.stateless_checkbox(
                     self.change_matcher()
-                        .has_matcher(user_comes_online_predicate(true, id)),
+                        .has_trigger(user_comes_online_predicate(true, id)),
                     "Notify when online (once)",
                 ) {
                     if notify {
                         self.change_matcher()
-                            .remove_matcher(user_comes_online_predicate(false, id));
+                            .remove_trigger(user_comes_online_predicate(false, id));
                         self.change_matcher().match_once_when_online(id.clone());
                     } else {
                         self.change_matcher()
-                            .remove_matcher(user_comes_online_predicate(true, id));
+                            .remove_trigger(user_comes_online_predicate(true, id));
                     }
                 } else if let Some(notify) = ui.stateless_checkbox(
                     self.change_matcher()
-                        .has_matcher(user_comes_online_predicate(false, id)),
+                        .has_trigger(user_comes_online_predicate(false, id)),
                     "Notify when online",
                 ) {
                     if notify {
                         self.change_matcher()
-                            .remove_matcher(user_comes_online_predicate(true, id));
+                            .remove_trigger(user_comes_online_predicate(true, id));
                         self.change_matcher()
-                            .add_match(user_comes_online_expression(id.clone()));
+                            .add_trigger_with_criteria(user_comes_online_expression(id.clone()));
                     } else {
                         self.change_matcher()
-                            .remove_matcher(user_comes_online_predicate(false, id));
+                            .remove_trigger(user_comes_online_predicate(false, id));
                     }
                 }
 
@@ -294,13 +294,13 @@ impl GwaihirApp {
         self.current_status.get(user_id).map(|s| s.display_name())
     }
 
-    fn change_matcher(&mut self) -> &mut ChangeMatcher {
+    fn change_matcher(&mut self) -> &mut TriggerManager {
         &mut self.persistence.change_matcher
     }
 }
 
-fn user_comes_online_predicate(once: bool, id: &UniqueUserId) -> impl Fn(&Matcher) -> bool + '_ {
-    move |m| m.drop_after_match == once && m.criteria == user_comes_online_expression(id.clone())
+fn user_comes_online_predicate(once: bool, id: &UniqueUserId) -> impl Fn(&Trigger) -> bool + '_ {
+    move |m| m.drop_after_trigger == once && m.criteria == user_comes_online_expression(id.clone())
 }
 
 impl eframe::App for GwaihirApp {
@@ -397,8 +397,8 @@ impl eframe::App for GwaihirApp {
                             ui.close_menu();
                         }
 
-                        if ui.button("Notifications").clicked() {
-                            self.notifications_window.set_shown(true);
+                        if ui.button("Triggers").clicked() {
+                            self.triggers_window.set_shown(true);
                             ui.close_menu();
                         }
                     });
@@ -502,7 +502,7 @@ impl eframe::App for GwaihirApp {
                 .queue_fake_update(RemoteUpdate::UserStatusUpdated(user_status))
                 .log_expect("Failed to queue fake user update");
         });
-        self.notifications_window
+        self.triggers_window
             .show(ctx, &mut self.persistence.change_matcher);
     }
 }
