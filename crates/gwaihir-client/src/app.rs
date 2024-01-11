@@ -6,7 +6,6 @@ use gwaihir_client_lib::{
 use log::{debug, info, warn};
 use log_err::LogErrResult;
 use networking_spacetimedb::{SpacetimeDBCreationParameters, SpacetimeDBInterface};
-use notify_rust::Notification;
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
@@ -29,7 +28,7 @@ use crate::{
         outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
     },
     tray_icon::{hide_to_tray, TrayIconData},
-    triggers::{user_comes_online_expression, Trigger, TriggerManager, Update},
+    triggers::{user_comes_online_trigger, Trigger, TriggerManager, Update},
     ui::{
         add_fake_user_window::AddFakeUserWindow,
         network_window::NetworkWindow,
@@ -47,7 +46,7 @@ pub struct Persistence {
     pub spacetimedb_db_name: String,
 
     #[serde(default)]
-    pub change_matcher: TriggerManager,
+    pub trigger_manager: TriggerManager,
 }
 
 impl Persistence {
@@ -59,7 +58,7 @@ impl Default for Persistence {
         Self {
             spacetimedb_db_name: "gwaihir-test".to_string(),
             ignored_users: Default::default(),
-            change_matcher: Default::default(),
+            trigger_manager: Default::default(),
         }
     }
 }
@@ -238,7 +237,8 @@ impl GwaihirApp {
                     if notify {
                         self.change_matcher()
                             .remove_trigger(user_comes_online_predicate(false, id));
-                        self.change_matcher().match_once_when_online(id.clone());
+                        self.change_matcher()
+                            .add_trigger(user_comes_online_trigger(id.clone(), true));
                     } else {
                         self.change_matcher()
                             .remove_trigger(user_comes_online_predicate(true, id));
@@ -252,7 +252,7 @@ impl GwaihirApp {
                         self.change_matcher()
                             .remove_trigger(user_comes_online_predicate(true, id));
                         self.change_matcher()
-                            .add_trigger_with_criteria(user_comes_online_expression(id.clone()));
+                            .add_trigger(user_comes_online_trigger(id.clone(), false));
                     } else {
                         self.change_matcher()
                             .remove_trigger(user_comes_online_predicate(false, id));
@@ -274,33 +274,17 @@ impl GwaihirApp {
         }
     }
 
-    fn send_match_notifications(&self, matches: Vec<UniqueUserId>) {
-        for user_id in matches {
-            let display_name = self
-                .get_user_display_name(&user_id)
-                .unwrap_or_else(|| "Unknown".to_string());
-            Notification::new()
-                .summary(&format!("{} now Online", display_name))
-                .body(&format!(
-                    "The user \"{}\" has transitioned from offline to online",
-                    display_name
-                ))
-                .show()
-                .unwrap();
-        }
-    }
-
     fn get_user_display_name(&self, user_id: &UniqueUserId) -> Option<String> {
         self.current_status.get(user_id).map(|s| s.display_name())
     }
 
     fn change_matcher(&mut self) -> &mut TriggerManager {
-        &mut self.persistence.change_matcher
+        &mut self.persistence.trigger_manager
     }
 }
 
 fn user_comes_online_predicate(once: bool, id: &UniqueUserId) -> impl Fn(&Trigger) -> bool + '_ {
-    move |m| m.drop_after_trigger == once && m.criteria == user_comes_online_expression(id.clone())
+    move |m| *m == user_comes_online_trigger(id.clone(), once)
 }
 
 impl eframe::App for GwaihirApp {
@@ -340,11 +324,14 @@ impl eframe::App for GwaihirApp {
                     if self.subscribed_to_user(&status.user_id) {
                         debug!("Got user update from DB: {:#?}", &status);
                         if let Some(current) = self.current_status.get(&status.user_id) {
-                            let matches = self.persistence.change_matcher.get_matches(
+                            let display_name = self
+                                .get_user_display_name(&status.user_id)
+                                .unwrap_or_else(|| "Unknown".to_string());
+                            self.persistence.trigger_manager.execute_triggers(
                                 &status.user_id,
+                                display_name,
                                 Update::new(&current.sensor_outputs, &status.sensor_outputs),
                             );
-                            self.send_match_notifications(matches);
                         }
                         self.current_status.insert(status.user_id.clone(), status);
                     }
@@ -503,7 +490,7 @@ impl eframe::App for GwaihirApp {
                 .log_expect("Failed to queue fake user update");
         });
         self.triggers_window
-            .show(ctx, &mut self.persistence.change_matcher);
+            .show(ctx, &mut self.persistence.trigger_manager);
     }
 }
 

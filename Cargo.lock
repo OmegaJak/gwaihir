@@ -2081,6 +2081,7 @@ dependencies = [
  "serde_with",
  "thiserror",
  "tray-icon",
+ "upon",
  "uuid",
  "windows 0.48.0",
  "winit",
@@ -4486,6 +4487,17 @@ name = "unicode-width"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0edd1e5b14653f783770bce4a4dabb4a5108a5370a5f5d8cfe8710c361f6c8b"
+
+[[package]]
+name = "upon"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6539a8975f097abc4500a33d542ac5f2e11b8912d48c980ce585161eed1ec59a"
+dependencies = [
+ "serde",
+ "unicode-ident",
+ "unicode-width",
+]
 
 [[package]]
 name = "url"
