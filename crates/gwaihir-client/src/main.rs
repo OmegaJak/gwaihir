@@ -8,6 +8,7 @@ use eframe::IconData;
 use flexi_logger::LoggerHandle;
 use gwaihir_client_lib::APP_ID;
 use log::info;
+use log_err::LogErrResult;
 use sensors::lock_status_sensor::LockStatusSensorBuilder;
 use std::path::PathBuf;
 
@@ -88,6 +89,15 @@ fn init_logging() -> LoggerHandle {
 
 pub fn project_dirs() -> ProjectDirs {
     ProjectDirs::from("", "", APP_ID).unwrap()
+}
+
+pub fn show_notification(summary: &str, body: &str) {
+    notify_rust::Notification::new()
+        .summary(summary)
+        .body(body)
+        .sound_name("Default")
+        .show()
+        .log_unwrap();
 }
 
 fn get_log_file_location(logger: &LoggerHandle) -> PathBuf {

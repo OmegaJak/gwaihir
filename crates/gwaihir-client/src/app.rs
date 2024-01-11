@@ -11,6 +11,7 @@ use std::{
     cell::RefCell,
     cmp::Ordering,
     collections::HashMap,
+    ffi::OsStr,
     path::PathBuf,
     rc::Rc,
     sync::mpsc::{Receiver, Sender, TryRecvError},
@@ -27,6 +28,7 @@ use crate::{
         lock_status_sensor::{init_lock_status_sensor, EventLoopRegisteredLockStatusSensorBuilder},
         outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
     },
+    show_notification,
     tray_icon::{hide_to_tray, TrayIconData},
     triggers::{user_comes_online_trigger, Trigger, TriggerManager, Update},
     ui::{
@@ -107,10 +109,18 @@ impl GwaihirApp {
                 .unwrap();
         }
 
-        let persistence: Persistence = cc
+        let persistence: Persistence = match cc
             .storage
             .and_then(|storage| eframe::get_value(storage, Persistence::STORAGE_KEY))
-            .unwrap_or_default();
+        {
+            Some(v) => v,
+            None => {
+                // This is here as insurance to ensure we don't overwrite a previously valid .ron with empty Persistence if Persistence wasn't migrated correctly
+                show_notification("Gwaihir init failed", "Gwaihir failed to initialize due to an error decoding its config. View the log for more details");
+                open_log_file(log_file_location);
+                panic!("Failed to deserialize app config");
+            }
+        };
 
         let periodic_repaint_thread_join_handle =
             create_periodic_repaint_thread(cc.egui_ctx.clone(), Duration::from_secs(10));
@@ -283,6 +293,10 @@ impl GwaihirApp {
     }
 }
 
+fn open_log_file(log_file_location: impl AsRef<OsStr>) {
+    opener::open(log_file_location).log_expect("Failed to open file using default OS handler");
+}
+
 fn user_comes_online_predicate(once: bool, id: &UniqueUserId) -> impl Fn(&Trigger) -> bool + '_ {
     move |m| *m == user_comes_online_trigger(id.clone(), once)
 }
@@ -365,8 +379,7 @@ impl eframe::App for GwaihirApp {
 
                     ui.menu_button("Open", |ui| {
                         if ui.button("Log").clicked() {
-                            opener::open(self.log_file_location.clone())
-                                .log_expect("Failed to open file using default OS handler");
+                            open_log_file(self.log_file_location.clone());
                             ui.close_menu();
                         }
 

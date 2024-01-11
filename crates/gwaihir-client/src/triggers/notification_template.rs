@@ -1,9 +1,8 @@
+use super::TriggerContext;
+use crate::show_notification;
 use log_err::LogErrResult;
-use notify_rust::Notification;
 use serde::{Deserialize, Serialize};
 use upon::Engine;
-
-use super::TriggerContext;
 
 #[derive(Serialize, Deserialize)]
 #[serde(
@@ -75,12 +74,7 @@ impl NotificationTemplate {
             .render(context)
             .to_string()
             .log_unwrap();
-        Notification::new()
-            .summary(&summary)
-            .body(&body)
-            .sound_name("Default")
-            .show()
-            .log_unwrap();
+        show_notification(&summary, &body);
     }
 
     fn compile_template<'a>(summary: String, body: String) -> Engine<'a> {
