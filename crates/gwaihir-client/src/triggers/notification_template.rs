@@ -78,6 +78,7 @@ impl NotificationTemplate {
         Notification::new()
             .summary(&summary)
             .body(&body)
+            .sound_name("Default")
             .show()
             .log_unwrap();
     }
