@@ -1,0 +1,7 @@
+error: cannot find attribute `serds` in this scope
+ --> tests/parse-struct.rs:5:1
+  |
+5 | #[version]
+  | ^^^^^^^^^^ help: a derive helper attribute with a similar name exists: `serde`
+  |
+  = note: this error originates in the attribute macro `version` (in Nightly builds, run with -Z macro-backtrace for more info)

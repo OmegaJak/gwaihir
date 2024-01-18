@@ -4,4 +4,5 @@ members = [
 	"crates/gwaihir-client-lib",
 	"crates/spacetimedb-server",
 	"crates/networking-spacetimedb",
+	"crates/serde-versioner",
 ]
