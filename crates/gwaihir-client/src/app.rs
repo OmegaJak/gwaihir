@@ -6,6 +6,7 @@ use gwaihir_client_lib::{
 use log::{debug, info, warn};
 use log_err::LogErrResult;
 use networking_spacetimedb::{SpacetimeDBCreationParameters, SpacetimeDBInterface};
+use pro_serde_versioned::VersionedUpgrade;
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
@@ -42,13 +43,49 @@ use crate::{
     },
 };
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
+pub struct PersistenceV1 {
+    pub ignored_users: HashSet<UniqueUserId>,
+    pub spacetimedb_db_name: String,
+
+    #[serde(default)]
+    pub trigger_manager: TriggerManager,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(into = "VersionedPersistence", from = "VersionedPersistence")]
 pub struct Persistence {
     pub ignored_users: HashSet<UniqueUserId>,
     pub spacetimedb_db_name: String,
 
     #[serde(default)]
     pub trigger_manager: TriggerManager,
+}
+
+impl From<Persistence> for VersionedPersistence {
+    fn from(value: Persistence) -> Self {
+        VersionedPersistence::V1(PersistenceV1 {
+            ignored_users: value.ignored_users,
+            spacetimedb_db_name: value.spacetimedb_db_name,
+            trigger_manager: value.trigger_manager,
+        })
+    }
+}
+
+impl From<VersionedPersistence> for Persistence {
+    fn from(value: VersionedPersistence) -> Self {
+        let upgraded = value.upgrade_to_latest();
+        Persistence {
+            ignored_users: upgraded.ignored_users,
+            spacetimedb_db_name: upgraded.spacetimedb_db_name,
+            trigger_manager: upgraded.trigger_manager,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, VersionedUpgrade, Clone)]
+pub enum VersionedPersistence {
+    V1(PersistenceV1),
 }
 
 impl Persistence {
@@ -109,18 +146,7 @@ impl GwaihirApp {
                 .unwrap();
         }
 
-        let persistence: Persistence = match cc
-            .storage
-            .and_then(|storage| eframe::get_value(storage, Persistence::STORAGE_KEY))
-        {
-            Some(v) => v,
-            None => {
-                // This is here as insurance to ensure we don't overwrite a previously valid .ron with empty Persistence if Persistence wasn't migrated correctly
-                show_notification("Gwaihir init failed", "Gwaihir failed to initialize due to an error decoding its config. View the log for more details");
-                open_log_file(log_file_location);
-                panic!("Failed to deserialize app config");
-            }
-        };
+        let persistence = load_and_migrate_persistence(cc, &log_file_location);
 
         let periodic_repaint_thread_join_handle =
             create_periodic_repaint_thread(cc.egui_ctx.clone(), Duration::from_secs(10));
@@ -290,6 +316,27 @@ impl GwaihirApp {
 
     fn change_matcher(&mut self) -> &mut TriggerManager {
         &mut self.persistence.trigger_manager
+    }
+}
+
+fn load_and_migrate_persistence(
+    cc: &eframe::CreationContext<'_>,
+    log_file_location: &PathBuf,
+) -> Persistence {
+    if let Some(v) = cc.storage.and_then(|storage| {
+        eframe::get_value::<VersionedPersistence>(storage, Persistence::STORAGE_KEY)
+    }) {
+        v.into()
+    } else if let Some(p) = cc
+        .storage
+        .and_then(|storage| eframe::get_value::<PersistenceV1>(storage, Persistence::STORAGE_KEY))
+    {
+        VersionedPersistence::V1(p).into()
+    } else {
+        // This is here as insurance to ensure we don't overwrite a previously valid .ron with empty Persistence if Persistence wasn't migrated correctly
+        show_notification("Gwaihir init failed", "Gwaihir failed to initialize due to an error decoding its config. View the log for more details");
+        open_log_file(log_file_location);
+        panic!("Failed to deserialize app config");
     }
 }
 
