@@ -38,12 +38,8 @@ impl TriggersWindow {
                         change_matcher.get_serialized_triggers()
                     {
                         ui.horizontal(|ui| {
-                            ui.label(serialized_matcher_criteria.clone());
-                            if ui.button("Copy").clicked() {
-                                ui.output_mut(|o| {
-                                    o.copied_text = serialized_matcher_criteria.clone()
-                                });
-                            }
+                            let mut tmp = serialized_matcher_criteria.clone();
+                            ui.text_edit_multiline(&mut tmp);
 
                             if ui.button("X").clicked() {
                                 change_matcher.remove_trigger_by_id(&id);

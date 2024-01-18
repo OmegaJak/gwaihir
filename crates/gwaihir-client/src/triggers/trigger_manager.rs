@@ -26,7 +26,7 @@ impl TriggerManager {
     pub fn get_serialized_triggers(&self) -> Vec<(Uuid, String)> {
         self.triggers
             .iter()
-            .map(|(k, v)| (*k, ron::to_string(&v.criteria).unwrap()))
+            .map(|(k, v)| (*k, ron::to_string(&v).unwrap()))
             .collect()
     }
 
