@@ -1,13 +1,33 @@
+use crate::{
+    networking::network_manager::NetworkManager,
+    periodic_repaint_thread::create_periodic_repaint_thread,
+    persistence::{Persistence, PersistenceV1, VersionedPersistence},
+    project_dirs,
+    sensor_monitor_thread::{MainToMonitorMessages, MonitorToMainMessages},
+    sensors::{
+        lock_status_sensor::{init_lock_status_sensor, EventLoopRegisteredLockStatusSensorBuilder},
+        outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
+    },
+    show_notification,
+    tray_icon::{hide_to_tray, TrayIconData},
+    triggers::{BehaviorOnTrigger, TriggerManager, Update},
+    ui::{
+        add_fake_user_window::AddFakeUserWindow,
+        network_window::NetworkWindow,
+        raw_data_window::{RawDataWindow, TimestampedData},
+        time_formatting::nicely_formatted_datetime,
+        triggers_window::TriggersWindow,
+        widgets::auto_launch_checkbox::AutoLaunchCheckboxUiExtension,
+    },
+};
 use chrono_humanize::HumanTime;
-use egui::{epaint::ahash::HashSet, Color32, RichText, ScrollArea, TextEdit, Widget};
+use egui::{Color32, RichText, ScrollArea, TextEdit, Widget};
 use gwaihir_client_lib::{
     chrono::Local, NetworkInterface, RemoteUpdate, UniqueUserId, UserStatus, APP_ID,
 };
 use log::{debug, info, warn};
 use log_err::LogErrResult;
 use networking_spacetimedb::{SpacetimeDBCreationParameters, SpacetimeDBInterface};
-use pro_serde_versioned::VersionedUpgrade;
-use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
     cmp::Ordering,
@@ -19,88 +39,6 @@ use std::{
     thread::JoinHandle,
     time::Duration,
 };
-
-use crate::{
-    networking::network_manager::NetworkManager,
-    periodic_repaint_thread::create_periodic_repaint_thread,
-    project_dirs,
-    sensor_monitor_thread::{MainToMonitorMessages, MonitorToMainMessages},
-    sensors::{
-        lock_status_sensor::{init_lock_status_sensor, EventLoopRegisteredLockStatusSensorBuilder},
-        outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
-    },
-    show_notification,
-    tray_icon::{hide_to_tray, TrayIconData},
-    triggers::{user_comes_online_trigger, Trigger, TriggerManager, Update},
-    ui::{
-        add_fake_user_window::AddFakeUserWindow,
-        network_window::NetworkWindow,
-        raw_data_window::{RawDataWindow, TimestampedData},
-        time_formatting::nicely_formatted_datetime,
-        triggers_window::TriggersWindow,
-        ui_extension_methods::UIExtensionMethods,
-        widgets::auto_launch_checkbox::AutoLaunchCheckboxUiExtension,
-    },
-};
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct PersistenceV1 {
-    pub ignored_users: HashSet<UniqueUserId>,
-    pub spacetimedb_db_name: String,
-
-    #[serde(default)]
-    pub trigger_manager: TriggerManager,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-#[serde(into = "VersionedPersistence", from = "VersionedPersistence")]
-pub struct Persistence {
-    pub ignored_users: HashSet<UniqueUserId>,
-    pub spacetimedb_db_name: String,
-
-    #[serde(default)]
-    pub trigger_manager: TriggerManager,
-}
-
-impl From<Persistence> for VersionedPersistence {
-    fn from(value: Persistence) -> Self {
-        VersionedPersistence::V1(PersistenceV1 {
-            ignored_users: value.ignored_users,
-            spacetimedb_db_name: value.spacetimedb_db_name,
-            trigger_manager: value.trigger_manager,
-        })
-    }
-}
-
-impl From<VersionedPersistence> for Persistence {
-    fn from(value: VersionedPersistence) -> Self {
-        let upgraded = value.upgrade_to_latest();
-        Persistence {
-            ignored_users: upgraded.ignored_users,
-            spacetimedb_db_name: upgraded.spacetimedb_db_name,
-            trigger_manager: upgraded.trigger_manager,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, VersionedUpgrade, Clone)]
-pub enum VersionedPersistence {
-    V1(PersistenceV1),
-}
-
-impl Persistence {
-    pub const STORAGE_KEY: &str = eframe::APP_KEY;
-}
-
-impl Default for Persistence {
-    fn default() -> Self {
-        Self {
-            spacetimedb_db_name: "gwaihir-test".to_string(),
-            ignored_users: Default::default(),
-            trigger_manager: Default::default(),
-        }
-    }
-}
 
 pub struct GwaihirApp {
     tray_icon_data: Option<TrayIconData>,
@@ -242,13 +180,13 @@ impl GwaihirApp {
 
     fn show_user_context_menu(
         &mut self,
-        id: &UniqueUserId,
+        target_user_id: &UniqueUserId,
         ui: &mut egui::Ui,
         user_status: &UserStatus<SensorOutputs>,
     ) {
         match &self.current_user_id {
             Some(current_user_id) => {
-                if id == current_user_id {
+                if target_user_id == current_user_id {
                     ui.horizontal(|ui| {
                         let text_edit_response = TextEdit::singleline(&mut self.set_name_input)
                             .desired_width(100.0)
@@ -262,38 +200,63 @@ impl GwaihirApp {
                             ui.close_menu();
                         }
                     });
-                } else if ui.button("Ignore").clicked() {
-                    self.persistence.ignored_users.insert(id.clone());
-                    ui.close_menu();
-                } else if let Some(notify) = ui.stateless_checkbox(
-                    self.change_matcher()
-                        .has_trigger(user_comes_online_predicate(true, id)),
-                    "Notify when online (once)",
-                ) {
-                    if notify {
-                        self.change_matcher()
-                            .remove_trigger(user_comes_online_predicate(false, id));
-                        self.change_matcher()
-                            .add_trigger(user_comes_online_trigger(id.clone(), true));
-                    } else {
-                        self.change_matcher()
-                            .remove_trigger(user_comes_online_predicate(true, id));
-                    }
-                } else if let Some(notify) = ui.stateless_checkbox(
-                    self.change_matcher()
-                        .has_trigger(user_comes_online_predicate(false, id)),
-                    "Notify when online",
-                ) {
-                    if notify {
-                        self.change_matcher()
-                            .remove_trigger(user_comes_online_predicate(true, id));
-                        self.change_matcher()
-                            .add_trigger(user_comes_online_trigger(id.clone(), false));
-                    } else {
-                        self.change_matcher()
-                            .remove_trigger(user_comes_online_predicate(false, id));
-                    }
                 }
+
+                if ui.button("Ignore").clicked() {
+                    self.persistence
+                        .ignored_users
+                        .insert(target_user_id.clone());
+                    ui.close_menu();
+                }
+
+                ui.menu_button("Triggers", |ui| {
+                    #[derive(Clone, PartialEq)]
+                    enum TriggerState {
+                        Disabled,
+                        Enabled,
+                        EnabledOnce,
+                    }
+
+                    for (_, trigger) in self.trigger_manager().triggers_iter_mut() {
+                        let mut current_state = match trigger.requested_users.get(target_user_id) {
+                            Some(BehaviorOnTrigger::NoAction) => TriggerState::Enabled,
+                            Some(BehaviorOnTrigger::Remove) => TriggerState::EnabledOnce,
+                            None => TriggerState::Disabled,
+                        };
+
+                        ui.horizontal(|ui| {
+                            ui.label(trigger.name.clone());
+                            if ui
+                                .selectable_value(&mut current_state, TriggerState::Disabled, "Off")
+                                .clicked()
+                            {
+                                trigger.requested_users.remove(target_user_id);
+                            }
+
+                            if ui
+                                .selectable_value(&mut current_state, TriggerState::Enabled, "On")
+                                .clicked()
+                            {
+                                trigger
+                                    .requested_users
+                                    .insert(target_user_id.clone(), BehaviorOnTrigger::NoAction);
+                            }
+
+                            if ui
+                                .selectable_value(
+                                    &mut current_state,
+                                    TriggerState::EnabledOnce,
+                                    "On (once)",
+                                )
+                                .clicked()
+                            {
+                                trigger
+                                    .requested_users
+                                    .insert(target_user_id.clone(), BehaviorOnTrigger::Remove);
+                            }
+                        });
+                    }
+                });
 
                 if ui.button("View Raw Data").clicked() {
                     self.received_data_viewer.show_data(
@@ -314,7 +277,7 @@ impl GwaihirApp {
         self.current_status.get(user_id).map(|s| s.display_name())
     }
 
-    fn change_matcher(&mut self) -> &mut TriggerManager {
+    fn trigger_manager(&mut self) -> &mut TriggerManager {
         &mut self.persistence.trigger_manager
     }
 }
@@ -331,7 +294,8 @@ fn load_and_migrate_persistence(
         .storage
         .and_then(|storage| eframe::get_value::<PersistenceV1>(storage, Persistence::STORAGE_KEY))
     {
-        VersionedPersistence::V1(p).into()
+        let v1 = VersionedPersistence::V1(p);
+        v1.into()
     } else {
         // This is here as insurance to ensure we don't overwrite a previously valid .ron with empty Persistence if Persistence wasn't migrated correctly
         show_notification("Gwaihir init failed", "Gwaihir failed to initialize due to an error decoding its config. View the log for more details");
@@ -342,10 +306,6 @@ fn load_and_migrate_persistence(
 
 fn open_log_file(log_file_location: impl AsRef<OsStr>) {
     opener::open(log_file_location).log_expect("Failed to open file using default OS handler");
-}
-
-fn user_comes_online_predicate(once: bool, id: &UniqueUserId) -> impl Fn(&Trigger) -> bool + '_ {
-    move |m| *m == user_comes_online_trigger(id.clone(), once)
 }
 
 impl eframe::App for GwaihirApp {

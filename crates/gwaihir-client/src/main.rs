@@ -15,6 +15,7 @@ use std::path::PathBuf;
 mod app;
 mod networking;
 mod periodic_repaint_thread;
+mod persistence;
 mod sensor_monitor_thread;
 mod sensors;
 mod tray_icon;

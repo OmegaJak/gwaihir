@@ -1,5 +1,5 @@
 use super::widgets::show_centered_window;
-use crate::{app::Persistence, networking::network_manager::NetworkManager};
+use crate::{networking::network_manager::NetworkManager, persistence::Persistence};
 use egui::ComboBox;
 use gwaihir_client_lib::{NetworkInterface, NetworkType};
 

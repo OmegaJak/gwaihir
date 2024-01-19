@@ -1,13 +1,17 @@
 use super::widgets::show_centered_window;
-use crate::triggers::{Action, NotificationTemplate, Trigger, TriggerManager};
+use crate::triggers::{
+    Action, Expression, NotificationTemplate, Trigger, TriggerManager, TriggerSource,
+};
 use egui::Color32;
 
 pub struct TriggersWindow {
     shown: bool,
+    name_input: String,
     criteria_input: String,
     notification_summary_input: String,
     notification_body_input: String,
-    drop_after_match: bool,
+    enabled_input: bool,
+    requestable_input: bool,
     err: Option<String>,
 }
 
@@ -15,10 +19,12 @@ impl TriggersWindow {
     pub fn new() -> Self {
         Self {
             shown: false,
+            name_input: Default::default(),
             criteria_input: Default::default(),
             notification_summary_input: Default::default(),
             notification_body_input: Default::default(),
-            drop_after_match: false,
+            enabled_input: true,
+            requestable_input: false,
             err: None,
         }
     }
@@ -51,6 +57,12 @@ impl TriggersWindow {
 
             ui.heading("Add new ");
             ui.horizontal(|ui| {
+                ui.label("Name: ");
+                egui::TextEdit::singleline(&mut self.name_input)
+                    .desired_width(f32::INFINITY)
+                    .show(ui);
+            });
+            ui.horizontal(|ui| {
                 ui.label("Criteria: ");
                 egui::TextEdit::singleline(&mut self.criteria_input)
                     .desired_width(f32::INFINITY)
@@ -66,23 +78,39 @@ impl TriggersWindow {
                 ui.label("Notif Body: ");
                 ui.text_edit_multiline(&mut self.notification_body_input);
             });
-            ui.checkbox(&mut self.drop_after_match, "Drop After Match");
+            ui.checkbox(&mut self.enabled_input, "Enabled");
+            ui.checkbox(&mut self.requestable_input, "Requestable");
             if ui.button("Add").clicked() {
-                match ron::from_str(&self.criteria_input) {
-                    Ok(criteria) => {
+                match ron::from_str::<Expression>(&self.criteria_input) {
+                    Ok(mut criteria) => {
+                        if self.requestable_input {
+                            criteria = Expression::And(
+                                Expression::RequestedForUser.into(),
+                                criteria.into(),
+                            );
+                        }
+
                         let matcher = Trigger {
+                            name: self.name_input.clone(),
+                            enabled: self.enabled_input,
                             criteria,
-                            drop_after_trigger: self.drop_after_match,
+                            source: TriggerSource::User,
                             actions: vec![Action::ShowNotification(NotificationTemplate::new(
                                 self.notification_summary_input.clone(),
                                 self.notification_body_input.clone(),
                             ))],
+                            requested_users: Default::default(),
                         };
                         change_matcher.add_trigger(matcher);
                         self.criteria_input.clear();
                     }
                     Err(err) => self.err = Some(err.to_string()),
                 }
+            }
+
+            ui.separator();
+            if ui.button("Reset default triggers").clicked() {
+                change_matcher.reset_default_triggers();
             }
 
             if let Some(err) = &self.err {

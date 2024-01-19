@@ -1,16 +1,16 @@
+use super::{trigger::BehaviorOnTrigger, Update};
+use crate::sensors::outputs::sensor_outputs::SensorOutputs;
 use gwaihir_client_lib::UniqueUserId;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use thiserror::Error;
-
-use crate::sensors::outputs::sensor_outputs::SensorOutputs;
-
-use super::Update;
 
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub enum Expression {
     And(ExpressionRef, ExpressionRef),
     Or(ExpressionRef, ExpressionRef),
     Equals(ValuePointer, ValuePointer),
+    RequestedForUser,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
@@ -32,9 +32,10 @@ pub type ExpressionRef = std::rc::Rc<Expression>;
 
 type EvalResult<T> = Result<T, EvaluationError>;
 
-pub struct EvalData<'a, 'b> {
+pub struct EvalData<'a, 'b, 'c> {
     pub user: &'a UniqueUserId,
     pub update: Update<&'b SensorOutputs>,
+    pub requested_users: &'c HashMap<UniqueUserId, BehaviorOnTrigger>,
 }
 
 #[derive(Error, Debug)]
@@ -44,7 +45,7 @@ pub enum EvaluationError {
 }
 
 impl Expression {
-    pub fn evaluate(&self, data: &EvalData<'_, '_>) -> EvalResult<bool> {
+    pub fn evaluate(&self, data: &EvalData<'_, '_, '_>) -> EvalResult<bool> {
         match self {
             Expression::And(left, right) => {
                 EvalResult::Ok(left.evaluate(data)? && right.evaluate(data)?)
@@ -60,12 +61,15 @@ impl Expression {
                     _ => EvalResult::Ok(false),
                 }
             }
+            Expression::RequestedForUser => {
+                EvalResult::Ok(data.requested_users.contains_key(data.user))
+            }
         }
     }
 }
 
 impl ValuePointer {
-    fn get_value(&self, data: &EvalData<'_, '_>) -> Option<Value> {
+    fn get_value(&self, data: &EvalData<'_, '_, '_>) -> Option<Value> {
         match self {
             ValuePointer::LastOnlineStatus => data
                 .update

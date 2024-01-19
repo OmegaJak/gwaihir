@@ -26,6 +26,7 @@ pub const APP_ID: &str = "gwaihir";
     Serialize,
     Deserialize,
     Debug,
+    Display
 ))]
 pub struct UniqueUserId(String);
 
