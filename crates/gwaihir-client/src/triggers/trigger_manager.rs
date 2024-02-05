@@ -93,6 +93,8 @@ impl TriggerManager {
             .retain(|_, trigger| trigger.source != TriggerSource::AppDefaults);
         self.triggers
             .insert(Uuid::new_v4(), default_triggers::user_coming_online());
+        self.triggers
+            .insert(Uuid::new_v4(), default_triggers::user_unlocked());
     }
 }
 
@@ -149,8 +151,9 @@ pub mod persistence {
 
 mod default_triggers {
     use crate::triggers::{
-        trigger::TriggerSource, value_pointer::ValuePointer, Action, Expression,
-        NotificationTemplate, Trigger,
+        trigger::TriggerSource,
+        value_pointer::{TimeSpecifier, ValuePointer},
+        Action, Expression, NotificationTemplate, Trigger,
     };
 
     pub fn user_coming_online() -> Trigger {
@@ -158,12 +161,12 @@ mod default_triggers {
             Expression::RequestedForUser.into(),
             Expression::And(
                 Expression::Equals(
-                    ValuePointer::LastOnlineStatus,
+                    ValuePointer::OnlineStatus(TimeSpecifier::Last),
                     ValuePointer::ConstBool(false),
                 )
                 .into(),
                 Expression::Equals(
-                    ValuePointer::CurrentOnlineStatus,
+                    ValuePointer::OnlineStatus(TimeSpecifier::Current),
                     ValuePointer::ConstBool(true),
                 )
                 .into(),
@@ -175,6 +178,38 @@ mod default_triggers {
             "The user \"{{user}}\" has transitioned from offline to online".to_string(),
         ))];
         let name = "User coming online".to_string();
+        Trigger {
+            criteria,
+            requested_users: Default::default(),
+            source: TriggerSource::AppDefaults,
+            actions,
+            name,
+            enabled: true,
+        }
+    }
+
+    pub fn user_unlocked() -> Trigger {
+        let criteria = Expression::And(
+            Expression::RequestedForUser.into(),
+            Expression::And(
+                Expression::Equals(
+                    ValuePointer::LockStatus(TimeSpecifier::Last),
+                    ValuePointer::ConstBool(true),
+                )
+                .into(),
+                Expression::Equals(
+                    ValuePointer::LockStatus(TimeSpecifier::Current),
+                    ValuePointer::ConstBool(false),
+                )
+                .into(),
+            )
+            .into(),
+        );
+        let actions = vec![Action::ShowNotification(NotificationTemplate::new(
+            "{{user}} unlocked".to_string(),
+            "The user \"{{user}}\" has unlocked their computer".to_string(),
+        ))];
+        let name = "User unlocked".to_string();
         Trigger {
             criteria,
             requested_users: Default::default(),

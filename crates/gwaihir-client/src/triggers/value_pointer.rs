@@ -1,4 +1,9 @@
-use super::expression::{EvalData, EvalResult, EvaluationError};
+use crate::sensors::outputs::sensor_outputs::SensorOutputs;
+
+use super::{
+    expression::{EvalData, EvalResult, EvaluationError},
+    Update,
+};
 use gwaihir_client_lib::UniqueUserId;
 use serde::{Deserialize, Serialize};
 
@@ -8,11 +13,17 @@ use serde::{Deserialize, Serialize};
     into = "persistence::VersionedValuePointer"
 )]
 pub enum ValuePointer {
-    LastOnlineStatus,
-    CurrentOnlineStatus,
+    OnlineStatus(TimeSpecifier),
+    LockStatus(TimeSpecifier),
     ConstBool(bool),
     ConstUserId(UniqueUserId),
     UserId,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Clone)]
+pub enum TimeSpecifier {
+    Last,
+    Current,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
@@ -24,20 +35,28 @@ pub enum Value {
 impl ValuePointer {
     pub fn get_value(&self, data: &EvalData<'_, '_, '_>) -> Option<Value> {
         match self {
-            ValuePointer::LastOnlineStatus => data
-                .update
-                .original
-                .get_online_status()
-                .map(|v| Value::Bool(v.online)),
-            ValuePointer::CurrentOnlineStatus => data
-                .update
-                .updated
-                .get_online_status()
-                .map(|v| Value::Bool(v.online)),
+            ValuePointer::OnlineStatus(time_specifier) => {
+                get_outputs_by_time_specifier(&data.update, time_specifier)
+                    .get_online_status()
+                    .map(|v| Value::Bool(v.online))
+            }
+            ValuePointer::LockStatus(time) => get_outputs_by_time_specifier(&data.update, time)
+                .is_locked()
+                .map(Value::Bool),
             ValuePointer::ConstBool(val) => Some(Value::Bool(*val)),
             ValuePointer::UserId => Some(Value::UserId(data.user.clone())),
             ValuePointer::ConstUserId(val) => Some(Value::UserId(val.clone())),
         }
+    }
+}
+
+fn get_outputs_by_time_specifier<'a>(
+    update: &'a Update<&SensorOutputs>,
+    specifier: &TimeSpecifier,
+) -> &'a SensorOutputs {
+    match specifier {
+        TimeSpecifier::Last => update.original,
+        TimeSpecifier::Current => update.updated,
     }
 }
 
@@ -60,12 +79,13 @@ impl Value {
 
 pub mod persistence {
     use super::*;
-    use pro_serde_versioned::VersionedUpgrade;
+    use pro_serde_versioned::{Upgrade, VersionedUpgrade};
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, VersionedUpgrade, PartialEq, Clone)]
     pub enum VersionedValuePointer {
         V1(ValuePointerV1),
+        V2(ValuePointerV2),
     }
 
     #[derive(Serialize, Deserialize, PartialEq, Clone)]
@@ -77,27 +97,36 @@ pub mod persistence {
         UserId,
     }
 
+    #[derive(Serialize, Deserialize, PartialEq, Clone)]
+    pub enum ValuePointerV2 {
+        OnlineStatus(TimeSpecifier),
+        LockStatus(TimeSpecifier),
+        ConstBool(bool),
+        ConstUserId(UniqueUserId),
+        UserId,
+    }
+
     impl From<VersionedValuePointer> for ValuePointer {
         fn from(value: VersionedValuePointer) -> Self {
             let value = value.upgrade_to_latest();
             match value {
-                ValuePointerV1::LastOnlineStatus => Self::LastOnlineStatus,
-                ValuePointerV1::CurrentOnlineStatus => Self::CurrentOnlineStatus,
-                ValuePointerV1::ConstBool(b) => Self::ConstBool(b),
-                ValuePointerV1::ConstUserId(id) => Self::ConstUserId(id),
-                ValuePointerV1::UserId => Self::UserId,
+                ValuePointerV2::OnlineStatus(time) => Self::OnlineStatus(time),
+                ValuePointerV2::LockStatus(time) => Self::LockStatus(time),
+                ValuePointerV2::ConstBool(b) => Self::ConstBool(b),
+                ValuePointerV2::ConstUserId(id) => Self::ConstUserId(id),
+                ValuePointerV2::UserId => Self::UserId,
             }
         }
     }
 
     impl From<ValuePointer> for VersionedValuePointer {
         fn from(value: ValuePointer) -> Self {
-            Self::V1(match value {
-                ValuePointer::LastOnlineStatus => ValuePointerV1::LastOnlineStatus,
-                ValuePointer::CurrentOnlineStatus => ValuePointerV1::CurrentOnlineStatus,
-                ValuePointer::ConstBool(b) => ValuePointerV1::ConstBool(b),
-                ValuePointer::ConstUserId(id) => ValuePointerV1::ConstUserId(id),
-                ValuePointer::UserId => ValuePointerV1::UserId,
+            Self::V2(match value {
+                ValuePointer::OnlineStatus(time) => ValuePointerV2::OnlineStatus(time),
+                ValuePointer::LockStatus(time) => ValuePointerV2::LockStatus(time),
+                ValuePointer::ConstBool(b) => ValuePointerV2::ConstBool(b),
+                ValuePointer::ConstUserId(id) => ValuePointerV2::ConstUserId(id),
+                ValuePointer::UserId => ValuePointerV2::UserId,
             })
         }
     }
@@ -105,6 +134,22 @@ pub mod persistence {
     impl From<ValuePointerV1> for ValuePointer {
         fn from(value: ValuePointerV1) -> Self {
             VersionedValuePointer::V1(value).into()
+        }
+    }
+
+    impl Upgrade<ValuePointerV2> for ValuePointerV1 {
+        fn upgrade(self) -> ValuePointerV2 {
+            match self {
+                ValuePointerV1::LastOnlineStatus => {
+                    ValuePointerV2::OnlineStatus(TimeSpecifier::Last)
+                }
+                ValuePointerV1::CurrentOnlineStatus => {
+                    ValuePointerV2::OnlineStatus(TimeSpecifier::Current)
+                }
+                ValuePointerV1::ConstBool(b) => ValuePointerV2::ConstBool(b),
+                ValuePointerV1::ConstUserId(id) => ValuePointerV2::ConstUserId(id),
+                ValuePointerV1::UserId => ValuePointerV2::UserId,
+            }
         }
     }
 }

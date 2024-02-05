@@ -39,6 +39,16 @@ impl SensorOutputs {
 
         None
     }
+
+    pub fn is_locked(&self) -> Option<bool> {
+        for output in self.outputs.iter() {
+            if let SensorOutput::SummarizedWindowActivity(activity) = output {
+                return Some(activity.is_locked());
+            }
+        }
+
+        None
+    }
 }
 
 impl AcceptsOnlineStatus for SensorOutputs {

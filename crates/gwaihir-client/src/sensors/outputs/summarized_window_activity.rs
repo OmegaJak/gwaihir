@@ -94,6 +94,10 @@ impl SummarizedWindowActivity {
         }
     }
 
+    pub fn is_locked(&self) -> bool {
+        self.current_window.window_name == WindowName::Locked
+    }
+
     fn add_time_total(
         entry: Entry<'_, WindowName, Duration>,
         started_using: DateTime<Utc>,
