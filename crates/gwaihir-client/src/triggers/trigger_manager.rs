@@ -149,8 +149,8 @@ pub mod persistence {
 
 mod default_triggers {
     use crate::triggers::{
-        expression::ValuePointer, trigger::TriggerSource, Action, Expression, NotificationTemplate,
-        Trigger,
+        trigger::TriggerSource, value_pointer::ValuePointer, Action, Expression,
+        NotificationTemplate, Trigger,
     };
 
     pub fn user_coming_online() -> Trigger {

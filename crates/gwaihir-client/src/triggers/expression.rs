@@ -1,4 +1,4 @@
-use super::{trigger::BehaviorOnTrigger, Update};
+use super::{trigger::BehaviorOnTrigger, value_pointer::ValuePointer, Update};
 use crate::sensors::outputs::sensor_outputs::SensorOutputs;
 use gwaihir_client_lib::UniqueUserId;
 use serde::{Deserialize, Serialize};
@@ -6,6 +6,10 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
+#[serde(
+    from = "persistence::VersionedExpression",
+    into = "persistence::VersionedExpression"
+)]
 pub enum Expression {
     And(ExpressionRef, ExpressionRef),
     Or(ExpressionRef, ExpressionRef),
@@ -13,24 +17,9 @@ pub enum Expression {
     RequestedForUser,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Clone)]
-pub enum ValuePointer {
-    LastOnlineStatus,
-    CurrentOnlineStatus,
-    ConstBool(bool),
-    ConstUserId(UniqueUserId),
-    UserId,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Clone)]
-pub enum Value {
-    Bool(bool),
-    UserId(UniqueUserId),
-}
-
 pub type ExpressionRef = std::rc::Rc<Expression>;
 
-type EvalResult<T> = Result<T, EvaluationError>;
+pub type EvalResult<T> = Result<T, EvaluationError>;
 
 pub struct EvalData<'a, 'b, 'c> {
     pub user: &'a UniqueUserId,
@@ -68,39 +57,80 @@ impl Expression {
     }
 }
 
-impl ValuePointer {
-    fn get_value(&self, data: &EvalData<'_, '_, '_>) -> Option<Value> {
-        match self {
-            ValuePointer::LastOnlineStatus => data
-                .update
-                .original
-                .get_online_status()
-                .map(|v| Value::Bool(v.online)),
-            ValuePointer::CurrentOnlineStatus => data
-                .update
-                .updated
-                .get_online_status()
-                .map(|v| Value::Bool(v.online)),
-            ValuePointer::ConstBool(val) => Some(Value::Bool(*val)),
-            ValuePointer::UserId => Some(Value::UserId(data.user.clone())),
-            ValuePointer::ConstUserId(val) => Some(Value::UserId(val.clone())),
+pub mod persistence {
+    use crate::triggers::value_pointer::persistence::ValuePointerV1;
+
+    use super::*;
+    use pro_serde_versioned::{Upgrade, VersionedUpgrade};
+    use serde::{Deserialize, Serialize};
+    use std::rc::Rc;
+
+    #[derive(Serialize, Deserialize, VersionedUpgrade, PartialEq, Clone)]
+    pub enum VersionedExpression {
+        V1(ExpressionV1),
+        V2(ExpressionV2),
+    }
+
+    #[derive(Serialize, Deserialize, PartialEq, Clone)]
+    pub enum ExpressionV1 {
+        And(Rc<ExpressionV1>, Rc<ExpressionV1>),
+        Or(Rc<ExpressionV1>, Rc<ExpressionV1>),
+        Equals(ValuePointerV1, ValuePointerV1),
+        RequestedForUser,
+    }
+
+    #[derive(Serialize, Deserialize, PartialEq, Clone)]
+    pub enum ExpressionV2 {
+        And(Rc<Expression>, Rc<Expression>),
+        Or(Rc<Expression>, Rc<Expression>),
+        Equals(ValuePointer, ValuePointer),
+        RequestedForUser,
+    }
+
+    impl From<VersionedExpression> for Expression {
+        fn from(value: VersionedExpression) -> Self {
+            let value = value.upgrade_to_latest();
+            match value {
+                ExpressionV2::And(a, b) => Self::And(a, b),
+                ExpressionV2::Or(a, b) => Self::Or(a, b),
+                ExpressionV2::Equals(a, b) => Self::Equals(a, b),
+                ExpressionV2::RequestedForUser => Self::RequestedForUser,
+            }
         }
     }
-}
 
-impl Value {
-    fn equals(&self, other: &Value) -> EvalResult<bool> {
-        match (self, other) {
-            (Value::Bool(left), Value::Bool(right)) => EvalResult::Ok(left == right),
-            (Value::Bool(_), Value::UserId(_)) => EvalResult::Err(EvaluationError::TypeMismatch(
-                "bool".to_string(),
-                "user id".to_string(),
-            )),
-            (Value::UserId(_), Value::Bool(_)) => EvalResult::Err(EvaluationError::TypeMismatch(
-                "bool".to_string(),
-                "user id".to_string(),
-            )),
-            (Value::UserId(left), Value::UserId(right)) => EvalResult::Ok(left == right),
+    impl From<Expression> for VersionedExpression {
+        fn from(value: Expression) -> Self {
+            Self::V2(match value {
+                Expression::And(a, b) => ExpressionV2::And(a, b),
+                Expression::Or(a, b) => ExpressionV2::Or(a, b),
+                Expression::Equals(a, b) => ExpressionV2::Equals(a, b),
+                Expression::RequestedForUser => ExpressionV2::RequestedForUser,
+            })
         }
+    }
+
+    impl From<ExpressionV1> for Expression {
+        fn from(value: ExpressionV1) -> Self {
+            VersionedExpression::V1(value).into()
+        }
+    }
+
+    impl Upgrade<ExpressionV2> for ExpressionV1 {
+        fn upgrade(self) -> ExpressionV2 {
+            match self {
+                Self::And(a, b) => ExpressionV2::And(convert_rc(a), convert_rc(b)),
+                Self::Or(a, b) => ExpressionV2::Or(convert_rc(a), convert_rc(b)),
+                Self::Equals(a, b) => ExpressionV2::Equals(a.into(), b.into()),
+                Self::RequestedForUser => ExpressionV2::RequestedForUser,
+            }
+        }
+    }
+
+    fn convert_rc<A, B>(a: Rc<A>) -> Rc<B>
+    where
+        B: From<A>,
+    {
+        Rc::new(Rc::into_inner(a).unwrap().into())
     }
 }

@@ -43,6 +43,7 @@ impl Trigger {
 
 pub mod persistence {
     use super::*;
+    use crate::triggers::expression::persistence::ExpressionV1;
     use pro_serde_versioned::{Upgrade, VersionedUpgrade};
     use serde::{Deserialize, Serialize};
 
@@ -50,17 +51,29 @@ pub mod persistence {
     pub enum VersionedTrigger {
         V1(TriggerV1),
         V2(TriggerV2),
+        V3(TriggerV3),
     }
 
     #[derive(Serialize, Deserialize, Clone)]
     pub struct TriggerV1 {
-        pub criteria: Expression,
+        pub criteria: ExpressionV1,
         pub drop_after_trigger: bool,
         pub actions: Vec<Action>,
     }
 
     #[derive(Serialize, Deserialize, Clone)]
     pub struct TriggerV2 {
+        pub name: String,
+        pub enabled: bool,
+        pub requested_users: HashMap<UniqueUserId, BehaviorOnTrigger>,
+        pub source: TriggerSource,
+
+        pub criteria: ExpressionV1,
+        pub actions: Vec<Action>,
+    }
+
+    #[derive(Serialize, Deserialize, Clone)]
+    pub struct TriggerV3 {
         pub name: String,
         pub enabled: bool,
         pub requested_users: HashMap<UniqueUserId, BehaviorOnTrigger>,
@@ -86,7 +99,7 @@ pub mod persistence {
 
     impl From<Trigger> for VersionedTrigger {
         fn from(value: Trigger) -> Self {
-            VersionedTrigger::V2(TriggerV2 {
+            VersionedTrigger::V3(TriggerV3 {
                 name: value.name,
                 enabled: value.enabled,
                 requested_users: value.requested_users,
@@ -105,6 +118,19 @@ pub mod persistence {
                 requested_users: HashMap::new(),
                 source: TriggerSource::User,
                 criteria: self.criteria,
+                actions: self.actions,
+            }
+        }
+    }
+
+    impl Upgrade<TriggerV3> for TriggerV2 {
+        fn upgrade(self) -> TriggerV3 {
+            TriggerV3 {
+                name: self.name,
+                enabled: self.enabled,
+                requested_users: self.requested_users,
+                source: self.source,
+                criteria: self.criteria.into(),
                 actions: self.actions,
             }
         }
