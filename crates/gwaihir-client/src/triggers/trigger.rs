@@ -36,7 +36,7 @@ impl Trigger {
     pub fn requestable(&self) -> bool {
         matches!(
             &self.criteria,
-            Expression::And(a, b) if matches!(**a, Expression::RequestedForUser) || matches!(**b, Expression::RequestedForUser)
+            Expression::And(a, b) if matches!(a.as_ref(), Expression::RequestedForUser) || matches!(b.as_ref(), Expression::RequestedForUser)
         )
     }
 }

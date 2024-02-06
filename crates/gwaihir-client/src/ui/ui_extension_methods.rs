@@ -1,6 +1,8 @@
+use std::fmt::Display;
+
 use egui::{
-    text::LayoutJob, CollapsingHeader, CollapsingResponse, InnerResponse, RichText, Ui, Widget,
-    WidgetText,
+    text::LayoutJob, CollapsingHeader, CollapsingResponse, InnerResponse, Response, RichText, Ui,
+    Widget, WidgetText,
 };
 
 pub trait UIExtensionMethods {
@@ -18,6 +20,12 @@ pub trait UIExtensionMethods {
     fn create_default_layout_job(&self, rich_texts: Vec<RichText>) -> LayoutJob;
 
     fn stateless_checkbox(&mut self, checked: bool, text: impl Into<WidgetText>) -> Option<bool>;
+
+    fn selectable_value_default_text<Value: PartialEq + Clone + Display>(
+        &mut self,
+        current_value: &mut Value,
+        selected_value: Value,
+    ) -> Response;
 }
 
 impl UIExtensionMethods for Ui {
@@ -66,5 +74,17 @@ impl UIExtensionMethods for Ui {
         }
 
         None
+    }
+
+    fn selectable_value_default_text<Value: PartialEq + Clone + Display>(
+        &mut self,
+        current_value: &mut Value,
+        selected_value: Value,
+    ) -> Response {
+        self.selectable_value(
+            current_value,
+            selected_value.clone(),
+            selected_value.to_string(),
+        )
     }
 }

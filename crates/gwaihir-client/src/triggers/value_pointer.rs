@@ -94,6 +94,10 @@ impl Value {
         }
     }
 
+    pub fn not_equals(&self, other: &Value) -> EvalResult<bool> {
+        EvalResult::Ok(!self.equals(other)?)
+    }
+
     pub fn greater_than(&self, other: &Value) -> EvalResult<bool> {
         match (self, other) {
             (Value::F64(left), Value::F64(right)) => EvalResult::Ok(left > right),
