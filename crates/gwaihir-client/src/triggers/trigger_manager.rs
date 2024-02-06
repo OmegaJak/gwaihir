@@ -95,6 +95,8 @@ impl TriggerManager {
             .insert(Uuid::new_v4(), default_triggers::user_coming_online());
         self.triggers
             .insert(Uuid::new_v4(), default_triggers::user_unlocked());
+        self.triggers
+            .insert(Uuid::new_v4(), default_triggers::user_active_again());
     }
 }
 
@@ -210,6 +212,39 @@ mod default_triggers {
             "The user \"{{user}}\" has unlocked their computer".to_string(),
         ))];
         let name = "User unlocked".to_string();
+        Trigger {
+            criteria,
+            requested_users: Default::default(),
+            source: TriggerSource::AppDefaults,
+            actions,
+            name,
+            enabled: true,
+        }
+    }
+
+    pub fn user_active_again() -> Trigger {
+        let criteria = Expression::And(
+            Expression::RequestedForUser.into(),
+            Expression::And(
+                Expression::Equals(
+                    ValuePointer::TotalKeyboardMouseUsage(TimeSpecifier::Last),
+                    ValuePointer::ConstF64(0.0),
+                )
+                .into(),
+                Expression::GreaterThan(
+                    ValuePointer::TotalKeyboardMouseUsage(TimeSpecifier::Current),
+                    ValuePointer::ConstF64(0.0),
+                )
+                .into(),
+            )
+            .into(),
+        );
+        let actions = vec![Action::ShowNotification(NotificationTemplate::new(
+            "{{user}} is now active".to_string(),
+            "\"{{user}}\" has used their mouse/keyboard for the first time in 10 minutes"
+                .to_string(),
+        ))];
+        let name = "User active again".to_string();
         Trigger {
             criteria,
             requested_users: Default::default(),

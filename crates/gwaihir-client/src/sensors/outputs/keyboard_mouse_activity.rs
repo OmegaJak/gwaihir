@@ -78,6 +78,18 @@ impl SensorWidget for KeyboardMouseActivity {
     }
 }
 
+impl KeyboardMouseActivity {
+    pub fn get_total_usage(&self) -> f64 {
+        self.keyboard_usage.total() + self.mouse_movement.total() + self.mouse_button_usage.total()
+    }
+}
+
+impl KeyboardMouseActivityData {
+    pub fn total(&self) -> f64 {
+        self.data.iter().sum()
+    }
+}
+
 impl UsageLevel {
     fn from_fractional(fractional_usage: f64) -> Option<Self> {
         match fractional_usage {

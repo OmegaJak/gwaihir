@@ -49,6 +49,16 @@ impl SensorOutputs {
 
         None
     }
+
+    pub fn get_total_keyboard_mouse_usage(&self) -> Option<f64> {
+        for output in self.outputs.iter() {
+            if let SensorOutput::KeyboardMouseActivity(activity) = output {
+                return Some(activity.get_total_usage());
+            }
+        }
+
+        None
+    }
 }
 
 impl AcceptsOnlineStatus for SensorOutputs {

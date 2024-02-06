@@ -1,4 +1,8 @@
-use super::{trigger::BehaviorOnTrigger, value_pointer::ValuePointer, Update};
+use super::{
+    trigger::BehaviorOnTrigger,
+    value_pointer::{Value, ValuePointer},
+    Update,
+};
 use crate::sensors::outputs::sensor_outputs::SensorOutputs;
 use gwaihir_client_lib::UniqueUserId;
 use serde::{Deserialize, Serialize};
@@ -14,6 +18,11 @@ pub enum Expression {
     And(ExpressionRef, ExpressionRef),
     Or(ExpressionRef, ExpressionRef),
     Equals(ValuePointer, ValuePointer),
+    Not(ExpressionRef),
+    GreaterThan(ValuePointer, ValuePointer),
+    LessThan(ValuePointer, ValuePointer),
+    GreaterThanOrEquals(ValuePointer, ValuePointer),
+    LessThanOrEquals(ValuePointer, ValuePointer),
     RequestedForUser,
 }
 
@@ -27,10 +36,24 @@ pub struct EvalData<'a, 'b, 'c> {
     pub requested_users: &'c HashMap<UniqueUserId, BehaviorOnTrigger>,
 }
 
+#[derive(Debug)]
+pub enum OperationType {
+    GreaterThan,
+}
+
+#[derive(Debug)]
+pub enum ValueType {
+    Bool,
+    UserId,
+    F64,
+}
+
 #[derive(Error, Debug)]
 pub enum EvaluationError {
-    #[error("Cannot compare a {0} to a {1}")]
-    TypeMismatch(String, String),
+    #[error("Cannot compare a \"{0:#?}\" to a \"{1:#?}\"")]
+    TypeMismatch(ValueType, ValueType),
+    #[error("Invalid operation - \"{0:#?}\" is not a valid operation on a \"{1:#?}\"")]
+    InvalidOperation(OperationType, ValueType),
 }
 
 impl Expression {
@@ -43,17 +66,43 @@ impl Expression {
                 EvalResult::Ok(left.evaluate(data)? || right.evaluate(data)?)
             }
             Expression::Equals(left, right) => {
-                let left_value = left.get_value(data);
-                let right_value = right.get_value(data);
-                match (left_value, right_value) {
-                    (Some(left), Some(right)) => left.equals(&right),
-                    _ => EvalResult::Ok(false),
-                }
+                binary_operator(data, left, right, |l, r| l.equals(r))
             }
             Expression::RequestedForUser => {
                 EvalResult::Ok(data.requested_users.contains_key(data.user))
             }
+            Expression::Not(expr) => EvalResult::Ok(!expr.evaluate(data)?),
+            Expression::GreaterThan(left, right) => {
+                binary_operator(data, left, right, |l, r| l.greater_than(r))
+            }
+            Expression::LessThan(left, right) => {
+                binary_operator(data, left, right, |l, r| l.less_than(r))
+            }
+            Expression::GreaterThanOrEquals(left, right) => {
+                binary_operator(data, left, right, |l, r| {
+                    EvalResult::Ok(l.greater_than(r)? || l.equals(r)?)
+                })
+            }
+            Expression::LessThanOrEquals(left, right) => {
+                binary_operator(data, left, right, |l, r| {
+                    EvalResult::Ok(l.less_than(r)? || l.equals(r)?)
+                })
+            }
         }
+    }
+}
+
+fn binary_operator(
+    data: &EvalData<'_, '_, '_>,
+    left: &ValuePointer,
+    right: &ValuePointer,
+    evaluate: impl Fn(&Value, &Value) -> EvalResult<bool>,
+) -> Result<bool, EvaluationError> {
+    let left_value = left.get_value(data);
+    let right_value = right.get_value(data);
+    match (left_value, right_value) {
+        (Some(left), Some(right)) => evaluate(&left, &right),
+        _ => EvalResult::Ok(false),
     }
 }
 
@@ -84,6 +133,11 @@ pub mod persistence {
         And(Rc<Expression>, Rc<Expression>),
         Or(Rc<Expression>, Rc<Expression>),
         Equals(ValuePointer, ValuePointer),
+        Not(Rc<Expression>),
+        GreaterThan(ValuePointer, ValuePointer),
+        LessThan(ValuePointer, ValuePointer),
+        GreaterThanOrEquals(ValuePointer, ValuePointer),
+        LessThanOrEquals(ValuePointer, ValuePointer),
         RequestedForUser,
     }
 
@@ -95,6 +149,11 @@ pub mod persistence {
                 ExpressionV2::Or(a, b) => Self::Or(a, b),
                 ExpressionV2::Equals(a, b) => Self::Equals(a, b),
                 ExpressionV2::RequestedForUser => Self::RequestedForUser,
+                ExpressionV2::Not(a) => Self::Not(a),
+                ExpressionV2::GreaterThan(a, b) => Self::GreaterThan(a, b),
+                ExpressionV2::LessThan(a, b) => Self::LessThan(a, b),
+                ExpressionV2::GreaterThanOrEquals(a, b) => Self::GreaterThanOrEquals(a, b),
+                ExpressionV2::LessThanOrEquals(a, b) => Self::LessThanOrEquals(a, b),
             }
         }
     }
@@ -106,6 +165,11 @@ pub mod persistence {
                 Expression::Or(a, b) => ExpressionV2::Or(a, b),
                 Expression::Equals(a, b) => ExpressionV2::Equals(a, b),
                 Expression::RequestedForUser => ExpressionV2::RequestedForUser,
+                Expression::Not(a) => ExpressionV2::Not(a),
+                Expression::GreaterThan(a, b) => ExpressionV2::GreaterThan(a, b),
+                Expression::LessThan(a, b) => ExpressionV2::LessThan(a, b),
+                Expression::GreaterThanOrEquals(a, b) => ExpressionV2::GreaterThanOrEquals(a, b),
+                Expression::LessThanOrEquals(a, b) => ExpressionV2::LessThanOrEquals(a, b),
             })
         }
     }
