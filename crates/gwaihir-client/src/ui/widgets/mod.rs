@@ -16,6 +16,8 @@ pub fn show_centered_window<R>(
         .pivot(egui::Align2::CENTER_CENTER)
         .default_pos(ctx.screen_rect().center())
         .open(&mut shown)
-        .show(ctx, add_contents);
+        .show(ctx, |ui| {
+            egui::ScrollArea::both().show(ui, add_contents);
+        });
     shown
 }
