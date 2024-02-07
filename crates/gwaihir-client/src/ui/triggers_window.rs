@@ -137,45 +137,74 @@ fn criteria_ui_rec(criteria: &mut Expression, ui: &mut egui::Ui, id_base: String
     let new_criteria = match criteria {
         Expression::And(l, r) => {
             criteria_ui_rec(l, ui, format!("{id_base}_andl"));
-            ui.label("AND");
+            let mut button_clicked = false;
+            if !matches!(l.as_ref(), Expression::RequestedForUser)
+                && !matches!(r.as_ref(), Expression::RequestedForUser)
+                && ui.button("AND").clicked()
+            {
+                button_clicked = true;
+            }
             criteria_ui_rec(r, ui, format!("{id_base}_andr"));
-            None
-        }
-        Expression::Or(_, _) => None,
-        Expression::Equals(l, r) => {
-            let id_base = format!("{id_base}_eq");
-            ui.horizontal(|ui| {
-                value_pointer_ui(l, ui);
-                let mut current = ComparisonOperators::Equals;
-                ComboBox::from_id_source(format!("{id_base}_operatorcombobox"))
-                    .selected_text(format!("{}", current))
-                    .show_ui(ui, |ui| {
-                        for operator in enum_iterator::all::<ComparisonOperators>()
-                            .filter(|o| o.valid_for_value(l) && o.valid_for_value(r))
-                        {
-                            ui.selectable_value_default_text(&mut current, operator);
-                        }
-                    });
-                value_pointer_ui(r, ui);
 
-                match current {
-                    ComparisonOperators::NotEquals => {
-                        Some(Expression::NotEquals(l.clone(), r.clone()))
-                    }
-                    ComparisonOperators::LessThan => None,
-                    ComparisonOperators::LessThanOrEquals => None,
-                    ComparisonOperators::GreaterThan => None,
-                    ComparisonOperators::GreaterThanOrEquals => None,
-                    ComparisonOperators::Equals => None,
-                }
-            })
-            .inner
+            if button_clicked {
+                Some(Expression::Or(l.clone(), r.clone()))
+            } else {
+                None
+            }
         }
-        Expression::NotEquals(_, _) => None,
-        Expression::GreaterThan(_, _) => None,
-        Expression::LessThan(_, _) => None,
-        Expression::GreaterThanOrEquals(_, _) => None,
-        Expression::LessThanOrEquals(_, _) => None,
+        Expression::Or(l, r) => {
+            criteria_ui_rec(l, ui, format!("{id_base}_orl"));
+            let button_clicked = ui.button("OR").clicked();
+            criteria_ui_rec(r, ui, format!("{id_base}_orr"));
+
+            if button_clicked {
+                Some(Expression::And(l.clone(), r.clone()))
+            } else {
+                None
+            }
+        }
+        Expression::Equals(l, r) => show_operator_ui(
+            ComparisonOperator::Equals,
+            format!("{id_base}_eq"),
+            l,
+            r,
+            ui,
+        ),
+        Expression::NotEquals(l, r) => show_operator_ui(
+            ComparisonOperator::NotEquals,
+            format!("{id_base}_neq"),
+            l,
+            r,
+            ui,
+        ),
+        Expression::GreaterThan(l, r) => show_operator_ui(
+            ComparisonOperator::GreaterThan,
+            format!("{id_base}_gt"),
+            l,
+            r,
+            ui,
+        ),
+        Expression::GreaterThanOrEquals(l, r) => show_operator_ui(
+            ComparisonOperator::GreaterThanOrEquals,
+            format!("{id_base}_ge"),
+            l,
+            r,
+            ui,
+        ),
+        Expression::LessThan(l, r) => show_operator_ui(
+            ComparisonOperator::LessThan,
+            format!("{id_base}_lt"),
+            l,
+            r,
+            ui,
+        ),
+        Expression::LessThanOrEquals(l, r) => show_operator_ui(
+            ComparisonOperator::LessThanOrEquals,
+            format!("{id_base}_le"),
+            l,
+            r,
+            ui,
+        ),
         Expression::RequestedForUser => None,
     };
     if let Some(new_criteria) = new_criteria {
@@ -183,7 +212,65 @@ fn criteria_ui_rec(criteria: &mut Expression, ui: &mut egui::Ui, id_base: String
     }
 }
 
-fn value_pointer_ui(value: &ValuePointer, ui: &mut egui::Ui) {
+fn show_operator_ui(
+    operator: ComparisonOperator,
+    id_base: String,
+    left_value: &mut ValuePointer,
+    right_value: &mut ValuePointer,
+    ui: &mut egui::Ui,
+) -> Option<Expression> {
+    ui.horizontal(|ui| {
+        value_pointer_ui(left_value, ui);
+        let mut current = operator.clone();
+        show_operator_selector_ui(&mut current, ui, left_value, right_value, id_base);
+        value_pointer_ui(right_value, ui);
+
+        get_updated_expression(operator, current, left_value, right_value)
+    })
+    .inner
+}
+
+fn show_operator_selector_ui(
+    current_operator: &mut ComparisonOperator,
+    ui: &mut egui::Ui,
+    left_value: &mut ValuePointer,
+    right_value: &mut ValuePointer,
+    id_base: String,
+) {
+    ComboBox::from_id_source(format!("{id_base}_operatorcombobox"))
+        .selected_text(format!("{}", current_operator))
+        .show_ui(ui, |ui| {
+            for operator in enum_iterator::all::<ComparisonOperator>()
+                .filter(|o| o.valid_for_value(left_value) && o.valid_for_value(right_value))
+            {
+                ui.selectable_value_default_text(current_operator, operator);
+            }
+        });
+}
+
+fn get_updated_expression(
+    current_operator: ComparisonOperator,
+    selected_operator: ComparisonOperator,
+    left_value: &mut ValuePointer,
+    right_value: &mut ValuePointer,
+) -> Option<Expression> {
+    if selected_operator == current_operator {
+        return None;
+    }
+
+    let left = left_value.clone();
+    let right = right_value.clone();
+    Some(match selected_operator {
+        ComparisonOperator::Equals => Expression::Equals(left, right),
+        ComparisonOperator::NotEquals => Expression::NotEquals(left, right),
+        ComparisonOperator::LessThan => Expression::LessThan(left, right),
+        ComparisonOperator::LessThanOrEquals => Expression::LessThanOrEquals(left, right),
+        ComparisonOperator::GreaterThan => Expression::GreaterThan(left, right),
+        ComparisonOperator::GreaterThanOrEquals => Expression::GreaterThanOrEquals(left, right),
+    })
+}
+
+fn value_pointer_ui(value: &mut ValuePointer, ui: &mut egui::Ui) {
     match value {
         ValuePointer::OnlineStatus(time) => {
             time_specifier_ui(time, ui);
@@ -197,36 +284,47 @@ fn value_pointer_ui(value: &ValuePointer, ui: &mut egui::Ui) {
             time_specifier_ui(time, ui);
             ui.label("Total KB/M Usage");
         }
-        ValuePointer::UserId => {}
+        ValuePointer::UserId => {
+            ui.label("Current User");
+        }
         ValuePointer::ConstBool(b) => {
-            if *b {
-                ui.label("true");
-            } else {
-                ui.label("false");
+            let text = if *b { "true" } else { "false" };
+            if ui.small_button(text).clicked() {
+                *b = !*b;
             }
         }
-        ValuePointer::ConstUserId(_) => {}
+        ValuePointer::ConstUserId(id) => {
+            ui.label(id.to_string());
+        }
         ValuePointer::ConstF64(v) => {
-            ui.label(v.to_string());
+            ui.add(egui::DragValue::new(v).speed(1).clamp_range(0.0..=100.0));
         }
     };
 }
 
-fn time_specifier_ui(time: &TimeSpecifier, ui: &mut egui::Ui) {
-    match time {
-        TimeSpecifier::Last => ui.small_button("Last"),
-        TimeSpecifier::Current => ui.small_button("Current"),
+fn time_specifier_ui(time: &mut TimeSpecifier, ui: &mut egui::Ui) {
+    match time.clone() {
+        TimeSpecifier::Last => {
+            if ui.small_button("Last").clicked() {
+                *time = TimeSpecifier::Current;
+            }
+        }
+        TimeSpecifier::Current => {
+            if ui.small_button("Current").clicked() {
+                *time = TimeSpecifier::Last;
+            }
+        }
     };
 }
 
 #[derive(Clone, PartialEq, Sequence)]
-enum ComparisonOperators {
-    Equals,
-    NotEquals,
-    LessThan,
-    LessThanOrEquals,
+enum ComparisonOperator {
     GreaterThan,
+    LessThan,
+    Equals,
     GreaterThanOrEquals,
+    LessThanOrEquals,
+    NotEquals,
 }
 
 enum ValueType {
@@ -235,7 +333,7 @@ enum ValueType {
     F64,
 }
 
-impl ComparisonOperators {
+impl ComparisonOperator {
     fn valid_for_value(&self, value: &ValuePointer) -> bool {
         let value_type = ValueType::from_pointer(value);
         self.valid_for_value_type(value_type)
@@ -245,20 +343,20 @@ impl ComparisonOperators {
         match value_type {
             ValueType::Bool => matches!(
                 self,
-                ComparisonOperators::Equals | ComparisonOperators::NotEquals
+                ComparisonOperator::Equals | ComparisonOperator::NotEquals
             ),
             ValueType::UserId => matches!(
                 self,
-                ComparisonOperators::Equals | ComparisonOperators::NotEquals
+                ComparisonOperator::Equals | ComparisonOperator::NotEquals
             ),
             ValueType::F64 => matches!(
                 self,
-                ComparisonOperators::Equals
-                    | ComparisonOperators::NotEquals
-                    | ComparisonOperators::GreaterThan
-                    | ComparisonOperators::GreaterThanOrEquals
-                    | ComparisonOperators::LessThan
-                    | ComparisonOperators::LessThanOrEquals
+                ComparisonOperator::Equals
+                    | ComparisonOperator::NotEquals
+                    | ComparisonOperator::GreaterThan
+                    | ComparisonOperator::GreaterThanOrEquals
+                    | ComparisonOperator::LessThan
+                    | ComparisonOperator::LessThanOrEquals
             ),
         }
     }
@@ -276,15 +374,15 @@ impl ValueType {
     }
 }
 
-impl std::fmt::Display for ComparisonOperators {
+impl std::fmt::Display for ComparisonOperator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ComparisonOperators::Equals => write!(f, "="),
-            ComparisonOperators::NotEquals => write!(f, "≠"),
-            ComparisonOperators::LessThan => write!(f, "<"),
-            ComparisonOperators::LessThanOrEquals => write!(f, "<="),
-            ComparisonOperators::GreaterThan => write!(f, ">"),
-            ComparisonOperators::GreaterThanOrEquals => write!(f, ">="),
+            ComparisonOperator::Equals => write!(f, "="),
+            ComparisonOperator::NotEquals => write!(f, "≠"),
+            ComparisonOperator::LessThan => write!(f, "<"),
+            ComparisonOperator::LessThanOrEquals => write!(f, "<="),
+            ComparisonOperator::GreaterThan => write!(f, ">"),
+            ComparisonOperator::GreaterThanOrEquals => write!(f, ">="),
         }
     }
 }
