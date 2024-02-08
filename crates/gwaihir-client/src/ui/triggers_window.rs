@@ -1,7 +1,7 @@
 use super::{ui_extension_methods::UIExtensionMethods, widgets::show_centered_window};
 use crate::triggers::{
-    Action, Expression, NotificationTemplate, TimeSpecifier, Trigger, TriggerManager,
-    TriggerSource, ValuePointer,
+    Action, Expression, ExpressionRef, NotificationTemplate, TimeSpecifier, Trigger,
+    TriggerManager, TriggerSource, ValuePointer,
 };
 use egui::{Color32, ComboBox};
 use enum_iterator::Sequence;
@@ -129,32 +129,23 @@ impl TriggersWindow {
     }
 }
 
-fn criteria_ui_rec(criteria: &mut Expression, ui: &mut egui::Ui, id_base: String) {
-    let new_criteria = match criteria {
-        Expression::And(l, r) => {
-            criteria_ui_rec(l, ui, format!("{id_base}_andl"));
-            let mut button_clicked = false;
-            if ui.button("AND").clicked() {
-                button_clicked = true;
-            }
-            criteria_ui_rec(r, ui, format!("{id_base}_andr"));
+enum ExpressionTreeAction {
+    None,
+    RemoveNode,
+    UpdateNode(Expression),
+}
 
-            if button_clicked {
-                Some(Expression::Or(l.clone(), r.clone()))
-            } else {
-                None
-            }
+fn criteria_ui_rec(
+    criteria: &mut Expression,
+    ui: &mut egui::Ui,
+    id_base: String,
+) -> ExpressionTreeAction {
+    let action = match criteria {
+        Expression::And(l, r) => {
+            show_binary_boolean_ui(l, r, format!("{id_base}_and"), "AND", Expression::Or, ui)
         }
         Expression::Or(l, r) => {
-            criteria_ui_rec(l, ui, format!("{id_base}_orl"));
-            let button_clicked = ui.button("OR").clicked();
-            criteria_ui_rec(r, ui, format!("{id_base}_orr"));
-
-            if button_clicked {
-                Some(Expression::And(l.clone(), r.clone()))
-            } else {
-                None
-            }
+            show_binary_boolean_ui(l, r, format!("{id_base}_or"), "OR", Expression::And, ui)
         }
         Expression::Equals(l, r) => show_operator_ui(
             ComparisonOperator::Equals,
@@ -200,11 +191,38 @@ fn criteria_ui_rec(criteria: &mut Expression, ui: &mut egui::Ui, id_base: String
         ),
         Expression::True => {
             ui.label("True");
-            None
+            ExpressionTreeAction::None
         }
     };
-    if let Some(new_criteria) = new_criteria {
-        *criteria = new_criteria;
+
+    if let ExpressionTreeAction::UpdateNode(new_expression) = action {
+        *criteria = new_expression;
+        ExpressionTreeAction::None
+    } else {
+        action
+    }
+}
+
+fn show_binary_boolean_ui(
+    l: &mut ExpressionRef,
+    r: &mut ExpressionRef,
+    id_base: String,
+    button_text: impl Into<egui::WidgetText>,
+    convert_to_other: impl FnOnce(ExpressionRef, ExpressionRef) -> Expression,
+    ui: &mut egui::Ui,
+) -> ExpressionTreeAction {
+    let left_action = criteria_ui_rec(l, ui, format!("{id_base}_l"));
+    let button_clicked = ui.button(button_text).clicked();
+    let right_action = criteria_ui_rec(r, ui, format!("{id_base}_r"));
+
+    if button_clicked {
+        ExpressionTreeAction::UpdateNode(convert_to_other(l.to_owned(), r.to_owned()))
+    } else if let ExpressionTreeAction::RemoveNode = left_action {
+        ExpressionTreeAction::UpdateNode(r.as_ref().to_owned())
+    } else if let ExpressionTreeAction::RemoveNode = right_action {
+        ExpressionTreeAction::UpdateNode(l.as_ref().to_owned())
+    } else {
+        ExpressionTreeAction::None
     }
 }
 
@@ -214,12 +232,16 @@ fn show_operator_ui(
     left_value: &mut ValuePointer,
     right_value: &mut ValuePointer,
     ui: &mut egui::Ui,
-) -> Option<Expression> {
+) -> ExpressionTreeAction {
     ui.horizontal(|ui| {
         value_pointer_ui(left_value, ui);
         let mut current = operator.clone();
         show_operator_selector_ui(&mut current, ui, left_value, right_value, id_base);
         value_pointer_ui(right_value, ui);
+
+        if ui.button("x").clicked() {
+            return ExpressionTreeAction::RemoveNode;
+        }
 
         get_updated_expression(operator, current, left_value, right_value)
     })
@@ -235,6 +257,7 @@ fn show_operator_selector_ui(
 ) {
     ComboBox::from_id_source(format!("{id_base}_operatorcombobox"))
         .selected_text(format!("{}", current_operator))
+        .width(10.0)
         .show_ui(ui, |ui| {
             for operator in enum_iterator::all::<ComparisonOperator>()
                 .filter(|o| o.valid_for_value(left_value) && o.valid_for_value(right_value))
@@ -249,14 +272,14 @@ fn get_updated_expression(
     selected_operator: ComparisonOperator,
     left_value: &mut ValuePointer,
     right_value: &mut ValuePointer,
-) -> Option<Expression> {
+) -> ExpressionTreeAction {
     if selected_operator == current_operator {
-        return None;
+        return ExpressionTreeAction::None;
     }
 
     let left = left_value.clone();
     let right = right_value.clone();
-    Some(match selected_operator {
+    ExpressionTreeAction::UpdateNode(match selected_operator {
         ComparisonOperator::Equals => Expression::Equals(left, right),
         ComparisonOperator::NotEquals => Expression::NotEquals(left, right),
         ComparisonOperator::LessThan => Expression::LessThan(left, right),
@@ -393,8 +416,8 @@ fn show_add_condition_ui(criteria: &mut Expression, ui: &mut egui::Ui) {
                 let starting_expression = addable.get_default();
                 let last_expression = criteria.get_left_to_right_dfs_last_expr_mut();
                 *last_expression = Expression::And(
-                    Box::new(last_expression.to_owned()),
-                    Box::new(starting_expression),
+                    ExpressionRef::new(last_expression.to_owned()),
+                    ExpressionRef::new(starting_expression),
                 );
             }
         }
