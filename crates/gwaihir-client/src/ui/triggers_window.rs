@@ -5,6 +5,7 @@ use crate::triggers::{
 };
 use egui::{Color32, ComboBox};
 use enum_iterator::Sequence;
+use gwaihir_client_lib::UniqueUserId;
 
 pub struct TriggersWindow {
     shown: bool,
@@ -44,6 +45,7 @@ impl TriggersWindow {
                     ui.checkbox(&mut trigger.requestable, "Requestable");
                 });
                 criteria_ui_rec(&mut trigger.criteria, ui, id.to_string());
+                show_add_condition_ui(&mut trigger.criteria, ui);
                 ui.separator();
             }
 
@@ -288,7 +290,10 @@ fn value_pointer_ui(value: &mut ValuePointer, ui: &mut egui::Ui) {
             }
         }
         ValuePointer::ConstUserId(id) => {
-            ui.label(id.to_string());
+            let mut id_str = id.to_string();
+            if ui.text_edit_singleline(&mut id_str).changed() {
+                *id = UniqueUserId::new(id_str);
+            }
         }
         ValuePointer::ConstF64(v) => {
             ui.add(egui::DragValue::new(v).speed(1).clamp_range(0.0..=100.0));
@@ -377,6 +382,63 @@ impl std::fmt::Display for ComparisonOperator {
             ComparisonOperator::LessThanOrEquals => write!(f, "<="),
             ComparisonOperator::GreaterThan => write!(f, ">"),
             ComparisonOperator::GreaterThanOrEquals => write!(f, ">="),
+        }
+    }
+}
+
+fn show_add_condition_ui(criteria: &mut Expression, ui: &mut egui::Ui) {
+    ui.menu_button("Add condition", |ui| {
+        for addable in enum_iterator::all::<AddableExpression>() {
+            if ui.button(addable.clone().to_string()).clicked() {
+                let starting_expression = addable.get_default();
+                let last_expression = criteria.get_left_to_right_dfs_last_expr_mut();
+                *last_expression = Expression::And(
+                    Box::new(last_expression.to_owned()),
+                    Box::new(starting_expression),
+                );
+            }
+        }
+    });
+}
+
+#[derive(Clone, PartialEq, Sequence)]
+enum AddableExpression {
+    OnlineStatus,
+    LockStatus,
+    TotalKeyboardMouseUsage,
+    UserId,
+}
+
+impl AddableExpression {
+    fn get_default(&self) -> Expression {
+        match self {
+            AddableExpression::OnlineStatus => Expression::Equals(
+                ValuePointer::OnlineStatus(TimeSpecifier::Current),
+                ValuePointer::ConstBool(true),
+            ),
+            AddableExpression::LockStatus => Expression::Equals(
+                ValuePointer::LockStatus(TimeSpecifier::Current),
+                ValuePointer::ConstBool(true),
+            ),
+            AddableExpression::TotalKeyboardMouseUsage => Expression::Equals(
+                ValuePointer::TotalKeyboardMouseUsage(TimeSpecifier::Current),
+                ValuePointer::ConstF64(0.0),
+            ),
+            AddableExpression::UserId => Expression::Equals(
+                ValuePointer::UserId,
+                ValuePointer::ConstUserId(UniqueUserId::new("")),
+            ),
+        }
+    }
+}
+
+impl std::fmt::Display for AddableExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AddableExpression::OnlineStatus => write!(f, "Online Status"),
+            AddableExpression::LockStatus => write!(f, "Lock Status"),
+            AddableExpression::TotalKeyboardMouseUsage => write!(f, "Total KB/M Usage"),
+            AddableExpression::UserId => write!(f, "User Id"),
         }
     }
 }

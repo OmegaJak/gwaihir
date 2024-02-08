@@ -91,6 +91,14 @@ impl Expression {
             Expression::True => EvalResult::Ok(true),
         }
     }
+
+    pub fn get_left_to_right_dfs_last_expr_mut(&mut self) -> &mut Expression {
+        match self {
+            Expression::And(_, r) => r.get_left_to_right_dfs_last_expr_mut(),
+            Expression::Or(_, r) => r.get_left_to_right_dfs_last_expr_mut(),
+            s => s,
+        }
+    }
 }
 
 fn binary_operator(
