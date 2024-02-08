@@ -314,7 +314,12 @@ fn value_pointer_ui(value: &mut ValuePointer, ui: &mut egui::Ui) {
         }
         ValuePointer::ConstUserId(id) => {
             let mut id_str = id.to_string();
-            if ui.text_edit_singleline(&mut id_str).changed() {
+            if egui::TextEdit::singleline(&mut id_str)
+                .desired_width(100.0)
+                .show(ui)
+                .response
+                .changed()
+            {
                 *id = UniqueUserId::new(id_str);
             }
         }
@@ -419,6 +424,7 @@ fn show_add_condition_ui(criteria: &mut Expression, ui: &mut egui::Ui) {
                     ExpressionRef::new(last_expression.to_owned()),
                     ExpressionRef::new(starting_expression),
                 );
+                ui.close_menu();
             }
         }
     });
