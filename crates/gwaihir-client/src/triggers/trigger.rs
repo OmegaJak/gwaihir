@@ -13,6 +13,7 @@ use std::collections::HashMap;
 pub struct Trigger {
     pub name: String,
     pub enabled: bool,
+    pub requestable: bool,
     pub requested_users: HashMap<UniqueUserId, BehaviorOnTrigger>,
     pub source: TriggerSource,
 
@@ -32,15 +33,6 @@ pub enum TriggerSource {
     User,
 }
 
-impl Trigger {
-    pub fn requestable(&self) -> bool {
-        matches!(
-            &self.criteria,
-            Expression::And(a, b) if matches!(a.as_ref(), Expression::RequestedForUser) || matches!(b.as_ref(), Expression::RequestedForUser)
-        )
-    }
-}
-
 pub mod persistence {
     use super::*;
     use crate::triggers::expression::persistence::ExpressionV1;
@@ -52,6 +44,7 @@ pub mod persistence {
         V1(TriggerV1),
         V2(TriggerV2),
         V3(TriggerV3),
+        V4(TriggerV4),
     }
 
     #[derive(Serialize, Deserialize, Clone)]
@@ -83,12 +76,25 @@ pub mod persistence {
         pub actions: Vec<Action>,
     }
 
+    #[derive(Serialize, Deserialize, Clone)]
+    pub struct TriggerV4 {
+        pub name: String,
+        pub enabled: bool,
+        pub requestable: bool,
+        pub requested_users: HashMap<UniqueUserId, BehaviorOnTrigger>,
+        pub source: TriggerSource,
+
+        pub criteria: Expression,
+        pub actions: Vec<Action>,
+    }
+
     impl From<VersionedTrigger> for Trigger {
         fn from(value: VersionedTrigger) -> Self {
             let value = value.upgrade_to_latest();
             Trigger {
                 name: value.name,
                 enabled: value.enabled,
+                requestable: value.requestable,
                 requested_users: value.requested_users,
                 source: value.source,
                 criteria: value.criteria,
@@ -99,9 +105,10 @@ pub mod persistence {
 
     impl From<Trigger> for VersionedTrigger {
         fn from(value: Trigger) -> Self {
-            VersionedTrigger::V3(TriggerV3 {
+            VersionedTrigger::V4(TriggerV4 {
                 name: value.name,
                 enabled: value.enabled,
+                requestable: value.requestable,
                 requested_users: value.requested_users,
                 source: value.source,
                 criteria: value.criteria,
@@ -131,6 +138,20 @@ pub mod persistence {
                 requested_users: self.requested_users,
                 source: self.source,
                 criteria: self.criteria.into(),
+                actions: self.actions,
+            }
+        }
+    }
+
+    impl Upgrade<TriggerV4> for TriggerV3 {
+        fn upgrade(self) -> TriggerV4 {
+            TriggerV4 {
+                name: self.name,
+                enabled: self.enabled,
+                requestable: true, // Not technically correct, being lazy here
+                requested_users: self.requested_users,
+                source: self.source,
+                criteria: self.criteria,
                 actions: self.actions,
             }
         }

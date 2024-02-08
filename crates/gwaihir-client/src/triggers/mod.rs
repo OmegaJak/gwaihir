@@ -18,13 +18,23 @@ pub use trigger_manager::TriggerManager;
 pub use value_pointer::TimeSpecifier;
 pub use value_pointer::ValuePointer;
 
+use crate::notification::NotificationDispatch;
+
 #[derive(new, Clone)]
 pub struct Update<T> {
     original: T,
     updated: T,
 }
 
+#[cfg(test)]
+impl<T> Update<T> {
+    pub(crate) fn as_ref(&self) -> Update<&T> {
+        Update::new(&self.original, &self.updated)
+    }
+}
+
 #[derive(Serialize)]
-struct TriggerContext {
+pub struct TriggerContext<'a, T: NotificationDispatch> {
     user: String,
+    notification_dispatch: &'a T,
 }

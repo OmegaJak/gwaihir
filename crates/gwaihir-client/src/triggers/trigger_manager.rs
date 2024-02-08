@@ -3,7 +3,7 @@ use super::{
     trigger::{BehaviorOnTrigger, TriggerSource},
     Trigger, TriggerContext, Update,
 };
-use crate::sensors::outputs::sensor_outputs::SensorOutputs;
+use crate::{notification::NotificationDispatch, sensors::outputs::sensor_outputs::SensorOutputs};
 use gwaihir_client_lib::UniqueUserId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -47,38 +47,41 @@ impl TriggerManager {
         user_id: &UniqueUserId,
         user_display_name: String,
         update: Update<&SensorOutputs>,
+        notification_dispatch: &impl NotificationDispatch,
     ) {
         let trigger_context = TriggerContext {
             user: user_display_name,
+            notification_dispatch,
         };
         for trigger in self.triggers.values_mut().filter(|t| t.enabled) {
             let eval_data = EvalData {
                 user: user_id,
                 update: update.clone(),
-                requested_users: &trigger.requested_users,
             };
 
-            match trigger.criteria.evaluate(&eval_data) {
-                Ok(result) => {
-                    if result {
-                        for action in trigger.actions.iter() {
-                            action.execute(&trigger_context);
+            if !trigger.requestable || trigger.requested_users.contains_key(user_id) {
+                match trigger.criteria.evaluate(&eval_data) {
+                    Ok(result) => {
+                        if result {
+                            for action in trigger.actions.iter() {
+                                action.execute(&trigger_context);
+                            }
                         }
 
                         if let Some(behavior_on_trigger) = trigger.requested_users.get(user_id) {
                             match behavior_on_trigger {
                                 BehaviorOnTrigger::NoAction => {}
                                 BehaviorOnTrigger::Remove => {
-                                    if trigger.requestable() {
+                                    if trigger.requestable {
                                         trigger.requested_users.remove(user_id);
                                     }
                                 }
                             }
                         }
                     }
-                }
-                Err(err) => {
-                    log::error!("Failed to evaluate criteria: {}", err);
+                    Err(err) => {
+                        log::error!("Failed to evaluate criteria: {}", err);
+                    }
                 }
             }
         }
@@ -160,18 +163,14 @@ mod default_triggers {
 
     pub fn user_coming_online() -> Trigger {
         let criteria = Expression::And(
-            Expression::RequestedForUser.into(),
-            Expression::And(
-                Expression::Equals(
-                    ValuePointer::OnlineStatus(TimeSpecifier::Last),
-                    ValuePointer::ConstBool(false),
-                )
-                .into(),
-                Expression::Equals(
-                    ValuePointer::OnlineStatus(TimeSpecifier::Current),
-                    ValuePointer::ConstBool(true),
-                )
-                .into(),
+            Expression::Equals(
+                ValuePointer::OnlineStatus(TimeSpecifier::Last),
+                ValuePointer::ConstBool(false),
+            )
+            .into(),
+            Expression::Equals(
+                ValuePointer::OnlineStatus(TimeSpecifier::Current),
+                ValuePointer::ConstBool(true),
             )
             .into(),
         );
@@ -182,28 +181,25 @@ mod default_triggers {
         let name = "User coming online".to_string();
         Trigger {
             criteria,
+            enabled: true,
+            requestable: true,
             requested_users: Default::default(),
             source: TriggerSource::AppDefaults,
             actions,
             name,
-            enabled: true,
         }
     }
 
     pub fn user_unlocked() -> Trigger {
         let criteria = Expression::And(
-            Expression::RequestedForUser.into(),
-            Expression::And(
-                Expression::Equals(
-                    ValuePointer::LockStatus(TimeSpecifier::Last),
-                    ValuePointer::ConstBool(true),
-                )
-                .into(),
-                Expression::Equals(
-                    ValuePointer::LockStatus(TimeSpecifier::Current),
-                    ValuePointer::ConstBool(false),
-                )
-                .into(),
+            Expression::Equals(
+                ValuePointer::LockStatus(TimeSpecifier::Last),
+                ValuePointer::ConstBool(true),
+            )
+            .into(),
+            Expression::Equals(
+                ValuePointer::LockStatus(TimeSpecifier::Current),
+                ValuePointer::ConstBool(false),
             )
             .into(),
         );
@@ -214,28 +210,25 @@ mod default_triggers {
         let name = "User unlocked".to_string();
         Trigger {
             criteria,
+            enabled: true,
+            requestable: true,
             requested_users: Default::default(),
             source: TriggerSource::AppDefaults,
             actions,
             name,
-            enabled: true,
         }
     }
 
     pub fn user_active_again() -> Trigger {
         let criteria = Expression::And(
-            Expression::RequestedForUser.into(),
-            Expression::And(
-                Expression::Equals(
-                    ValuePointer::TotalKeyboardMouseUsage(TimeSpecifier::Last),
-                    ValuePointer::ConstF64(0.0),
-                )
-                .into(),
-                Expression::GreaterThan(
-                    ValuePointer::TotalKeyboardMouseUsage(TimeSpecifier::Current),
-                    ValuePointer::ConstF64(0.0),
-                )
-                .into(),
+            Expression::Equals(
+                ValuePointer::TotalKeyboardMouseUsage(TimeSpecifier::Last),
+                ValuePointer::ConstF64(0.0),
+            )
+            .into(),
+            Expression::GreaterThan(
+                ValuePointer::TotalKeyboardMouseUsage(TimeSpecifier::Current),
+                ValuePointer::ConstF64(0.0),
             )
             .into(),
         );
@@ -247,11 +240,120 @@ mod default_triggers {
         let name = "User active again".to_string();
         Trigger {
             criteria,
+            enabled: true,
+            requestable: true,
             requested_users: Default::default(),
             source: TriggerSource::AppDefaults,
             actions,
             name,
-            enabled: true,
         }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::{
+        notification::MockNotificationDispatch,
+        triggers::{Action, Expression, NotificationTemplate},
+    };
+    use lazy_static::lazy_static;
+    use maplit::hashmap;
+
+    lazy_static! {
+        static ref REQUESTED_USER_ID: UniqueUserId = UniqueUserId::new("requested");
+        static ref NOT_REQUESTED_USER_ID: UniqueUserId = UniqueUserId::new("not_requested");
+    }
+
+    #[test]
+    pub fn execute_triggers_when_trigger_not_requestable_and_not_requested_executes_trigger() {
+        let mut notification_dispatch = MockNotificationDispatch::new();
+        let mut manager = TriggerManager::default();
+        manager.add_trigger(Trigger {
+            requestable: false,
+            requested_users: hashmap!(),
+            ..default_test_trigger()
+        });
+
+        notification_dispatch
+            .expect_show_notification()
+            .times(1)
+            .return_const(());
+
+        manager.execute_triggers(
+            &REQUESTED_USER_ID,
+            "".to_owned(),
+            empty_update().as_ref(),
+            &notification_dispatch,
+        );
+    }
+
+    #[test]
+    pub fn execute_triggers_when_trigger_requestable_and_requested_executes_trigger() {
+        let mut notification_dispatch = MockNotificationDispatch::new();
+        let mut manager = TriggerManager::default();
+        manager.add_trigger(Trigger {
+            requestable: true,
+            requested_users: hashmap!(REQUESTED_USER_ID.clone() => BehaviorOnTrigger::NoAction),
+            ..default_test_trigger()
+        });
+
+        notification_dispatch
+            .expect_show_notification()
+            .times(1)
+            .return_const(());
+
+        manager.execute_triggers(
+            &REQUESTED_USER_ID,
+            "".to_owned(),
+            empty_update().as_ref(),
+            &notification_dispatch,
+        );
+    }
+
+    #[test]
+    pub fn execute_triggers_when_trigger_requestable_and_not_requested_skips_trigger() {
+        let mut notification_dispatch = MockNotificationDispatch::new();
+        let mut manager = TriggerManager::default();
+        manager.add_trigger(Trigger {
+            requestable: true,
+            requested_users: hashmap!(),
+            ..default_test_trigger()
+        });
+
+        notification_dispatch
+            .expect_show_notification()
+            .times(0)
+            .return_const(());
+
+        manager.execute_triggers(
+            &REQUESTED_USER_ID,
+            "".to_owned(),
+            empty_update().as_ref(),
+            &notification_dispatch,
+        );
+    }
+
+    fn default_test_trigger() -> Trigger {
+        Trigger {
+            name: "test trigger".to_owned(),
+            enabled: true,
+            requestable: true,
+            requested_users: hashmap!(REQUESTED_USER_ID.clone() => BehaviorOnTrigger::NoAction),
+            source: TriggerSource::AppDefaults,
+            criteria: Expression::True,
+            actions: vec![Action::ShowNotification(NotificationTemplate::new(
+                "summary".to_owned(),
+                "body".to_owned(),
+            ))],
+        }
+    }
+
+    fn empty_update() -> Update<SensorOutputs> {
+        Update::new(empty_sensor_outputs(), empty_sensor_outputs())
+    }
+
+    fn empty_sensor_outputs() -> SensorOutputs {
+        SensorOutputs { outputs: vec![] }
     }
 }

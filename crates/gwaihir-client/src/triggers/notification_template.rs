@@ -1,5 +1,5 @@
 use super::TriggerContext;
-use crate::show_notification;
+use crate::notification::NotificationDispatch;
 use log_err::LogErrResult;
 use serde::{Deserialize, Serialize};
 use upon::Engine;
@@ -20,6 +20,11 @@ pub struct NotificationTemplate {
 struct NotificationTemplateShadow {
     summary: String,
     body: String,
+}
+
+#[derive(Serialize)]
+struct RenderContext {
+    user: String,
 }
 
 impl From<NotificationTemplateShadow> for NotificationTemplate {
@@ -61,20 +66,28 @@ impl NotificationTemplate {
         }
     }
 
-    pub(super) fn show_notification(&self, context: &TriggerContext) {
+    pub(super) fn show_notification<T: NotificationDispatch>(
+        &self,
+        context: &TriggerContext<'_, T>,
+    ) {
+        let render_context = RenderContext {
+            user: context.user.clone(),
+        };
         let summary = self
             .template
             .template(Self::SUMMARY_TEMPLATE_NAME)
-            .render(context)
+            .render(&render_context)
             .to_string()
             .log_unwrap();
         let body = self
             .template
             .template(Self::BODY_TEMPLATE_NAME)
-            .render(context)
+            .render(&render_context)
             .to_string()
             .log_unwrap();
-        show_notification(&summary, &body);
+        context
+            .notification_dispatch
+            .show_notification(&summary, &body);
     }
 
     fn compile_template<'a>(summary: String, body: String) -> Engine<'a> {

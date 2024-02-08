@@ -41,7 +41,7 @@ impl TriggersWindow {
             for (id, trigger) in change_matcher.triggers_iter_mut() {
                 ui.horizontal(|ui| {
                     ui.label(trigger.name.clone());
-                    ui.stateless_checkbox(trigger.requestable(), "Requestable");
+                    ui.checkbox(&mut trigger.requestable, "Requestable");
                 });
                 criteria_ui_rec(&mut trigger.criteria, ui, id.to_string());
                 ui.separator();
@@ -94,17 +94,11 @@ impl TriggersWindow {
             ui.checkbox(&mut self.requestable_input, "Requestable");
             if ui.button("Add").clicked() {
                 match ron::from_str::<Expression>(&self.criteria_input) {
-                    Ok(mut criteria) => {
-                        if self.requestable_input {
-                            criteria = Expression::And(
-                                Expression::RequestedForUser.into(),
-                                criteria.into(),
-                            );
-                        }
-
+                    Ok(criteria) => {
                         let matcher = Trigger {
                             name: self.name_input.clone(),
                             enabled: self.enabled_input,
+                            requestable: self.requestable_input,
                             criteria,
                             source: TriggerSource::User,
                             actions: vec![Action::ShowNotification(NotificationTemplate::new(
@@ -138,10 +132,7 @@ fn criteria_ui_rec(criteria: &mut Expression, ui: &mut egui::Ui, id_base: String
         Expression::And(l, r) => {
             criteria_ui_rec(l, ui, format!("{id_base}_andl"));
             let mut button_clicked = false;
-            if !matches!(l.as_ref(), Expression::RequestedForUser)
-                && !matches!(r.as_ref(), Expression::RequestedForUser)
-                && ui.button("AND").clicked()
-            {
+            if ui.button("AND").clicked() {
                 button_clicked = true;
             }
             criteria_ui_rec(r, ui, format!("{id_base}_andr"));
@@ -205,7 +196,10 @@ fn criteria_ui_rec(criteria: &mut Expression, ui: &mut egui::Ui, id_base: String
             r,
             ui,
         ),
-        Expression::RequestedForUser => None,
+        Expression::True => {
+            ui.label("True");
+            None
+        }
     };
     if let Some(new_criteria) = new_criteria {
         *criteria = new_criteria;
@@ -285,7 +279,7 @@ fn value_pointer_ui(value: &mut ValuePointer, ui: &mut egui::Ui) {
             ui.label("Total KB/M Usage");
         }
         ValuePointer::UserId => {
-            ui.label("Current User");
+            ui.label("UserId");
         }
         ValuePointer::ConstBool(b) => {
             let text = if *b { "true" } else { "false" };

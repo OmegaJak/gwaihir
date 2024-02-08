@@ -1,5 +1,6 @@
 use crate::{
     networking::network_manager::NetworkManager,
+    notification::{NotificationDispatch, OSNotificationDispatch},
     periodic_repaint_thread::create_periodic_repaint_thread,
     persistence::{Persistence, PersistenceV1, VersionedPersistence},
     project_dirs,
@@ -8,7 +9,6 @@ use crate::{
         lock_status_sensor::{init_lock_status_sensor, EventLoopRegisteredLockStatusSensorBuilder},
         outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
     },
-    show_notification,
     tray_icon::{hide_to_tray, TrayIconData},
     triggers::{BehaviorOnTrigger, TriggerManager, Update},
     ui::{
@@ -217,7 +217,11 @@ impl GwaihirApp {
                         EnabledOnce,
                     }
 
-                    for (_, trigger) in self.trigger_manager().triggers_iter_mut() {
+                    for (_, trigger) in self
+                        .trigger_manager()
+                        .triggers_iter_mut()
+                        .filter(|(_, t)| t.requestable)
+                    {
                         let mut current_state = match trigger.requested_users.get(target_user_id) {
                             Some(BehaviorOnTrigger::NoAction) => TriggerState::Enabled,
                             Some(BehaviorOnTrigger::Remove) => TriggerState::EnabledOnce,
@@ -298,7 +302,7 @@ fn load_and_migrate_persistence(
         v1.into()
     } else {
         // This is here as insurance to ensure we don't overwrite a previously valid .ron with empty Persistence if Persistence wasn't migrated correctly
-        show_notification("Gwaihir init failed", "Gwaihir failed to initialize due to an error decoding its config. View the log for more details");
+        OSNotificationDispatch.show_notification("Gwaihir init failed", "Gwaihir failed to initialize due to an error decoding its config. View the log for more details");
         open_log_file(log_file_location);
         panic!("Failed to deserialize app config");
     }
@@ -352,6 +356,7 @@ impl eframe::App for GwaihirApp {
                                 &status.user_id,
                                 display_name,
                                 Update::new(&current.sensor_outputs, &status.sensor_outputs),
+                                &OSNotificationDispatch,
                             );
                         }
                         self.current_status.insert(status.user_id.clone(), status);

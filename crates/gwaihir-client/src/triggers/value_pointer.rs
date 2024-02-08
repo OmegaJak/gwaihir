@@ -37,7 +37,7 @@ pub enum Value {
 }
 
 impl ValuePointer {
-    pub fn get_value(&self, data: &EvalData<'_, '_, '_>) -> Option<Value> {
+    pub fn get_value(&self, data: &EvalData<'_, '_>) -> Option<Value> {
         match self {
             ValuePointer::OnlineStatus(time_specifier) => {
                 get_outputs_by_time_specifier(&data.update, time_specifier)
