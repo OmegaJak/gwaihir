@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use super::{ui_extension_methods::UIExtensionMethods, widgets::show_centered_window};
 use crate::triggers::{
     Action, Expression, ExpressionRef, NotificationTemplate, NotificationTemplateError,
-    TimeSpecifier, Trigger, TriggerManager, TriggerSource, ValuePointer,
+    TimeSpecifier, Trigger, TriggerManager, ValuePointer,
 };
 use egui::{Color32, ComboBox, TextBuffer};
 use enum_iterator::Sequence;
@@ -11,12 +11,6 @@ use gwaihir_client_lib::UniqueUserId;
 
 pub struct TriggersWindow {
     shown: bool,
-    name_input: String,
-    criteria_input: String,
-    notification_summary_input: String,
-    notification_body_input: String,
-    enabled_input: bool,
-    requestable_input: bool,
     err: Option<String>,
     last_deleted_trigger: Option<Trigger>,
     notification_errors: HashMap<String, String>,
@@ -26,12 +20,6 @@ impl TriggersWindow {
     pub fn new() -> Self {
         Self {
             shown: false,
-            name_input: Default::default(),
-            criteria_input: Default::default(),
-            notification_summary_input: Default::default(),
-            notification_body_input: Default::default(),
-            enabled_input: true,
-            requestable_input: false,
             err: None,
             last_deleted_trigger: None,
             notification_errors: HashMap::new(),
@@ -44,132 +32,95 @@ impl TriggersWindow {
 
     pub fn show(&mut self, ctx: &egui::Context, change_matcher: &mut TriggerManager) {
         self.shown = show_centered_window(self.shown, "Triggers", ctx, |ui| {
-            let mut triggers_to_remove = Vec::new();
-            for (id, trigger) in change_matcher.triggers_iter_mut() {
-                ui.horizontal(|ui| {
-                    ui.heading(trigger.name.clone())
-                        .context_menu(|ui| {
-                            ui.name_input("Set name", format!("set_trigger_name_{id}"), |name| {
-                                trigger.name = name;
-                            });
-
-                            ui.separator();
-                            if ui.button("Delete").clicked() {
-                                self.last_deleted_trigger = Some(trigger.clone());
-                                triggers_to_remove.push(id.to_owned());
-                                ui.close_menu();
+            egui::TopBottomPanel::bottom("triggers_bottom_panel")
+                .resizable(false)
+                .min_height(0.0)
+                .show_inside(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        if ui.button("Reset default triggers").clicked() {
+                            change_matcher.reset_default_triggers();
+                        }
+                        if let Some(trigger) = self.last_deleted_trigger.as_ref() {
+                            if ui.button("Recover last deleted trigger").clicked() {
+                                change_matcher.add_trigger(trigger.clone());
+                                self.last_deleted_trigger = None;
                             }
-                        })
-                        .on_hover_text_at_pointer("Right click for options");
-                    ui.checkbox(&mut trigger.enabled, "Enabled");
-                    ui.checkbox(&mut trigger.requestable, "Requestable")
-                        .on_hover_text(
-                            "If true, this trigger will only run \
-                            for users that it is requested to run for. \
-                            If false, it will run for all users.",
-                        );
-                });
-                ui.collapsing_default_open_with_id("Criteria", format!("{id}_criteria"), |ui| {
-                    show_criteria_ui_rec(&mut trigger.criteria, ui, id.to_string(), None);
-                });
-                ui.collapsing_default_open_with_id("Action(s)", format!("{id}_actions"), |ui| {
-                    for (i, action) in trigger.actions.iter_mut().enumerate() {
-                        self.show_action_ui(action, format!("{id}_action{i}"), ui);
-                    }
-                });
-                ui.separator();
-            }
+                        }
 
-            for id in triggers_to_remove {
-                change_matcher.remove_trigger_by_id(&id);
-            }
-
-            ui.heading("Current");
-            egui::Grid::new("existing_notifications")
-                .num_columns(1)
-                .striped(true)
-                .show(ui, |ui| {
-                    for (id, serialized_matcher_criteria) in
-                        change_matcher.get_serialized_triggers()
-                    {
-                        ui.horizontal(|ui| {
-                            let mut tmp = serialized_matcher_criteria.clone();
-                            ui.text_edit_multiline(&mut tmp);
-
-                            if ui.button("X").clicked() {
-                                change_matcher.remove_trigger_by_id(&id);
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                            if ui.button("Add trigger").clicked() {
+                                let trigger = Default::default();
+                                change_matcher.add_trigger(trigger);
                             }
                         });
-                        ui.end_row();
+                    });
+
+                    if let Some(err) = &self.err {
+                        ui.separator();
+                        ui.colored_label(Color32::RED, err);
                     }
                 });
 
-            ui.heading("Add new ");
-            ui.horizontal(|ui| {
-                ui.label("Name: ");
-                egui::TextEdit::singleline(&mut self.name_input)
-                    .desired_width(f32::INFINITY)
-                    .show(ui);
-            });
-            ui.horizontal(|ui| {
-                ui.label("Criteria: ");
-                egui::TextEdit::singleline(&mut self.criteria_input)
-                    .desired_width(f32::INFINITY)
-                    .show(ui);
-            });
-            ui.horizontal(|ui| {
-                ui.label("Notif Summary: ");
-                egui::TextEdit::singleline(&mut self.notification_summary_input)
-                    .desired_width(f32::INFINITY)
-                    .show(ui);
-            });
-            ui.horizontal(|ui| {
-                ui.label("Notif Body: ");
-                ui.text_edit_multiline(&mut self.notification_body_input);
-            });
-            ui.checkbox(&mut self.enabled_input, "Enabled");
-            ui.checkbox(&mut self.requestable_input, "Requestable");
-            if ui.button("Add").clicked() {
-                match ron::from_str::<Expression>(&self.criteria_input) {
-                    Ok(criteria) => {
-                        let matcher = Trigger {
-                            name: self.name_input.clone(),
-                            enabled: self.enabled_input,
-                            requestable: self.requestable_input,
-                            criteria,
-                            source: TriggerSource::User,
-                            actions: vec![Action::ShowNotification(NotificationTemplate::new(
-                                self.notification_summary_input.clone(),
-                                self.notification_body_input.clone(),
-                            ))],
-                            requested_users: Default::default(),
-                        };
-                        change_matcher.add_trigger(matcher);
-                        self.criteria_input.clear();
+            egui::CentralPanel::default().show_inside(ui, |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    let mut triggers_to_remove = Vec::new();
+                    for (id, trigger) in change_matcher.triggers_iter_mut() {
+                        ui.horizontal(|ui| {
+                            ui.heading(trigger.name.clone())
+                                .context_menu(|ui| {
+                                    ui.name_input(
+                                        "Set name",
+                                        format!("set_trigger_name_{id}"),
+                                        |name| {
+                                            trigger.name = name;
+                                        },
+                                    );
+
+                                    ui.separator();
+                                    if ui.button("Delete").clicked() {
+                                        self.last_deleted_trigger = Some(trigger.clone());
+                                        triggers_to_remove.push(id.to_owned());
+                                        ui.close_menu();
+                                    }
+                                })
+                                .on_hover_text_at_pointer("Right click for options");
+                            ui.checkbox(&mut trigger.enabled, "Enabled");
+                            ui.checkbox(&mut trigger.requestable, "Requestable")
+                                .on_hover_text(
+                                    "If true, this trigger will only run \
+                            for users that it is requested to run for. \
+                            If false, it will run for all users.",
+                                );
+                        });
+                        ui.collapsing_default_open_with_id(
+                            "Criteria",
+                            format!("{id}_criteria"),
+                            |ui| {
+                                show_criteria_ui_rec(
+                                    &mut trigger.criteria,
+                                    ui,
+                                    id.to_string(),
+                                    None,
+                                );
+                            },
+                        );
+                        ui.collapsing_default_open_with_id(
+                            "Action(s)",
+                            format!("{id}_actions"),
+                            |ui| {
+                                for (i, action) in trigger.actions.iter_mut().enumerate() {
+                                    self.show_action_ui(action, format!("{id}_action{i}"), ui);
+                                }
+                            },
+                        );
+                        ui.separator();
                     }
-                    Err(err) => self.err = Some(err.to_string()),
-                }
-            }
 
-            ui.separator();
-            if ui.button("Reset default triggers").clicked() {
-                change_matcher.reset_default_triggers();
-            }
-            if ui.button("Add trigger").clicked() {
-                let trigger = Default::default();
-                change_matcher.add_trigger(trigger);
-            }
-            if let Some(trigger) = self.last_deleted_trigger.as_ref() {
-                if ui.button("Recover last deleted trigger").clicked() {
-                    change_matcher.add_trigger(trigger.clone());
-                    self.last_deleted_trigger = None;
-                }
-            }
-
-            if let Some(err) = &self.err {
-                ui.separator();
-                ui.colored_label(Color32::RED, err);
-            }
+                    for id in triggers_to_remove {
+                        change_matcher.remove_trigger_by_id(&id);
+                    }
+                });
+            });
         });
     }
 
@@ -407,7 +358,7 @@ fn show_binary_boolean_ui(
     };
 
     if last_expression_type.is_some_and(|e| e != current_expression_type) {
-        ui.indent(format!("{id_base}_indent"), |ui| f(ui)).inner
+        ui.indent(format!("{id_base}_indent"), f).inner
     } else {
         f(ui)
     }

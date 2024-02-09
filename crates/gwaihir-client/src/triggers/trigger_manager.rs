@@ -31,13 +31,6 @@ impl TriggerManager {
         self.triggers.insert(Uuid::new_v4(), trigger);
     }
 
-    pub fn get_serialized_triggers(&self) -> Vec<(Uuid, String)> {
-        self.triggers
-            .iter()
-            .map(|(k, v)| (*k, ron::to_string(&v).unwrap()))
-            .collect()
-    }
-
     pub fn triggers_iter_mut(&mut self) -> impl Iterator<Item = (&Uuid, &mut Trigger)> {
         self.triggers.iter_mut()
     }
