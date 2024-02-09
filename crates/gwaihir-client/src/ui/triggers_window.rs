@@ -16,6 +16,7 @@ pub struct TriggersWindow {
     enabled_input: bool,
     requestable_input: bool,
     err: Option<String>,
+    last_deleted_trigger: Option<Trigger>,
 }
 
 impl TriggersWindow {
@@ -29,6 +30,7 @@ impl TriggersWindow {
             enabled_input: true,
             requestable_input: false,
             err: None,
+            last_deleted_trigger: None,
         }
     }
 
@@ -38,14 +40,37 @@ impl TriggersWindow {
 
     pub fn show(&mut self, ctx: &egui::Context, change_matcher: &mut TriggerManager) {
         self.shown = show_centered_window(self.shown, "Triggers", ctx, |ui| {
-            ui.heading("First");
+            let mut triggers_to_remove = Vec::new();
             for (id, trigger) in change_matcher.triggers_iter_mut() {
                 ui.horizontal(|ui| {
-                    ui.label(trigger.name.clone());
-                    ui.checkbox(&mut trigger.requestable, "Requestable");
+                    ui.heading(trigger.name.clone())
+                        .context_menu(|ui| {
+                            ui.name_input("Set name", format!("set_trigger_name_{id}"), |name| {
+                                trigger.name = name;
+                            });
+
+                            ui.separator();
+                            if ui.button("Delete").clicked() {
+                                self.last_deleted_trigger = Some(trigger.clone());
+                                triggers_to_remove.push(id.to_owned());
+                                ui.close_menu();
+                            }
+                        })
+                        .on_hover_text_at_pointer("Right click for options");
+                    ui.checkbox(&mut trigger.enabled, "Enabled");
+                    ui.checkbox(&mut trigger.requestable, "Requestable")
+                        .on_hover_text(
+                            "If true, this trigger will only run \
+                            for users that it is requested to run for. \
+                            If false, it will run for all users.",
+                        );
                 });
                 criteria_ui_rec(&mut trigger.criteria, ui, id.to_string(), None);
                 ui.separator();
+            }
+
+            for id in triggers_to_remove {
+                change_matcher.remove_trigger_by_id(&id);
             }
 
             ui.heading("Current");
@@ -118,6 +143,12 @@ impl TriggersWindow {
             ui.separator();
             if ui.button("Reset default triggers").clicked() {
                 change_matcher.reset_default_triggers();
+            }
+            if let Some(trigger) = self.last_deleted_trigger.as_ref() {
+                if ui.button("Recover last deleted trigger").clicked() {
+                    change_matcher.add_trigger(trigger.clone());
+                    self.last_deleted_trigger = None;
+                }
             }
 
             if let Some(err) = &self.err {
@@ -284,12 +315,19 @@ fn show_node_actions_menu_button(
     right_value: &mut ValuePointer,
 ) -> Option<ExpressionTreeAction> {
     ui.menu_button("...", |ui| {
+        let add_condition_response =
+            show_add_condition_button(ui, operator, left_value, right_value);
+        if add_condition_response.is_some() {
+            return add_condition_response;
+        }
+
+        ui.separator();
         if ui.button("Delete").clicked() {
             ui.close_menu();
             return Some(ExpressionTreeAction::RemoveNode);
         }
 
-        show_add_condition_button(ui, operator, left_value, right_value)
+        None
     })
     .inner
     .flatten()

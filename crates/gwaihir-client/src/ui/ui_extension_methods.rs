@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
 use egui::{
-    text::LayoutJob, CollapsingHeader, CollapsingResponse, InnerResponse, Response, RichText, Ui,
-    Widget, WidgetText,
+    text::LayoutJob, CollapsingHeader, CollapsingResponse, Id, InnerResponse, Response, RichText,
+    TextEdit, Ui, Widget, WidgetText,
 };
 
 pub trait UIExtensionMethods {
@@ -26,6 +26,13 @@ pub trait UIExtensionMethods {
         current_value: &mut Value,
         selected_value: Value,
     ) -> Response;
+
+    fn name_input(
+        &mut self,
+        button_text: impl Into<egui::WidgetText>,
+        id_source: impl std::hash::Hash,
+        set_name: impl FnMut(String),
+    );
 }
 
 impl UIExtensionMethods for Ui {
@@ -86,5 +93,36 @@ impl UIExtensionMethods for Ui {
             selected_value.clone(),
             selected_value.to_string(),
         )
+    }
+
+    fn name_input(
+        &mut self,
+        button_text: impl Into<egui::WidgetText>,
+        id_source: impl std::hash::Hash,
+        mut set_name: impl FnMut(String),
+    ) {
+        let id_source = Id::new(id_source);
+        let input_id = self.make_persistent_id(id_source);
+        let mut name = self.memory_mut(|mem| {
+            mem.data
+                .get_temp_mut_or_default::<String>(input_id)
+                .to_string()
+        });
+
+        self.horizontal(|ui| {
+            let text_edit_response = TextEdit::singleline(&mut name).desired_width(100.0).ui(ui);
+            if text_edit_response.changed() {
+                ui.memory_mut(|mem| mem.data.insert_temp(input_id, name.clone()));
+            }
+
+            if ui.button(button_text).clicked()
+                || (text_edit_response.lost_focus()
+                    && ui.input(|i| i.key_pressed(egui::Key::Enter)))
+            {
+                set_name(name.clone());
+                ui.memory_mut(|mem| mem.data.remove::<String>(input_id));
+                ui.close_menu();
+            }
+        });
     }
 }
