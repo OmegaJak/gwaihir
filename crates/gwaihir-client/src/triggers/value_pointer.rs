@@ -7,7 +7,7 @@ use super::{
 use gwaihir_client_lib::UniqueUserId;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
 #[serde(
     from = "persistence::VersionedValuePointer",
     into = "persistence::VersionedValuePointer"
@@ -23,7 +23,7 @@ pub enum ValuePointer {
     ConstF64(f64),
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
 pub enum TimeSpecifier {
     Last,
     Current,

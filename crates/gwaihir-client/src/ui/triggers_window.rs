@@ -44,8 +44,7 @@ impl TriggersWindow {
                     ui.label(trigger.name.clone());
                     ui.checkbox(&mut trigger.requestable, "Requestable");
                 });
-                criteria_ui_rec(&mut trigger.criteria, ui, id.to_string());
-                show_add_condition_ui(&mut trigger.criteria, ui);
+                criteria_ui_rec(&mut trigger.criteria, ui, id.to_string(), None);
                 ui.separator();
             }
 
@@ -129,6 +128,7 @@ impl TriggersWindow {
     }
 }
 
+#[derive(Debug)]
 enum ExpressionTreeAction {
     None,
     RemoveNode,
@@ -139,14 +139,27 @@ fn criteria_ui_rec(
     criteria: &mut Expression,
     ui: &mut egui::Ui,
     id_base: String,
+    last_expression_type: Option<ExpressionType>,
 ) -> ExpressionTreeAction {
     let action = match criteria {
-        Expression::And(l, r) => {
-            show_binary_boolean_ui(l, r, format!("{id_base}_and"), "AND", Expression::Or, ui)
-        }
-        Expression::Or(l, r) => {
-            show_binary_boolean_ui(l, r, format!("{id_base}_or"), "OR", Expression::And, ui)
-        }
+        Expression::And(l, r) => show_binary_boolean_ui(
+            l,
+            r,
+            id_base.clone(),
+            "AND",
+            ExpressionType::And,
+            last_expression_type,
+            ui,
+        ),
+        Expression::Or(l, r) => show_binary_boolean_ui(
+            l,
+            r,
+            format!("{id_base}_or"),
+            "OR",
+            ExpressionType::Or,
+            last_expression_type,
+            ui,
+        ),
         Expression::Equals(l, r) => show_operator_ui(
             ComparisonOperator::Equals,
             format!("{id_base}_eq"),
@@ -208,21 +221,35 @@ fn show_binary_boolean_ui(
     r: &mut ExpressionRef,
     id_base: String,
     button_text: impl Into<egui::WidgetText>,
-    convert_to_other: impl FnOnce(ExpressionRef, ExpressionRef) -> Expression,
+    current_expression_type: ExpressionType,
+    last_expression_type: Option<ExpressionType>,
     ui: &mut egui::Ui,
 ) -> ExpressionTreeAction {
-    let left_action = criteria_ui_rec(l, ui, format!("{id_base}_l"));
-    let button_clicked = ui.button(button_text).clicked();
-    let right_action = criteria_ui_rec(r, ui, format!("{id_base}_r"));
+    let f = |ui: &mut egui::Ui| {
+        let left_action =
+            criteria_ui_rec(l, ui, format!("{id_base}_l"), Some(current_expression_type));
+        let button_clicked = ui.button(button_text).clicked();
+        let right_action =
+            criteria_ui_rec(r, ui, format!("{id_base}_r"), Some(current_expression_type));
 
-    if button_clicked {
-        ExpressionTreeAction::UpdateNode(convert_to_other(l.to_owned(), r.to_owned()))
-    } else if let ExpressionTreeAction::RemoveNode = left_action {
-        ExpressionTreeAction::UpdateNode(r.as_ref().to_owned())
-    } else if let ExpressionTreeAction::RemoveNode = right_action {
-        ExpressionTreeAction::UpdateNode(l.as_ref().to_owned())
+        if button_clicked {
+            ExpressionTreeAction::UpdateNode(match current_expression_type {
+                ExpressionType::And => Expression::Or(l.to_owned(), r.to_owned()),
+                ExpressionType::Or => Expression::And(l.to_owned(), r.to_owned()),
+            })
+        } else if let ExpressionTreeAction::RemoveNode = left_action {
+            ExpressionTreeAction::UpdateNode(r.as_ref().to_owned())
+        } else if let ExpressionTreeAction::RemoveNode = right_action {
+            ExpressionTreeAction::UpdateNode(l.as_ref().to_owned())
+        } else {
+            ExpressionTreeAction::None
+        }
+    };
+
+    if last_expression_type.is_some_and(|e| e != current_expression_type) {
+        ui.indent(format!("{id_base}_indent"), |ui| f(ui)).inner
     } else {
-        ExpressionTreeAction::None
+        f(ui)
     }
 }
 
@@ -239,13 +266,60 @@ fn show_operator_ui(
         show_operator_selector_ui(&mut current, ui, left_value, right_value, id_base);
         value_pointer_ui(right_value, ui);
 
-        if ui.button("x").clicked() {
-            return ExpressionTreeAction::RemoveNode;
+        ui.separator();
+        if let Some(action) = show_node_actions_menu_button(ui, &operator, left_value, right_value)
+        {
+            return action;
         }
 
         get_updated_expression(operator, current, left_value, right_value)
     })
     .inner
+}
+
+fn show_node_actions_menu_button(
+    ui: &mut egui::Ui,
+    operator: &ComparisonOperator,
+    left_value: &mut ValuePointer,
+    right_value: &mut ValuePointer,
+) -> Option<ExpressionTreeAction> {
+    ui.menu_button("...", |ui| {
+        if ui.button("Delete").clicked() {
+            ui.close_menu();
+            return Some(ExpressionTreeAction::RemoveNode);
+        }
+
+        show_add_condition_button(ui, operator, left_value, right_value)
+    })
+    .inner
+    .flatten()
+}
+
+fn show_add_condition_button(
+    ui: &mut egui::Ui,
+    operator: &ComparisonOperator,
+    left_value: &mut ValuePointer,
+    right_value: &mut ValuePointer,
+) -> Option<ExpressionTreeAction> {
+    ui.menu_button("Add Condition", |ui| {
+        for addable in enum_iterator::all::<AddableExpression>() {
+            if ui.button(addable.clone().to_string()).clicked() {
+                let recreated_existing_expression =
+                    operator.create_expression(left_value.to_owned(), right_value.to_owned());
+                let selected_expression = addable.get_default();
+                let new_expression = Expression::And(
+                    ExpressionRef::new(recreated_existing_expression),
+                    ExpressionRef::new(selected_expression),
+                );
+                ui.close_menu();
+                return Some(ExpressionTreeAction::UpdateNode(new_expression));
+            }
+        }
+
+        None
+    })
+    .inner
+    .flatten()
 }
 
 fn show_operator_selector_ui(
@@ -344,6 +418,12 @@ fn time_specifier_ui(time: &mut TimeSpecifier, ui: &mut egui::Ui) {
     };
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum ExpressionType {
+    And,
+    Or,
+}
+
 #[derive(Clone, PartialEq, Sequence)]
 enum ComparisonOperator {
     GreaterThan,
@@ -387,6 +467,19 @@ impl ComparisonOperator {
             ),
         }
     }
+
+    fn create_expression(&self, l: ValuePointer, r: ValuePointer) -> Expression {
+        let new_expression = match self {
+            ComparisonOperator::GreaterThan => Expression::GreaterThan,
+            ComparisonOperator::LessThan => Expression::LessThan,
+            ComparisonOperator::Equals => Expression::Equals,
+            ComparisonOperator::GreaterThanOrEquals => Expression::GreaterThanOrEquals,
+            ComparisonOperator::LessThanOrEquals => Expression::LessThanOrEquals,
+            ComparisonOperator::NotEquals => Expression::NotEquals,
+        };
+
+        new_expression(l, r)
+    }
 }
 
 impl ValueType {
@@ -412,22 +505,6 @@ impl std::fmt::Display for ComparisonOperator {
             ComparisonOperator::GreaterThanOrEquals => write!(f, ">="),
         }
     }
-}
-
-fn show_add_condition_ui(criteria: &mut Expression, ui: &mut egui::Ui) {
-    ui.menu_button("Add condition", |ui| {
-        for addable in enum_iterator::all::<AddableExpression>() {
-            if ui.button(addable.clone().to_string()).clicked() {
-                let starting_expression = addable.get_default();
-                let last_expression = criteria.get_left_to_right_dfs_last_expr_mut();
-                *last_expression = Expression::And(
-                    ExpressionRef::new(last_expression.to_owned()),
-                    ExpressionRef::new(starting_expression),
-                );
-                ui.close_menu();
-            }
-        }
-    });
 }
 
 #[derive(Clone, PartialEq, Sequence)]
