@@ -155,6 +155,10 @@ impl TriggersWindow {
             if ui.button("Reset default triggers").clicked() {
                 change_matcher.reset_default_triggers();
             }
+            if ui.button("Add trigger").clicked() {
+                let trigger = Default::default();
+                change_matcher.add_trigger(trigger);
+            }
             if let Some(trigger) = self.last_deleted_trigger.as_ref() {
                 if ui.button("Recover last deleted trigger").clicked() {
                     change_matcher.add_trigger(trigger.clone());

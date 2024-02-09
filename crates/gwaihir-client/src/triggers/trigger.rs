@@ -1,5 +1,5 @@
-use super::expression::Expression;
-use super::Action;
+use super::{expression::Expression, ValuePointer};
+use super::{Action, NotificationTemplate, TimeSpecifier};
 use derive_new::new;
 use gwaihir_client_lib::UniqueUserId;
 use serde::{Deserialize, Serialize};
@@ -31,6 +31,26 @@ pub enum BehaviorOnTrigger {
 pub enum TriggerSource {
     AppDefaults,
     User,
+}
+
+impl Default for Trigger {
+    fn default() -> Self {
+        Self {
+            name: "Trigger".to_owned(),
+            enabled: false,
+            requestable: true,
+            requested_users: Default::default(),
+            source: TriggerSource::User,
+            criteria: Expression::Equals(
+                ValuePointer::TotalKeyboardMouseUsage(TimeSpecifier::Current),
+                ValuePointer::ConstF64(123.456),
+            ),
+            actions: vec![Action::ShowNotification(NotificationTemplate::new(
+                "Default notification summary".to_owned(),
+                "Default notification body. Triggered for {{user}}.".to_owned(),
+            ))],
+        }
+    }
 }
 
 pub mod persistence {
