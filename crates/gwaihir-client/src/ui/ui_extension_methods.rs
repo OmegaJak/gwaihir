@@ -12,6 +12,13 @@ pub trait UIExtensionMethods {
         add_contents: impl FnOnce(&mut Ui) -> R,
     ) -> CollapsingResponse<R>;
 
+    fn collapsing_default_open_with_id<R>(
+        &mut self,
+        heading: impl Into<WidgetText>,
+        id_source: impl std::hash::Hash,
+        add_contents: impl FnOnce(&mut Ui) -> R,
+    ) -> CollapsingResponse<R>;
+
     fn horizontal_with_no_item_spacing<R>(
         &mut self,
         add_contents: impl FnOnce(&mut Ui) -> R,
@@ -43,6 +50,18 @@ impl UIExtensionMethods for Ui {
     ) -> CollapsingResponse<R> {
         CollapsingHeader::new(heading)
             .default_open(true)
+            .show(self, add_contents)
+    }
+
+    fn collapsing_default_open_with_id<R>(
+        &mut self,
+        heading: impl Into<WidgetText>,
+        id_source: impl std::hash::Hash,
+        add_contents: impl FnOnce(&mut Ui) -> R,
+    ) -> CollapsingResponse<R> {
+        CollapsingHeader::new(heading)
+            .default_open(true)
+            .id_source(id_source)
             .show(self, add_contents)
     }
 

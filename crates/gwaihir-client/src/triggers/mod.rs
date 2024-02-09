@@ -12,6 +12,7 @@ pub use action::Action;
 pub use expression::Expression;
 pub use expression::ExpressionRef;
 pub use notification_template::NotificationTemplate;
+pub use notification_template::NotificationTemplateError;
 pub use trigger::{BehaviorOnTrigger, Trigger, TriggerSource};
 pub use trigger_manager::persistence::{TriggerManagerV1, VersionedTriggerManager};
 pub use trigger_manager::TriggerManager;

@@ -1,9 +1,11 @@
+use std::collections::HashMap;
+
 use super::{ui_extension_methods::UIExtensionMethods, widgets::show_centered_window};
 use crate::triggers::{
-    Action, Expression, ExpressionRef, NotificationTemplate, TimeSpecifier, Trigger,
-    TriggerManager, TriggerSource, ValuePointer,
+    Action, Expression, ExpressionRef, NotificationTemplate, NotificationTemplateError,
+    TimeSpecifier, Trigger, TriggerManager, TriggerSource, ValuePointer,
 };
-use egui::{Color32, ComboBox};
+use egui::{Color32, ComboBox, TextBuffer};
 use enum_iterator::Sequence;
 use gwaihir_client_lib::UniqueUserId;
 
@@ -17,6 +19,7 @@ pub struct TriggersWindow {
     requestable_input: bool,
     err: Option<String>,
     last_deleted_trigger: Option<Trigger>,
+    notification_errors: HashMap<String, String>,
 }
 
 impl TriggersWindow {
@@ -31,6 +34,7 @@ impl TriggersWindow {
             requestable_input: false,
             err: None,
             last_deleted_trigger: None,
+            notification_errors: HashMap::new(),
         }
     }
 
@@ -65,7 +69,14 @@ impl TriggersWindow {
                             If false, it will run for all users.",
                         );
                 });
-                criteria_ui_rec(&mut trigger.criteria, ui, id.to_string(), None);
+                ui.collapsing_default_open_with_id("Criteria", format!("{id}_criteria"), |ui| {
+                    show_criteria_ui_rec(&mut trigger.criteria, ui, id.to_string(), None);
+                });
+                ui.collapsing_default_open_with_id("Action(s)", format!("{id}_actions"), |ui| {
+                    for (i, action) in trigger.actions.iter_mut().enumerate() {
+                        self.show_action_ui(action, format!("{id}_action{i}"), ui);
+                    }
+                });
                 ui.separator();
             }
 
@@ -157,6 +168,120 @@ impl TriggersWindow {
             }
         });
     }
+
+    fn show_action_ui(&mut self, action: &mut Action, base_id: String, ui: &mut egui::Ui) {
+        match action {
+            Action::ShowNotification(template) => {
+                self.show_notification_action_ui(template, base_id, ui);
+            }
+        }
+    }
+
+    fn show_notification_action_ui(
+        &mut self,
+        template: &mut NotificationTemplate,
+        base_id: String,
+        ui: &mut egui::Ui,
+    ) {
+        ui.collapsing_default_open_with_id("Send Notification", format!("{base_id}_notif"), |ui| {
+            let summary_id = format!("{base_id}_summary");
+            ui.horizontal(|ui| {
+                ui.label("Summary: ");
+                let mut summary = template.summary();
+                let mut response = egui::TextEdit::singleline(&mut summary)
+                    .desired_width(f32::INFINITY)
+                    .show(ui)
+                    .response;
+                response = show_insert_notification_template_variable_menu(response, &mut summary);
+                if response.changed() {
+                    let result = template.recompile_with_summary(summary);
+                    self.handle_notification_compilation_result(result, &summary_id);
+                }
+            });
+
+            if let Some(msg) = self.notification_errors.get(&summary_id) {
+                ui.colored_label(Color32::RED, msg);
+            }
+
+            let body_id = format!("{base_id}_body");
+            ui.horizontal(|ui| {
+                ui.label("Body: ");
+                let mut body = template.body();
+                let mut response = ui.text_edit_multiline(&mut body);
+                response = show_insert_notification_template_variable_menu(response, &mut body);
+                if response.changed() {
+                    let result = template.recompile_with_body(body);
+                    self.handle_notification_compilation_result(result, &body_id);
+                }
+            });
+
+            if let Some(msg) = self.notification_errors.get(&body_id) {
+                ui.colored_label(Color32::RED, msg);
+            }
+        });
+    }
+
+    fn handle_notification_compilation_result(
+        &mut self,
+        result: Result<(), NotificationTemplateError>,
+        summary_id: &str,
+    ) {
+        match result {
+            Ok(_) => {
+                self.notification_errors.remove(summary_id);
+            }
+            Err(e) => {
+                self.notification_errors.insert(
+                    summary_id.to_owned(),
+                    format!("Attempted to write invalid notification data: {}\n", e),
+                );
+            }
+        }
+    }
+}
+
+fn show_insert_notification_template_variable_menu(
+    mut text_edit_response: egui::Response,
+    text_edit_contents: &mut String,
+) -> egui::Response {
+    let mut inserted_variable = false;
+    let text_edit_id = text_edit_response.id;
+    text_edit_response = text_edit_response.context_menu(|ui| {
+        ui.menu_button("Insert Variable", |ui| {
+            for variable in NotificationTemplate::get_available_variables() {
+                if ui.button(variable.clone()).clicked() {
+                    if let Some(mut state) = egui::TextEdit::load_state(ui.ctx(), text_edit_id) {
+                        if let Some(range) = state.ccursor_range() {
+                            text_edit_contents.insert_text(&variable, range.primary.index);
+                            state.set_ccursor_range(Some(egui::text_edit::CCursorRange::one(
+                                egui::text::CCursor::new(range.primary.index + variable.len()),
+                            )));
+                        } else {
+                            *text_edit_contents = format!("{text_edit_contents}{variable}");
+                            state.set_ccursor_range(Some(egui::text_edit::CCursorRange::one(
+                                egui::text::CCursor::new(text_edit_contents.chars().count()),
+                            )));
+                        }
+
+                        inserted_variable = true;
+                        state.store(ui.ctx(), text_edit_id);
+                    } else {
+                        log::warn!(
+                            "Failed to insert variable because textedit state couldn't be loaded"
+                        );
+                    }
+                    ui.ctx().memory_mut(|mem| mem.request_focus(text_edit_id));
+                    ui.close_menu();
+                }
+            }
+        });
+    });
+
+    if inserted_variable {
+        text_edit_response.mark_changed();
+    }
+
+    text_edit_response
 }
 
 #[derive(Debug)]
@@ -166,7 +291,7 @@ enum ExpressionTreeAction {
     UpdateNode(Expression),
 }
 
-fn criteria_ui_rec(
+fn show_criteria_ui_rec(
     criteria: &mut Expression,
     ui: &mut egui::Ui,
     id_base: String,
@@ -258,10 +383,10 @@ fn show_binary_boolean_ui(
 ) -> ExpressionTreeAction {
     let f = |ui: &mut egui::Ui| {
         let left_action =
-            criteria_ui_rec(l, ui, format!("{id_base}_l"), Some(current_expression_type));
+            show_criteria_ui_rec(l, ui, format!("{id_base}_l"), Some(current_expression_type));
         let button_clicked = ui.button(button_text).clicked();
         let right_action =
-            criteria_ui_rec(r, ui, format!("{id_base}_r"), Some(current_expression_type));
+            show_criteria_ui_rec(r, ui, format!("{id_base}_r"), Some(current_expression_type));
 
         if button_clicked {
             ExpressionTreeAction::UpdateNode(match current_expression_type {
