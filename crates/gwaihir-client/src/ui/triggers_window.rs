@@ -329,16 +329,27 @@ fn show_operator_selector_ui(
     right_value: &mut ValuePointer,
     id_base: String,
 ) {
-    ComboBox::from_id_source(format!("{id_base}_operatorcombobox"))
-        .selected_text(format!("{}", current_operator))
-        .width(10.0)
-        .show_ui(ui, |ui| {
-            for operator in enum_iterator::all::<ComparisonOperator>()
-                .filter(|o| o.valid_for_value(left_value) && o.valid_for_value(right_value))
-            {
-                ui.selectable_value_default_text(current_operator, operator);
-            }
-        });
+    let valid_operators: Vec<_> = enum_iterator::all::<ComparisonOperator>()
+        .filter(|o| o.valid_for_value(left_value) && o.valid_for_value(right_value))
+        .collect();
+    if valid_operators.len() == 2 {
+        if ui.button(current_operator.to_string()).clicked() {
+            *current_operator = valid_operators
+                .iter()
+                .find(|o| *o != current_operator)
+                .expect("When there are only two operators in a vec of unique operators, one should be different from the current")
+                .to_owned();
+        }
+    } else {
+        ComboBox::from_id_source(format!("{id_base}_operatorcombobox"))
+            .selected_text(format!("{}", current_operator))
+            .width(10.0)
+            .show_ui(ui, |ui| {
+                for operator in valid_operators {
+                    ui.selectable_value_default_text(current_operator, operator);
+                }
+            });
+    }
 }
 
 fn get_updated_expression(
