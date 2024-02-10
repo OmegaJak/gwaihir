@@ -1,12 +1,21 @@
+use std::fmt::Display;
+
 use egui::{
-    text::LayoutJob, CollapsingHeader, CollapsingResponse, InnerResponse, RichText, Ui, Widget,
-    WidgetText,
+    text::LayoutJob, CollapsingHeader, CollapsingResponse, Id, InnerResponse, Response, RichText,
+    TextEdit, Ui, Widget, WidgetText,
 };
 
 pub trait UIExtensionMethods {
     fn collapsing_default_open<R>(
         &mut self,
         heading: impl Into<WidgetText>,
+        add_contents: impl FnOnce(&mut Ui) -> R,
+    ) -> CollapsingResponse<R>;
+
+    fn collapsing_default_open_with_id<R>(
+        &mut self,
+        heading: impl Into<WidgetText>,
+        id_source: impl std::hash::Hash,
         add_contents: impl FnOnce(&mut Ui) -> R,
     ) -> CollapsingResponse<R>;
 
@@ -18,6 +27,19 @@ pub trait UIExtensionMethods {
     fn create_default_layout_job(&self, rich_texts: Vec<RichText>) -> LayoutJob;
 
     fn stateless_checkbox(&mut self, checked: bool, text: impl Into<WidgetText>) -> Option<bool>;
+
+    fn selectable_value_default_text<Value: PartialEq + Clone + Display>(
+        &mut self,
+        current_value: &mut Value,
+        selected_value: Value,
+    ) -> Response;
+
+    fn name_input(
+        &mut self,
+        button_text: impl Into<egui::WidgetText>,
+        id_source: impl std::hash::Hash,
+        set_name: impl FnMut(String),
+    );
 }
 
 impl UIExtensionMethods for Ui {
@@ -28,6 +50,18 @@ impl UIExtensionMethods for Ui {
     ) -> CollapsingResponse<R> {
         CollapsingHeader::new(heading)
             .default_open(true)
+            .show(self, add_contents)
+    }
+
+    fn collapsing_default_open_with_id<R>(
+        &mut self,
+        heading: impl Into<WidgetText>,
+        id_source: impl std::hash::Hash,
+        add_contents: impl FnOnce(&mut Ui) -> R,
+    ) -> CollapsingResponse<R> {
+        CollapsingHeader::new(heading)
+            .default_open(true)
+            .id_source(id_source)
             .show(self, add_contents)
     }
 
@@ -66,5 +100,48 @@ impl UIExtensionMethods for Ui {
         }
 
         None
+    }
+
+    fn selectable_value_default_text<Value: PartialEq + Clone + Display>(
+        &mut self,
+        current_value: &mut Value,
+        selected_value: Value,
+    ) -> Response {
+        self.selectable_value(
+            current_value,
+            selected_value.clone(),
+            selected_value.to_string(),
+        )
+    }
+
+    fn name_input(
+        &mut self,
+        button_text: impl Into<egui::WidgetText>,
+        id_source: impl std::hash::Hash,
+        mut set_name: impl FnMut(String),
+    ) {
+        let id_source = Id::new(id_source);
+        let input_id = self.make_persistent_id(id_source);
+        let mut name = self.memory_mut(|mem| {
+            mem.data
+                .get_temp_mut_or_default::<String>(input_id)
+                .to_string()
+        });
+
+        self.horizontal(|ui| {
+            let text_edit_response = TextEdit::singleline(&mut name).desired_width(100.0).ui(ui);
+            if text_edit_response.changed() {
+                ui.memory_mut(|mem| mem.data.insert_temp(input_id, name.clone()));
+            }
+
+            if ui.button(button_text).clicked()
+                || (text_edit_response.lost_focus()
+                    && ui.input(|i| i.key_pressed(egui::Key::Enter)))
+            {
+                set_name(name.clone());
+                ui.memory_mut(|mem| mem.data.remove::<String>(input_id));
+                ui.close_menu();
+            }
+        });
     }
 }

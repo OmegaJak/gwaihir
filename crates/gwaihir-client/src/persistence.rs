@@ -68,7 +68,7 @@ impl From<VersionedPersistence> for Persistence {
 }
 
 impl Persistence {
-    pub const STORAGE_KEY: &str = eframe::APP_KEY;
+    pub const STORAGE_KEY: &'static str = eframe::APP_KEY;
 }
 
 impl Default for Persistence {

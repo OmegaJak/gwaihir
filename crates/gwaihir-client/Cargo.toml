@@ -31,6 +31,8 @@ delegate = "0.10.0"
 notify-rust = "4"
 derive-new = "0.6.0"
 uuid = { version = "1.6.1", features = ["v4", "serde"] }
+enum-iterator = "1.5.0"
+maplit = "1.0.2"
 
 # Triggers
 ron = "0.8.1"  # May only need direct dependency while using RON for notification editing
@@ -72,3 +74,5 @@ pulsectl-rs = "0.3.2"
 
 [dev-dependencies]
 assert_matches = "1.5.0"
+lazy_static = "1.4.0"
+mockall = "0.12.1"

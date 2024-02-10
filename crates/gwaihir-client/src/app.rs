@@ -1,5 +1,6 @@
 use crate::{
     networking::network_manager::NetworkManager,
+    notification::{NotificationDispatch, OSNotificationDispatch},
     periodic_repaint_thread::create_periodic_repaint_thread,
     persistence::{Persistence, PersistenceV1, VersionedPersistence},
     project_dirs,
@@ -8,20 +9,19 @@ use crate::{
         lock_status_sensor::{init_lock_status_sensor, EventLoopRegisteredLockStatusSensorBuilder},
         outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
     },
-    show_notification,
     tray_icon::{hide_to_tray, TrayIconData},
-    triggers::{BehaviorOnTrigger, TriggerManager, Update},
+    triggers::{ui::TriggersWindow, BehaviorOnTrigger, TriggerManager, Update},
     ui::{
         add_fake_user_window::AddFakeUserWindow,
         network_window::NetworkWindow,
         raw_data_window::{RawDataWindow, TimestampedData},
         time_formatting::nicely_formatted_datetime,
-        triggers_window::TriggersWindow,
+        ui_extension_methods::UIExtensionMethods,
         widgets::auto_launch_checkbox::AutoLaunchCheckboxUiExtension,
     },
 };
 use chrono_humanize::HumanTime;
-use egui::{Color32, RichText, ScrollArea, TextEdit, Widget};
+use egui::{Color32, RichText, ScrollArea};
 use gwaihir_client_lib::{
     chrono::Local, NetworkInterface, RemoteUpdate, UniqueUserId, UserStatus, APP_ID,
 };
@@ -52,8 +52,6 @@ pub struct GwaihirApp {
 
     network: NetworkManager,
     current_user_id: Option<UniqueUserId>,
-
-    set_name_input: String,
 
     persistence: Persistence,
     log_file_location: PathBuf,
@@ -110,8 +108,6 @@ impl GwaihirApp {
             current_user_id: None,
 
             _periodic_repaint_thread_join_handle: periodic_repaint_thread_join_handle,
-
-            set_name_input: String::new(),
 
             persistence,
             log_file_location,
@@ -187,18 +183,8 @@ impl GwaihirApp {
         match &self.current_user_id {
             Some(current_user_id) => {
                 if target_user_id == current_user_id {
-                    ui.horizontal(|ui| {
-                        let text_edit_response = TextEdit::singleline(&mut self.set_name_input)
-                            .desired_width(100.0)
-                            .ui(ui);
-                        if ui.button("Set Username").clicked()
-                            || (text_edit_response.lost_focus()
-                                && ui.input(|i| i.key_pressed(egui::Key::Enter)))
-                        {
-                            self.network.set_username(self.set_name_input.clone());
-                            self.set_name_input = String::new();
-                            ui.close_menu();
-                        }
+                    ui.name_input("Set Username", "set_username_input", |name| {
+                        self.network.set_username(name)
                     });
                 }
 
@@ -217,7 +203,11 @@ impl GwaihirApp {
                         EnabledOnce,
                     }
 
-                    for (_, trigger) in self.trigger_manager().triggers_iter_mut() {
+                    for (_, trigger) in self
+                        .trigger_manager()
+                        .triggers_iter_mut()
+                        .filter(|(_, t)| t.requestable)
+                    {
                         let mut current_state = match trigger.requested_users.get(target_user_id) {
                             Some(BehaviorOnTrigger::NoAction) => TriggerState::Enabled,
                             Some(BehaviorOnTrigger::Remove) => TriggerState::EnabledOnce,
@@ -298,7 +288,7 @@ fn load_and_migrate_persistence(
         v1.into()
     } else {
         // This is here as insurance to ensure we don't overwrite a previously valid .ron with empty Persistence if Persistence wasn't migrated correctly
-        show_notification("Gwaihir init failed", "Gwaihir failed to initialize due to an error decoding its config. View the log for more details");
+        OSNotificationDispatch.show_notification("Gwaihir init failed", "Gwaihir failed to initialize due to an error decoding its config. View the log for more details");
         open_log_file(log_file_location);
         panic!("Failed to deserialize app config");
     }
@@ -352,6 +342,7 @@ impl eframe::App for GwaihirApp {
                                 &status.user_id,
                                 display_name,
                                 Update::new(&current.sensor_outputs, &status.sensor_outputs),
+                                &OSNotificationDispatch,
                             );
                         }
                         self.current_status.insert(status.user_id.clone(), status);

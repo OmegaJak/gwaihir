@@ -7,7 +7,7 @@ use super::{
 use gwaihir_client_lib::UniqueUserId;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
 #[serde(
     from = "persistence::VersionedValuePointer",
     into = "persistence::VersionedValuePointer"
@@ -23,7 +23,7 @@ pub enum ValuePointer {
     ConstF64(f64),
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
 pub enum TimeSpecifier {
     Last,
     Current,
@@ -37,7 +37,7 @@ pub enum Value {
 }
 
 impl ValuePointer {
-    pub fn get_value(&self, data: &EvalData<'_, '_, '_>) -> Option<Value> {
+    pub fn get_value(&self, data: &EvalData<'_, '_>) -> Option<Value> {
         match self {
             ValuePointer::OnlineStatus(time_specifier) => {
                 get_outputs_by_time_specifier(&data.update, time_specifier)
@@ -92,6 +92,10 @@ impl Value {
                 ))
             }
         }
+    }
+
+    pub fn not_equals(&self, other: &Value) -> EvalResult<bool> {
+        EvalResult::Ok(!self.equals(other)?)
     }
 
     pub fn greater_than(&self, other: &Value) -> EvalResult<bool> {
