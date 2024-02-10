@@ -206,9 +206,9 @@ impl std::fmt::Display for ComparisonOperator {
             ComparisonOperator::Equals => write!(f, "="),
             ComparisonOperator::NotEquals => write!(f, "≠"),
             ComparisonOperator::LessThan => write!(f, "<"),
-            ComparisonOperator::LessThanOrEquals => write!(f, "<="),
+            ComparisonOperator::LessThanOrEquals => write!(f, "≤"),
             ComparisonOperator::GreaterThan => write!(f, ">"),
-            ComparisonOperator::GreaterThanOrEquals => write!(f, ">="),
+            ComparisonOperator::GreaterThanOrEquals => write!(f, "≥"),
         }
     }
 }
