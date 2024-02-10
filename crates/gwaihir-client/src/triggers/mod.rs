@@ -6,6 +6,7 @@ mod expression;
 mod notification_template;
 mod trigger;
 mod trigger_manager;
+pub mod ui;
 mod value_pointer;
 
 pub use action::Action;
