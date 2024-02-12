@@ -1,4 +1,10 @@
-use crate::sensors::outputs::sensor_outputs::SensorOutputs;
+use super::{
+    backoff_executor::BackoffExecutor, offline_network_interface::OfflineNetworkInterface,
+};
+use crate::{
+    networking::backoff_executor::BackoffExecutionAction,
+    sensors::outputs::sensor_outputs::SensorOutputs,
+};
 use delegate::delegate;
 use gwaihir_client_lib::{NetworkInterface, NetworkInterfaceCreator, NetworkType, RemoteUpdate};
 use log::{info, warn};
@@ -8,16 +14,15 @@ use std::{
     time::{Duration, Instant},
 };
 
-use super::offline_network_interface::OfflineNetworkInterface;
-
-const MIN_TIME_BETWEEN_RECONNECT_ATTEMPTS: Duration = Duration::from_secs(30);
+const MIN_TIME_BETWEEN_RECONNECT_ATTEMPTS: Duration = Duration::from_secs(1);
+const MAX_TIME_BETWEEN_RECONNECT_ATTEMPTS: Duration = Duration::from_secs(60);
 
 pub struct NetworkManager {
     network: Box<dyn NetworkInterface<SensorOutputs>>,
     network_tx: Sender<RemoteUpdate<SensorOutputs>>,
     network_rx: Receiver<RemoteUpdate<SensorOutputs>>,
     egui_ctx: egui::Context,
-    last_offline_check: Option<Instant>,
+    backoff: BackoffExecutor,
 }
 
 impl NetworkManager {
@@ -40,7 +45,10 @@ impl NetworkManager {
             network_tx,
             network_rx,
             egui_ctx: egui_ctx.clone(),
-            last_offline_check: None,
+            backoff: BackoffExecutor::new(
+                MIN_TIME_BETWEEN_RECONNECT_ATTEMPTS,
+                MAX_TIME_BETWEEN_RECONNECT_ATTEMPTS,
+            ),
         }
     }
 
@@ -56,22 +64,21 @@ impl NetworkManager {
     }
 
     pub fn try_reconnect_if_needed(&mut self) {
-        if self.is_offline()
-            && self.last_offline_check.map_or(true, |last_check| {
-                Instant::now().duration_since(last_check) > MIN_TIME_BETWEEN_RECONNECT_ATTEMPTS
-            })
-        {
-            let success = self.network.try_reconnect();
-            info!("Attempting reconnection to the network");
-            if success {
-                info!("Successfully reconnected to the network");
-            } else {
-                warn!(
-                    "Failed to reconnect to the network, trying again in ~{}s",
-                    MIN_TIME_BETWEEN_RECONNECT_ATTEMPTS.as_secs()
-                );
-            }
-            self.last_offline_check = Some(Instant::now());
+        if self.is_offline() {
+            self.backoff.maybe_execute(
+                || {
+                    let success = self.network.try_reconnect();
+                    info!("Attempting reconnection to the network");
+                    if success {
+                        info!("Successfully reconnected to the network");
+                        BackoffExecutionAction::Reset
+                    } else {
+                        warn!("Failed to reconnect to the network, trying again soon");
+                        BackoffExecutionAction::KeepTrying
+                    }
+                },
+                Instant::now(),
+            );
         }
     }
 
