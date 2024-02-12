@@ -1,7 +1,7 @@
 use super::{trigger_widget_extensions::TriggerWidgetExtension, TriggerAction};
 use crate::{
     triggers::{Trigger, TriggerManager},
-    ui::widgets::show_centered_window,
+    ui::{ui_extension_methods::UIExtensionMethods, widgets::show_centered_window},
 };
 
 pub struct TriggersWindow {
@@ -44,7 +44,7 @@ impl TriggersWindow {
                             }
                         }
 
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                        ui.horizontal_right(|ui| {
                             if ui.button("Add trigger").clicked() {
                                 trigger_manager.add_trigger(Default::default());
                             }
@@ -54,16 +54,27 @@ impl TriggersWindow {
 
             egui::CentralPanel::default().show_inside(ui, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    let mut triggers_to_remove = Vec::new();
+                    let mut trigger_actions = Vec::new();
                     for (id, trigger) in trigger_manager.triggers_iter_mut() {
-                        if let TriggerAction::Delete = trigger.ui(id, ui) {
-                            self.last_deleted_trigger = Some(trigger.clone());
-                            triggers_to_remove.push(id.to_owned());
-                        }
+                        trigger_actions.push((id.to_owned(), trigger.ui(id, ui)));
                     }
 
-                    for id in triggers_to_remove {
-                        trigger_manager.remove_trigger_by_id(&id);
+                    for (id, action) in trigger_actions {
+                        match action {
+                            TriggerAction::None => {}
+                            TriggerAction::MoveUp => {
+                                trigger_manager.move_trigger(&id, -1);
+                            }
+                            TriggerAction::MoveDown => {
+                                trigger_manager.move_trigger(&id, 1);
+                            }
+                            TriggerAction::Delete => {
+                                if let Some(trigger) = trigger_manager.get_trigger_by_id(&id) {
+                                    self.last_deleted_trigger = Some(trigger.to_owned());
+                                    trigger_manager.remove_trigger_by_id(&id);
+                                }
+                            }
+                        }
                     }
                 });
             });

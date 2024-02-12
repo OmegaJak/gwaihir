@@ -59,6 +59,15 @@ impl TriggerWidgetExtension for Trigger {
                             for users that it is requested to run for. \
                             If false, it will run for all users.",
                 );
+            ui.horizontal_right(|ui| {
+                if ui.button("⬆").clicked() {
+                    action = TriggerAction::MoveUp;
+                }
+
+                if ui.button("⬇").clicked() {
+                    action = TriggerAction::MoveDown;
+                }
+            });
         });
         ui.collapsing_default_open_with_id("Criteria", format!("{trigger_id}_criteria"), |ui| {
             self.criteria.ui(trigger_id.to_string(), None, ui);

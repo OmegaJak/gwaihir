@@ -36,8 +36,9 @@ maplit = "1.0.2"
 exponential-backoff = "1.2.0"
 
 # Triggers
-ron = "0.8.1"  # May only need direct dependency while using RON for notification editing
+ron = "0.8.1"                                          # May only need direct dependency while using RON for notification editing
 upon = "0.8.0"
+indexmap = { version = "2.2.3", features = ["serde"] }
 
 # Logging
 log = "0.4"

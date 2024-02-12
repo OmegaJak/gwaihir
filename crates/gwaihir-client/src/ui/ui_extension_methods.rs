@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
 use egui::{
-    text::LayoutJob, CollapsingHeader, CollapsingResponse, Id, InnerResponse, Response, RichText,
-    TextEdit, Ui, Widget, WidgetText,
+    text::LayoutJob, Align, CollapsingHeader, CollapsingResponse, Id, InnerResponse, Layout,
+    Response, RichText, TextEdit, Ui, Widget, WidgetText,
 };
 
 pub trait UIExtensionMethods {
@@ -23,6 +23,9 @@ pub trait UIExtensionMethods {
         &mut self,
         add_contents: impl FnOnce(&mut Ui) -> R,
     ) -> InnerResponse<R>;
+
+    /// Horizontal with right-aligned contents
+    fn horizontal_right<R>(&mut self, add_contents: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R>;
 
     fn create_default_layout_job(&self, rich_texts: Vec<RichText>) -> LayoutJob;
 
@@ -72,6 +75,12 @@ impl UIExtensionMethods for Ui {
         self.spacing_mut().item_spacing.x = 0.0;
 
         self.horizontal(add_contents)
+    }
+
+    fn horizontal_right<R>(&mut self, add_contents: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
+        let initial_size = self.available_size_before_wrap();
+        let layout = Layout::right_to_left(Align::Center);
+        self.allocate_ui_with_layout(initial_size, layout, add_contents)
     }
 
     fn create_default_layout_job(&self, rich_texts: Vec<RichText>) -> LayoutJob {

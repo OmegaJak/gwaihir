@@ -5,6 +5,7 @@ use super::{
 };
 use crate::{notification::NotificationDispatch, sensors::outputs::sensor_outputs::SensorOutputs};
 use gwaihir_client_lib::UniqueUserId;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -15,20 +16,31 @@ use uuid::Uuid;
     into = "persistence::VersionedTriggerManager"
 )]
 pub struct TriggerManager {
-    triggers: HashMap<Uuid, Trigger>,
+    triggers: IndexMap<Uuid, Trigger>,
 }
 
 impl TriggerManager {
-    pub fn remove_trigger(&mut self, predicate: impl Fn(&Trigger) -> bool) {
-        self.triggers.retain(|_, c| !predicate(c));
+    pub fn remove_trigger_by_id(&mut self, trigger_id: &Uuid) -> Option<Trigger> {
+        self.triggers.shift_remove(trigger_id)
     }
 
-    pub fn remove_trigger_by_id(&mut self, trigger_id: &Uuid) -> Option<Trigger> {
-        self.triggers.remove(trigger_id)
+    pub fn get_trigger_by_id(&mut self, trigger_id: &Uuid) -> Option<&Trigger> {
+        self.triggers.get(trigger_id)
     }
 
     pub fn add_trigger(&mut self, trigger: Trigger) {
         self.triggers.insert(Uuid::new_v4(), trigger);
+    }
+
+    pub fn move_trigger(&mut self, trigger_id: &Uuid, index_offset: isize) {
+        if let Some(index) = self.triggers.get_index_of(trigger_id) {
+            if let Some(other_index) = index.checked_add_signed(index_offset) {
+                // Implicitly > 0
+                if other_index < self.triggers.len() {
+                    self.triggers.swap_indices(index, other_index);
+                }
+            }
+        }
     }
 
     pub fn triggers_iter_mut(&mut self) -> impl Iterator<Item = (&Uuid, &mut Trigger)> {
@@ -80,10 +92,6 @@ impl TriggerManager {
         }
     }
 
-    pub fn has_trigger(&self, predicate: impl Fn(&Trigger) -> bool) -> bool {
-        self.triggers.iter().any(|(_, v)| predicate(v))
-    }
-
     pub fn reset_default_triggers(&mut self) {
         self.triggers
             .retain(|_, trigger| trigger.source != TriggerSource::AppDefaults);
@@ -106,6 +114,7 @@ pub mod persistence {
     pub enum VersionedTriggerManager {
         V1(TriggerManagerV1),
         V2(TriggerManagerV2),
+        V3(TriggerManagerV3),
     }
 
     #[derive(Serialize, Deserialize, Clone, Default)]
@@ -116,6 +125,11 @@ pub mod persistence {
     #[derive(Serialize, Deserialize, Clone)]
     pub struct TriggerManagerV2 {
         triggers: HashMap<Uuid, Trigger>,
+    }
+
+    #[derive(Serialize, Deserialize, Clone)]
+    pub struct TriggerManagerV3 {
+        triggers: IndexMap<Uuid, Trigger>,
     }
 
     impl From<VersionedTriggerManager> for TriggerManager {
@@ -129,7 +143,7 @@ pub mod persistence {
 
     impl From<TriggerManager> for VersionedTriggerManager {
         fn from(value: TriggerManager) -> Self {
-            VersionedTriggerManager::V2(TriggerManagerV2 {
+            VersionedTriggerManager::V3(TriggerManagerV3 {
                 triggers: value.triggers,
             })
         }
@@ -143,6 +157,14 @@ pub mod persistence {
             }
 
             TriggerManagerV2 { triggers: new_map }
+        }
+    }
+
+    impl Upgrade<TriggerManagerV3> for TriggerManagerV2 {
+        fn upgrade(self) -> TriggerManagerV3 {
+            TriggerManagerV3 {
+                triggers: IndexMap::from_iter(self.triggers),
+            }
         }
     }
 }

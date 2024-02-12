@@ -19,5 +19,7 @@ enum ExpressionTreeAction {
 
 enum TriggerAction {
     None,
+    MoveUp,
+    MoveDown,
     Delete,
 }
