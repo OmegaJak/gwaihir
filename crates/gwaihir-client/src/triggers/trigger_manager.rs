@@ -66,11 +66,9 @@ impl TriggerManager {
 
             if !trigger.requestable || trigger.requested_users.contains_key(user_id) {
                 match trigger.criteria.evaluate(&eval_data) {
-                    Ok(result) => {
-                        if result {
-                            for action in trigger.actions.iter() {
-                                action.execute(&trigger_context);
-                            }
+                    Ok(true) => {
+                        for action in trigger.actions.iter() {
+                            action.execute(&trigger_context);
                         }
 
                         if let Some(behavior_on_trigger) = trigger.requested_users.get(user_id) {
@@ -84,6 +82,7 @@ impl TriggerManager {
                             }
                         }
                     }
+                    Ok(false) => {}
                     Err(err) => {
                         log::error!("Failed to evaluate criteria: {}", err);
                     }
@@ -297,7 +296,7 @@ pub mod tests {
     use super::*;
     use crate::{
         notification::MockNotificationDispatch,
-        triggers::{Action, Expression, NotificationTemplate},
+        triggers::{Action, Expression, NotificationTemplate, ValuePointer},
     };
     use lazy_static::lazy_static;
     use maplit::hashmap;
@@ -373,6 +372,39 @@ pub mod tests {
             "".to_owned(),
             empty_update().as_ref(),
             &notification_dispatch,
+        );
+    }
+
+    #[test]
+    pub fn execute_triggers_when_requested_trigger_criteria_not_met_does_not_unrequest_trigger() {
+        let notification_dispatch = MockNotificationDispatch::new();
+        let mut manager = TriggerManager::default();
+        manager.add_trigger(Trigger {
+            requestable: true,
+            requested_users: hashmap!(REQUESTED_USER_ID.clone() => BehaviorOnTrigger::Remove),
+            criteria: Expression::Equals(
+                ValuePointer::ConstBool(false),
+                ValuePointer::ConstBool(true),
+            ),
+            ..default_test_trigger()
+        });
+
+        manager.execute_triggers(
+            &REQUESTED_USER_ID,
+            "".to_owned(),
+            empty_update().as_ref(),
+            &notification_dispatch,
+        );
+
+        assert_eq!(
+            1,
+            manager
+                .triggers_iter_mut()
+                .next()
+                .unwrap()
+                .1
+                .requested_users
+                .len()
         );
     }
 
