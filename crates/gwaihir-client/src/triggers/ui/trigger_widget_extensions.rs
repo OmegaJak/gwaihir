@@ -11,7 +11,7 @@ use crate::{
 
 use super::{
     action_widget_extensions::ActionWidgetExtensions, boolean_operator::BooleanOperator,
-    ExpressionTreeAction, TriggerAction,
+    user_selectable_expression::UserSelectableExpression, ExpressionTreeAction, TriggerAction,
 };
 
 pub trait SimpleTriggerWidgetExtension {
@@ -88,15 +88,19 @@ impl SimpleTriggerWidgetExtension for ValuePointer {
         match self {
             ValuePointer::OnlineStatus(time) => {
                 time.ui(ui);
-                ui.label("Online Status");
+                ui.label(UserSelectableExpression::OnlineStatus.to_string());
             }
             ValuePointer::LockStatus(time) => {
                 time.ui(ui);
-                ui.label("Lock Status");
+                ui.label(UserSelectableExpression::LockStatus.to_string());
             }
             ValuePointer::TotalKeyboardMouseUsage(time) => {
                 time.ui(ui);
-                ui.label("Total KB/M Usage");
+                ui.label(UserSelectableExpression::TotalKeyboardMouseUsage.to_string());
+            }
+            ValuePointer::NumAppsUsingMicrophone(time) => {
+                time.ui(ui);
+                ui.label(UserSelectableExpression::NumAppsUsingMicrophone.to_string());
             }
             ValuePointer::UserId => {
                 ui.label("UserId");
@@ -120,6 +124,9 @@ impl SimpleTriggerWidgetExtension for ValuePointer {
             }
             ValuePointer::ConstF64(v) => {
                 ui.add(egui::DragValue::new(v).speed(1).clamp_range(0.0..=100.0));
+            }
+            ValuePointer::ConstUsize(v) => {
+                ui.add(egui::DragValue::new(v).speed(1).clamp_range(0..=100));
             }
         }
     }

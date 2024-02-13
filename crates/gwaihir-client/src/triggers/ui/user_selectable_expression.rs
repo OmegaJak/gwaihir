@@ -8,6 +8,7 @@ pub enum UserSelectableExpression {
     LockStatus,
     TotalKeyboardMouseUsage,
     UserId,
+    NumAppsUsingMicrophone,
 }
 
 impl UserSelectableExpression {
@@ -29,6 +30,10 @@ impl UserSelectableExpression {
                 ValuePointer::UserId,
                 ValuePointer::ConstUserId(UniqueUserId::new("")),
             ),
+            UserSelectableExpression::NumAppsUsingMicrophone => Expression::Equals(
+                ValuePointer::NumAppsUsingMicrophone(TimeSpecifier::Current),
+                ValuePointer::ConstUsize(0),
+            ),
         }
     }
 }
@@ -40,6 +45,7 @@ impl std::fmt::Display for UserSelectableExpression {
             UserSelectableExpression::LockStatus => write!(f, "Lock Status"),
             UserSelectableExpression::TotalKeyboardMouseUsage => write!(f, "Total KB/M Usage"),
             UserSelectableExpression::UserId => write!(f, "User Id"),
+            UserSelectableExpression::NumAppsUsingMicrophone => write!(f, "# Apps Using Mic"),
         }
     }
 }

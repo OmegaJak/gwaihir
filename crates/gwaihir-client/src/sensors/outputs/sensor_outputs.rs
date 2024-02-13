@@ -59,6 +59,16 @@ impl SensorOutputs {
 
         None
     }
+
+    pub fn get_num_apps_using_microphone(&self) -> Option<usize> {
+        for output in self.outputs.iter() {
+            if let SensorOutput::MicrophoneUsage(usage) = output {
+                return Some(usage.usage.len());
+            }
+        }
+
+        None
+    }
 }
 
 impl AcceptsOnlineStatus for SensorOutputs {

@@ -23,6 +23,7 @@ pub enum ValueType {
     Bool,
     UserId,
     F64,
+    Usize,
 }
 
 impl ComparisonOperator {
@@ -41,16 +42,21 @@ impl ComparisonOperator {
                 self,
                 ComparisonOperator::Equals | ComparisonOperator::NotEquals
             ),
-            ValueType::F64 => matches!(
-                self,
-                ComparisonOperator::Equals
-                    | ComparisonOperator::NotEquals
-                    | ComparisonOperator::GreaterThan
-                    | ComparisonOperator::GreaterThanOrEquals
-                    | ComparisonOperator::LessThan
-                    | ComparisonOperator::LessThanOrEquals
-            ),
+            ValueType::F64 => self.is_numeric_operator(),
+            ValueType::Usize => self.is_numeric_operator(),
         }
+    }
+
+    fn is_numeric_operator(&self) -> bool {
+        matches!(
+            self,
+            ComparisonOperator::Equals
+                | ComparisonOperator::NotEquals
+                | ComparisonOperator::GreaterThan
+                | ComparisonOperator::GreaterThanOrEquals
+                | ComparisonOperator::LessThan
+                | ComparisonOperator::LessThanOrEquals
+        )
     }
 
     pub fn create_expression(&self, l: ValuePointer, r: ValuePointer) -> Expression {
@@ -196,6 +202,9 @@ impl From<&ValuePointer> for ValueType {
             | ValuePointer::ConstBool(_) => ValueType::Bool,
             ValuePointer::TotalKeyboardMouseUsage(_) | ValuePointer::ConstF64(_) => ValueType::F64,
             ValuePointer::UserId | ValuePointer::ConstUserId(_) => ValueType::UserId,
+            ValuePointer::NumAppsUsingMicrophone(_) | ValuePointer::ConstUsize(_) => {
+                ValueType::Usize
+            }
         }
     }
 }

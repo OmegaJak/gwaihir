@@ -36,21 +36,17 @@ pub struct EvalData<'a, 'b> {
 #[derive(Debug)]
 pub enum OperationType {
     GreaterThan,
-}
-
-#[derive(Debug)]
-pub enum ValueType {
-    Bool,
-    UserId,
-    F64,
+    LessThan,
 }
 
 #[derive(Error, Debug)]
 pub enum EvaluationError {
-    #[error("Cannot compare a \"{0:#?}\" to a \"{1:#?}\"")]
-    TypeMismatch(ValueType, ValueType),
-    #[error("Invalid operation - \"{0:#?}\" is not a valid operation on a \"{1:#?}\"")]
-    InvalidOperation(OperationType, ValueType),
+    #[error("Cannot compare \"{0:#?}\" to \"{1:#?}\"")]
+    TypeMismatch(Value, Value),
+    #[error(
+        "Invalid operation - \"{0:#?}\" is not a valid operation on \"{1:#?}\" and \"{2:#?}\""
+    )]
+    InvalidOperation(OperationType, Value, Value),
 }
 
 impl Default for Expression {

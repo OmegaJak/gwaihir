@@ -1,7 +1,7 @@
 use crate::sensors::outputs::sensor_outputs::SensorOutputs;
 
 use super::{
-    expression::{EvalData, EvalResult, EvaluationError, OperationType, ValueType},
+    expression::{EvalData, EvalResult, EvaluationError, OperationType},
     Update,
 };
 use gwaihir_client_lib::UniqueUserId;
@@ -16,11 +16,13 @@ pub enum ValuePointer {
     OnlineStatus(TimeSpecifier),
     LockStatus(TimeSpecifier),
     TotalKeyboardMouseUsage(TimeSpecifier),
+    NumAppsUsingMicrophone(TimeSpecifier),
     UserId,
 
     ConstBool(bool),
     ConstUserId(UniqueUserId),
     ConstF64(f64),
+    ConstUsize(usize),
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
@@ -29,11 +31,12 @@ pub enum TimeSpecifier {
     Current,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
 pub enum Value {
     Bool(bool),
     UserId(UniqueUserId),
     F64(f64),
+    Usize(usize),
 }
 
 impl ValuePointer {
@@ -56,6 +59,12 @@ impl ValuePointer {
                     .map(Value::F64)
             }
             ValuePointer::ConstF64(v) => Some(Value::F64(*v)),
+            ValuePointer::NumAppsUsingMicrophone(time) => {
+                get_outputs_by_time_specifier(&data.update, time)
+                    .get_num_apps_using_microphone()
+                    .map(Value::Usize)
+            }
+            ValuePointer::ConstUsize(v) => Some(Value::Usize(*v)),
         }
     }
 }
@@ -76,21 +85,9 @@ impl Value {
             (Value::Bool(left), Value::Bool(right)) => EvalResult::Ok(left == right),
             (Value::UserId(left), Value::UserId(right)) => EvalResult::Ok(left == right),
             (Value::F64(left), Value::F64(right)) => EvalResult::Ok(left == right),
-            (Value::Bool(_), Value::UserId(_)) | (Value::UserId(_), Value::Bool(_)) => {
-                EvalResult::Err(EvaluationError::TypeMismatch(
-                    ValueType::Bool,
-                    ValueType::UserId,
-                ))
-            }
-            (Value::Bool(_), Value::F64(_)) | (Value::F64(_), Value::Bool(_)) => EvalResult::Err(
-                EvaluationError::TypeMismatch(ValueType::Bool, ValueType::F64),
-            ),
-            (Value::UserId(_), Value::F64(_)) | (Value::F64(_), Value::UserId(_)) => {
-                EvalResult::Err(EvaluationError::TypeMismatch(
-                    ValueType::UserId,
-                    ValueType::F64,
-                ))
-            }
+            (Value::Usize(left), Value::Usize(right)) => EvalResult::Ok(left == right),
+
+            (a, b) => EvalResult::Err(EvaluationError::TypeMismatch(a.to_owned(), b.to_owned())),
         }
     }
 
@@ -101,24 +98,24 @@ impl Value {
     pub fn greater_than(&self, other: &Value) -> EvalResult<bool> {
         match (self, other) {
             (Value::F64(left), Value::F64(right)) => EvalResult::Ok(left > right),
-            (Value::Bool(_), _) | (_, Value::Bool(_)) => EvalResult::Err(
-                EvaluationError::InvalidOperation(OperationType::GreaterThan, ValueType::Bool),
-            ),
-            (Value::UserId(_), _) | (_, Value::UserId(_)) => EvalResult::Err(
-                EvaluationError::InvalidOperation(OperationType::GreaterThan, ValueType::UserId),
-            ),
+            (Value::Usize(left), Value::Usize(right)) => EvalResult::Ok(left > right),
+            (a, b) => EvalResult::Err(EvaluationError::InvalidOperation(
+                OperationType::GreaterThan,
+                a.to_owned(),
+                b.to_owned(),
+            )),
         }
     }
 
     pub fn less_than(&self, other: &Value) -> EvalResult<bool> {
         match (self, other) {
             (Value::F64(left), Value::F64(right)) => EvalResult::Ok(left < right),
-            (Value::Bool(_), _) | (_, Value::Bool(_)) => EvalResult::Err(
-                EvaluationError::InvalidOperation(OperationType::GreaterThan, ValueType::Bool),
-            ),
-            (Value::UserId(_), _) | (_, Value::UserId(_)) => EvalResult::Err(
-                EvaluationError::InvalidOperation(OperationType::GreaterThan, ValueType::UserId),
-            ),
+            (Value::Usize(left), Value::Usize(right)) => EvalResult::Ok(left < right),
+            (a, b) => EvalResult::Err(EvaluationError::InvalidOperation(
+                OperationType::LessThan,
+                a.to_owned(),
+                b.to_owned(),
+            )),
         }
     }
 }
@@ -148,11 +145,13 @@ pub mod persistence {
         OnlineStatus(TimeSpecifier),
         LockStatus(TimeSpecifier),
         TotalKeyboardMouseUsage(TimeSpecifier),
+        NumAppsUsingMicrophone(TimeSpecifier),
         UserId,
 
         ConstBool(bool),
         ConstUserId(UniqueUserId),
         ConstF64(f64),
+        ConstUsize(usize),
     }
 
     impl From<VersionedValuePointer> for ValuePointer {
@@ -168,6 +167,8 @@ pub mod persistence {
                     Self::TotalKeyboardMouseUsage(time)
                 }
                 ValuePointerV2::ConstF64(v) => Self::ConstF64(v),
+                ValuePointerV2::NumAppsUsingMicrophone(time) => Self::NumAppsUsingMicrophone(time),
+                ValuePointerV2::ConstUsize(time) => Self::ConstUsize(time),
             }
         }
     }
@@ -184,6 +185,10 @@ pub mod persistence {
                     ValuePointerV2::TotalKeyboardMouseUsage(time)
                 }
                 ValuePointer::ConstF64(v) => ValuePointerV2::ConstF64(v),
+                ValuePointer::ConstUsize(v) => ValuePointerV2::ConstUsize(v),
+                ValuePointer::NumAppsUsingMicrophone(time) => {
+                    ValuePointerV2::NumAppsUsingMicrophone(time)
+                }
             })
         }
     }

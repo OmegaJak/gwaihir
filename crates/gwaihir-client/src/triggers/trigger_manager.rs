@@ -95,12 +95,10 @@ impl TriggerManager {
     pub fn reset_default_triggers(&mut self) {
         self.triggers
             .retain(|_, trigger| trigger.source != TriggerSource::AppDefaults);
-        self.triggers
-            .insert(Uuid::new_v4(), default_triggers::user_coming_online());
-        self.triggers
-            .insert(Uuid::new_v4(), default_triggers::user_unlocked());
-        self.triggers
-            .insert(Uuid::new_v4(), default_triggers::user_active_again());
+        self.add_trigger(default_triggers::user_coming_online());
+        self.add_trigger(default_triggers::user_unlocked());
+        self.add_trigger(default_triggers::user_active_again());
+        self.add_trigger(default_triggers::done_with_meeting());
     }
 }
 
@@ -253,6 +251,35 @@ mod default_triggers {
                 .to_string(),
         ))];
         let name = "User active again".to_string();
+        Trigger {
+            criteria,
+            enabled: true,
+            requestable: true,
+            requested_users: Default::default(),
+            source: TriggerSource::AppDefaults,
+            actions,
+            name,
+        }
+    }
+
+    pub fn done_with_meeting() -> Trigger {
+        let criteria = Expression::And(
+            Expression::GreaterThan(
+                ValuePointer::NumAppsUsingMicrophone(TimeSpecifier::Last),
+                ValuePointer::ConstUsize(0),
+            )
+            .into(),
+            Expression::Equals(
+                ValuePointer::NumAppsUsingMicrophone(TimeSpecifier::Current),
+                ValuePointer::ConstUsize(0),
+            )
+            .into(),
+        );
+        let actions = vec![Action::ShowNotification(NotificationTemplate::new(
+            "{{user}} is done with their meeting".to_string(),
+            "The # of apps listening to \"{{user}}'s\" microphone has dropped to 0".to_string(),
+        ))];
+        let name = "Done with meeting".to_string();
         Trigger {
             criteria,
             enabled: true,
