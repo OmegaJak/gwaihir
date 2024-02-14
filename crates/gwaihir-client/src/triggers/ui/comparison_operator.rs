@@ -1,8 +1,12 @@
 use crate::{
-    triggers::{Expression, ExpressionRef, ValuePointer},
+    triggers::{
+        value_pointer::{ValueKind, ValuePointerKind},
+        Expression, ExpressionRef, TimeSpecifier, ValuePointer,
+    },
     ui::ui_extension_methods::UIExtensionMethods,
 };
 use enum_iterator::Sequence;
+use gwaihir_client_lib::UniqueUserId;
 
 use super::{
     user_selectable_expression::UserSelectableExpression, ExpressionTreeAction,
@@ -19,31 +23,24 @@ pub enum ComparisonOperator {
     NotEquals,
 }
 
-pub enum ValueType {
-    Bool,
-    UserId,
-    F64,
-    Usize,
-}
-
 impl ComparisonOperator {
     pub fn valid_for_value(&self, value: &ValuePointer) -> bool {
-        let value_type = ValueType::from(value);
+        let value_type = ValueKind::from(value);
         self.valid_for_value_type(value_type)
     }
 
-    pub fn valid_for_value_type(&self, value_type: ValueType) -> bool {
+    pub fn valid_for_value_type(&self, value_type: ValueKind) -> bool {
         match value_type {
-            ValueType::Bool => matches!(
+            ValueKind::Bool => matches!(
                 self,
                 ComparisonOperator::Equals | ComparisonOperator::NotEquals
             ),
-            ValueType::UserId => matches!(
+            ValueKind::UserId => matches!(
                 self,
                 ComparisonOperator::Equals | ComparisonOperator::NotEquals
             ),
-            ValueType::F64 => self.is_numeric_operator(),
-            ValueType::Usize => self.is_numeric_operator(),
+            ValueKind::F64 => self.is_numeric_operator(),
+            ValueKind::Usize => self.is_numeric_operator(),
         }
     }
 
@@ -154,6 +151,16 @@ impl ComparisonOperator {
                 return add_condition_response;
             }
 
+            ui.menu_button("Swap Value", |ui| {
+                ui.menu_button("Left", |ui| {
+                    show_swap_value_ui(left_value, ui);
+                });
+
+                ui.menu_button("Right", |ui| {
+                    show_swap_value_ui(right_value, ui);
+                });
+            });
+
             ui.separator();
             if ui.button("Delete").clicked() {
                 ui.close_menu();
@@ -194,17 +201,76 @@ impl ComparisonOperator {
     }
 }
 
-impl From<&ValuePointer> for ValueType {
+fn show_swap_value_ui(value: &mut ValuePointer, ui: &mut egui::Ui) {
+    let current_kind = ValueKind::from(&value.kind());
+    let value_kind = value.kind();
+    for valid_replacement in ValuePointerKind::all()
+        .iter()
+        .filter(|k| **k != value_kind && ValueKind::from(*k) == current_kind)
+    {
+        if ui.button(valid_replacement.get_display_text()).clicked() {
+            *value = valid_replacement.get_default_value_pointer();
+            ui.close_menu();
+        }
+    }
+}
+
+impl From<&ValuePointer> for ValueKind {
     fn from(value: &ValuePointer) -> Self {
+        ValueKind::from(&value.kind())
+    }
+}
+
+impl From<&ValuePointerKind> for ValueKind {
+    fn from(value: &ValuePointerKind) -> Self {
         match value {
-            ValuePointer::OnlineStatus(_)
-            | ValuePointer::LockStatus(_)
-            | ValuePointer::ConstBool(_) => ValueType::Bool,
-            ValuePointer::TotalKeyboardMouseUsage(_) | ValuePointer::ConstF64(_) => ValueType::F64,
-            ValuePointer::UserId | ValuePointer::ConstUserId(_) => ValueType::UserId,
-            ValuePointer::NumAppsUsingMicrophone(_) | ValuePointer::ConstUsize(_) => {
-                ValueType::Usize
+            ValuePointerKind::OnlineStatus
+            | ValuePointerKind::LockStatus
+            | ValuePointerKind::ConstBool => ValueKind::Bool,
+            ValuePointerKind::TotalKeyboardMouseUsage | ValuePointerKind::ConstF64 => {
+                ValueKind::F64
             }
+            ValuePointerKind::UserId | ValuePointerKind::ConstUserId => ValueKind::UserId,
+            ValuePointerKind::NumAppsUsingMicrophone | ValuePointerKind::ConstUsize => {
+                ValueKind::Usize
+            }
+        }
+    }
+}
+
+impl ValuePointerKind {
+    fn get_default_value_pointer(&self) -> ValuePointer {
+        let time = TimeSpecifier::Current;
+        match self {
+            ValuePointerKind::OnlineStatus => ValuePointer::OnlineStatus(time),
+            ValuePointerKind::LockStatus => ValuePointer::LockStatus(time),
+            ValuePointerKind::TotalKeyboardMouseUsage => {
+                ValuePointer::TotalKeyboardMouseUsage(time)
+            }
+            ValuePointerKind::NumAppsUsingMicrophone => ValuePointer::NumAppsUsingMicrophone(time),
+            ValuePointerKind::UserId => ValuePointer::UserId,
+            ValuePointerKind::ConstBool => ValuePointer::ConstBool(true),
+            ValuePointerKind::ConstUserId => ValuePointer::ConstUserId(UniqueUserId::new("")),
+            ValuePointerKind::ConstF64 => ValuePointer::ConstF64(0.0),
+            ValuePointerKind::ConstUsize => ValuePointer::ConstUsize(0),
+        }
+    }
+
+    fn get_display_text(&self) -> String {
+        match self {
+            ValuePointerKind::OnlineStatus => UserSelectableExpression::OnlineStatus.to_string(),
+            ValuePointerKind::LockStatus => UserSelectableExpression::LockStatus.to_string(),
+            ValuePointerKind::TotalKeyboardMouseUsage => {
+                UserSelectableExpression::TotalKeyboardMouseUsage.to_string()
+            }
+            ValuePointerKind::NumAppsUsingMicrophone => {
+                UserSelectableExpression::NumAppsUsingMicrophone.to_string()
+            }
+            ValuePointerKind::UserId => UserSelectableExpression::UserId.to_string(),
+            ValuePointerKind::ConstBool
+            | ValuePointerKind::ConstUserId
+            | ValuePointerKind::ConstF64
+            | ValuePointerKind::ConstUsize => "Fixed Value".to_owned(),
         }
     }
 }

@@ -2113,6 +2113,7 @@ dependencies = [
  "flexi_logger",
  "gwaihir-client-lib",
  "indexmap 2.2.3",
+ "kinded",
  "lazy_static",
  "lodepng",
  "log",

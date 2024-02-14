@@ -5,9 +5,10 @@ use super::{
     Update,
 };
 use gwaihir_client_lib::UniqueUserId;
+use kinded::Kinded;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug, Kinded)]
 #[serde(
     from = "persistence::VersionedValuePointer",
     into = "persistence::VersionedValuePointer"
@@ -31,7 +32,7 @@ pub enum TimeSpecifier {
     Current,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug, Kinded)]
 pub enum Value {
     Bool(bool),
     UserId(UniqueUserId),
