@@ -48,7 +48,7 @@ impl From<SummarizedWindowActivity> for SensorOutput {
     }
 }
 
-impl SensorWidget for SummarizedWindowActivity {
+impl SensorWidget<()> for SummarizedWindowActivity {
     fn show(&self, ui: &mut egui::Ui, id: &gwaihir_client_lib::UniqueUserId) {
         let time_using_current: HumanTime = HumanTime::from(self.current_window.started_using);
         let header_text = self.get_header_text(ui, time_using_current);

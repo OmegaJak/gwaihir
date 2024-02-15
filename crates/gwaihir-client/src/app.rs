@@ -7,7 +7,11 @@ use crate::{
     sensor_monitor_thread::{MainToMonitorMessages, MonitorToMainMessages},
     sensors::{
         lock_status_sensor::{init_lock_status_sensor, EventLoopRegisteredLockStatusSensorBuilder},
-        outputs::{sensor_output::SensorOutput, sensor_outputs::SensorOutputs},
+        outputs::{
+            online_status::OnlineStatus,
+            sensor_output::{SensorOutput, SensorWidget},
+            sensor_outputs::SensorOutputs,
+        },
     },
     tray_icon::{hide_to_tray, TrayIconData},
     triggers::{ui::TriggersWindow, BehaviorOnTrigger, TriggerManager, Update},
@@ -19,11 +23,13 @@ use crate::{
         ui_extension_methods::UIExtensionMethods,
         widgets::auto_launch_checkbox::AutoLaunchCheckboxUiExtension,
     },
+    user_summaries::UserSummaries,
 };
 use chrono_humanize::HumanTime;
 use egui::{Color32, RichText, ScrollArea};
 use gwaihir_client_lib::{
-    chrono::Local, NetworkInterface, RemoteUpdate, UniqueUserId, UserStatus, APP_ID,
+    chrono::{Local, Utc},
+    NetworkInterface, RemoteUpdate, UniqueUserId, UserStatus, APP_ID,
 };
 use log::{debug, info, warn};
 use log_err::LogErrResult;
@@ -47,6 +53,7 @@ pub struct GwaihirApp {
     tx_to_monitor_thread: Sender<MainToMonitorMessages>,
     rx_from_monitor_thread: Receiver<MonitorToMainMessages>,
     current_status: HashMap<UniqueUserId, UserStatus<SensorOutputs>>,
+    user_summaries: UserSummaries,
 
     _periodic_repaint_thread_join_handle: JoinHandle<()>,
 
@@ -98,6 +105,7 @@ impl GwaihirApp {
             tx_to_monitor_thread,
             rx_from_monitor_thread,
             current_status: HashMap::new(),
+            user_summaries: UserSummaries::new(),
 
             network_window: NetworkWindow::new(&network),
             transmission_spy: RawDataWindow::new("Last Sent Data".to_string()),
@@ -343,6 +351,7 @@ impl eframe::App for GwaihirApp {
                                 display_name,
                                 Update::new(&current.sensor_outputs, &status.sensor_outputs),
                                 &OSNotificationDispatch,
+                                &mut self.user_summaries,
                             );
                         }
                         self.current_status.insert(status.user_id.clone(), status);
@@ -438,51 +447,48 @@ impl eframe::App for GwaihirApp {
             let user_status_list = self.get_filtered_sorted_user_statuses();
             ScrollArea::vertical().show(ui, |ui| {
                 for (id, status) in user_status_list.iter() {
+                    let summary = self.user_summaries.get(id);
                     ui.horizontal(|ui| {
                         ui.spacing_mut().item_spacing.x = 2.0;
-                        status.sensor_outputs.show_first(
-                            |o| matches!(o, SensorOutput::OnlineStatus(_)),
-                            ui,
-                            id,
-                        );
+                        if summary.is_some() {
+                            let online = status
+                                .last_update
+                                .signed_duration_since(Utc::now())
+                                .num_minutes()
+                                < 6;
+                            OnlineStatus { online }
+                                .show(ui, id)
+                                .on_hover_text_at_pointer(last_updated_text(status));
+                        } else {
+                            status.sensor_outputs.show_first(
+                                |o| matches!(o, SensorOutput::OnlineStatus(_)),
+                                ui,
+                                id,
+                            );
+                        }
                         ui.heading(status.display_name())
                             .context_menu(|ui| {
                                 self.show_user_context_menu(id, ui, status);
                             })
                             .on_hover_text_at_pointer("Right click for options");
-                        ui.label(RichText::new(format!(
-                            " {} ",
-                            HumanTime::from(status.last_update)
-                        )))
-                        .on_hover_text_at_pointer(format!(
-                            "Last updated: {}",
-                            nicely_formatted_datetime(status.last_update.with_timezone(&Local),)
-                        ));
+                        if summary.is_none() {
+                            ui.label(RichText::new(format!(
+                                " {} ",
+                                HumanTime::from(status.last_update)
+                            )))
+                            .on_hover_text_at_pointer(last_updated_text(status));
+                        }
                     });
 
-                    status.sensor_outputs.show_first(
-                        |o| matches!(o, SensorOutput::LockStatus(_)),
-                        ui,
-                        id,
-                    );
-
-                    status.sensor_outputs.show_first(
-                        |o| matches!(o, SensorOutput::SummarizedWindowActivity(_)),
-                        ui,
-                        id,
-                    );
-
-                    status.sensor_outputs.show_first(
-                        |o| matches!(o, SensorOutput::KeyboardMouseActivity(_)),
-                        ui,
-                        id,
-                    );
-
-                    status.sensor_outputs.show_first(
-                        |o| matches!(o, SensorOutput::MicrophoneUsage(_)),
-                        ui,
-                        id,
-                    );
+                    if let Some(summary) = summary {
+                        egui::CollapsingHeader::new(RichText::new(summary).size(15.0))
+                            .id_source(format!("{}_details", id))
+                            .show(ui, |ui| {
+                                show_sensor_status(status, ui, id);
+                            });
+                    } else {
+                        show_sensor_status(status, ui, id);
+                    }
                 }
             });
 
@@ -503,6 +509,35 @@ impl eframe::App for GwaihirApp {
         self.triggers_window
             .show(ctx, &mut self.persistence.trigger_manager);
     }
+}
+
+fn last_updated_text(status: &UserStatus<SensorOutputs>) -> String {
+    format!(
+        "Last updated: {}",
+        nicely_formatted_datetime(status.last_update.with_timezone(&Local),)
+    )
+}
+
+fn show_sensor_status(status: &UserStatus<SensorOutputs>, ui: &mut egui::Ui, id: &UniqueUserId) {
+    status
+        .sensor_outputs
+        .show_first(|o| matches!(o, SensorOutput::LockStatus(_)), ui, id);
+
+    status.sensor_outputs.show_first(
+        |o| matches!(o, SensorOutput::SummarizedWindowActivity(_)),
+        ui,
+        id,
+    );
+
+    status.sensor_outputs.show_first(
+        |o| matches!(o, SensorOutput::KeyboardMouseActivity(_)),
+        ui,
+        id,
+    );
+
+    status
+        .sensor_outputs
+        .show_first(|o| matches!(o, SensorOutput::MicrophoneUsage(_)), ui, id);
 }
 
 impl GwaihirApp {

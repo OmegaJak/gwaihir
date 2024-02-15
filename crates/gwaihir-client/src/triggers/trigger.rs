@@ -45,10 +45,13 @@ impl Default for Trigger {
                 ValuePointer::TotalKeyboardMouseUsage(TimeSpecifier::Current),
                 ValuePointer::ConstF64(123.456),
             ),
-            actions: vec![Action::ShowNotification(NotificationTemplate::new(
-                "Default notification summary".to_owned(),
-                "Default notification body. Triggered for {{user}}.".to_owned(),
-            ))],
+            actions: vec![Action::ShowNotification(
+                NotificationTemplate::new(
+                    "Default notification summary".to_owned(),
+                    "Default notification body. Triggered for {{user}}.".to_owned(),
+                )
+                .expect("correct syntax is used in compile-time strings above"),
+            )],
         }
     }
 }

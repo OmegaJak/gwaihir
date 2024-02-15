@@ -10,7 +10,7 @@ pub struct LockStatus {
     pub num_unlocks: u32,
 }
 
-impl SensorWidget for LockStatus {
+impl SensorWidget<()> for LockStatus {
     fn show(&self, ui: &mut egui::Ui, id: &UniqueUserId) {
         self.show_details(id, ui);
     }

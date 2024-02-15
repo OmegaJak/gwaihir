@@ -21,6 +21,7 @@ mod sensors;
 mod tray_icon;
 pub mod triggers;
 mod ui;
+mod user_summaries;
 
 const ICON_BYTES: &[u8] = include_bytes!("../assets/eagle.png");
 

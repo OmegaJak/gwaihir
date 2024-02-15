@@ -1,9 +1,11 @@
 use derive_new::new;
-use serde::Serialize;
+use gwaihir_client_lib::UniqueUserId;
 
 mod action;
 mod expression;
 mod notification_template;
+mod summary_template;
+mod text_template;
 mod trigger;
 mod trigger_manager;
 pub mod ui;
@@ -13,14 +15,14 @@ pub use action::Action;
 pub use expression::Expression;
 pub use expression::ExpressionRef;
 pub use notification_template::NotificationTemplate;
-pub use notification_template::NotificationTemplateError;
+pub use text_template::TextTemplateError;
 pub use trigger::{BehaviorOnTrigger, Trigger, TriggerSource};
 pub use trigger_manager::persistence::{TriggerManagerV1, VersionedTriggerManager};
 pub use trigger_manager::TriggerManager;
 pub use value_pointer::TimeSpecifier;
 pub use value_pointer::ValuePointer;
 
-use crate::notification::NotificationDispatch;
+use crate::user_summaries::UserSummaries;
 
 #[derive(new, Clone)]
 pub struct Update<T> {
@@ -35,8 +37,9 @@ impl<T> Update<T> {
     }
 }
 
-#[derive(Serialize)]
-pub struct TriggerContext<'a, T: NotificationDispatch> {
+pub struct TriggerContext<'a, 'b, T> {
     user: String,
+    user_id: UniqueUserId,
     notification_dispatch: &'a T,
+    user_summaries: &'b mut UserSummaries,
 }

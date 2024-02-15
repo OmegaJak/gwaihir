@@ -5,7 +5,7 @@ default:
 
 # Run the Gwaihir executable. Pass --release to run release mode, or any other cargo args as desired.
 run *args:
-	cargo run -p gwaihir
+	cargo run -p gwaihir {{args}}
 
 # Build the Gwaihir executable. Pass --release to build release mode, or any other cargo args as desired.
 build *args:

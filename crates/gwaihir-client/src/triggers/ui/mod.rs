@@ -3,6 +3,7 @@ use super::Expression;
 mod action_widget_extensions;
 mod boolean_operator;
 mod comparison_operator;
+mod text_template_extensions;
 mod trigger_widget_extensions;
 mod triggers_window;
 mod user_selectable_expression;

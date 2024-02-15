@@ -9,12 +9,12 @@ pub struct OnlineStatus {
     pub online: bool,
 }
 
-impl SensorWidget for OnlineStatus {
-    fn show(&self, ui: &mut egui::Ui, _id: &UniqueUserId) {
+impl SensorWidget<egui::Response> for OnlineStatus {
+    fn show(&self, ui: &mut egui::Ui, _id: &UniqueUserId) -> egui::Response {
         let mut online_color = Color32::RED;
         if self.online {
             online_color = Color32::GREEN;
         }
-        ui.label(RichText::new("⏺ ").color(online_color).heading());
+        ui.label(RichText::new("⏺ ").color(online_color).heading())
     }
 }

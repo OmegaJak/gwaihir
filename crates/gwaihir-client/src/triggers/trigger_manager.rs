@@ -3,7 +3,10 @@ use super::{
     trigger::{BehaviorOnTrigger, TriggerSource},
     Trigger, TriggerContext, Update,
 };
-use crate::{notification::NotificationDispatch, sensors::outputs::sensor_outputs::SensorOutputs};
+use crate::{
+    notification::NotificationDispatch, sensors::outputs::sensor_outputs::SensorOutputs,
+    user_summaries::UserSummaries,
+};
 use gwaihir_client_lib::UniqueUserId;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -53,10 +56,14 @@ impl TriggerManager {
         user_display_name: String,
         update: Update<&SensorOutputs>,
         notification_dispatch: &impl NotificationDispatch,
+        user_summaries: &mut UserSummaries,
     ) {
-        let trigger_context = TriggerContext {
+        user_summaries.clear_summary(user_id);
+        let mut trigger_context = TriggerContext {
             user: user_display_name,
+            user_id: user_id.clone(),
             notification_dispatch,
+            user_summaries,
         };
         for trigger in self.triggers.values_mut().filter(|t| t.enabled) {
             let eval_data = EvalData {
@@ -68,7 +75,7 @@ impl TriggerManager {
                 match trigger.criteria.evaluate(&eval_data) {
                     Ok(true) => {
                         for action in trigger.actions.iter() {
-                            action.execute(&trigger_context);
+                            action.execute(&mut trigger_context);
                         }
 
                         if let Some(behavior_on_trigger) = trigger.requested_users.get(user_id) {
@@ -98,6 +105,9 @@ impl TriggerManager {
         self.add_trigger(default_triggers::user_unlocked());
         self.add_trigger(default_triggers::user_active_again());
         self.add_trigger(default_triggers::done_with_meeting());
+        self.add_trigger(default_triggers::summary_in_meeting());
+        self.add_trigger(default_triggers::summary_inactive());
+        self.add_trigger(default_triggers::summary_locked());
     }
 }
 
@@ -168,6 +178,7 @@ pub mod persistence {
 
 mod default_triggers {
     use crate::triggers::{
+        summary_template::SummaryTemplate,
         trigger::TriggerSource,
         value_pointer::{TimeSpecifier, ValuePointer},
         Action, Expression, NotificationTemplate, Trigger,
@@ -186,10 +197,13 @@ mod default_triggers {
             )
             .into(),
         );
-        let actions = vec![Action::ShowNotification(NotificationTemplate::new(
-            "{{user}} now Online".to_string(),
-            "The user \"{{user}}\" has transitioned from offline to online".to_string(),
-        ))];
+        let actions = vec![Action::ShowNotification(
+            NotificationTemplate::new(
+                "{{user}} now Online".to_string(),
+                "The user \"{{user}}\" has transitioned from offline to online".to_string(),
+            )
+            .unwrap(),
+        )];
         let name = "User coming online".to_string();
         Trigger {
             criteria,
@@ -215,10 +229,13 @@ mod default_triggers {
             )
             .into(),
         );
-        let actions = vec![Action::ShowNotification(NotificationTemplate::new(
-            "{{user}} unlocked".to_string(),
-            "The user \"{{user}}\" has unlocked their computer".to_string(),
-        ))];
+        let actions = vec![Action::ShowNotification(
+            NotificationTemplate::new(
+                "{{user}} unlocked".to_string(),
+                "The user \"{{user}}\" has unlocked their computer".to_string(),
+            )
+            .unwrap(),
+        )];
         let name = "User unlocked".to_string();
         Trigger {
             criteria,
@@ -244,11 +261,14 @@ mod default_triggers {
             )
             .into(),
         );
-        let actions = vec![Action::ShowNotification(NotificationTemplate::new(
-            "{{user}} is now active".to_string(),
-            "\"{{user}}\" has used their mouse/keyboard for the first time in 10 minutes"
-                .to_string(),
-        ))];
+        let actions = vec![Action::ShowNotification(
+            NotificationTemplate::new(
+                "{{user}} is now active".to_string(),
+                "\"{{user}}\" has used their mouse/keyboard for the first time in 10 minutes"
+                    .to_string(),
+            )
+            .unwrap(),
+        )];
         let name = "User active again".to_string();
         Trigger {
             criteria,
@@ -274,15 +294,78 @@ mod default_triggers {
             )
             .into(),
         );
-        let actions = vec![Action::ShowNotification(NotificationTemplate::new(
-            "{{user}} is done with their meeting".to_string(),
-            "The # of apps listening to \"{{user}}'s\" microphone has dropped to 0".to_string(),
-        ))];
+        let actions = vec![Action::ShowNotification(
+            NotificationTemplate::new(
+                "{{user}} is done with their meeting".to_string(),
+                "The # of apps listening to \"{{user}}'s\" microphone has dropped to 0".to_string(),
+            )
+            .unwrap(),
+        )];
         let name = "Done with meeting".to_string();
         Trigger {
             criteria,
             enabled: true,
             requestable: true,
+            requested_users: Default::default(),
+            source: TriggerSource::AppDefaults,
+            actions,
+            name,
+        }
+    }
+
+    pub fn summary_inactive() -> Trigger {
+        let criteria = Expression::Equals(
+            ValuePointer::TotalKeyboardMouseUsage(TimeSpecifier::Current),
+            ValuePointer::ConstF64(0.0),
+        );
+        let actions = vec![Action::SetSummary(
+            SummaryTemplate::new("Inactive".to_owned()).unwrap(),
+        )];
+        let name = "Summary - Inactive".to_string();
+        Trigger {
+            criteria,
+            enabled: true,
+            requestable: false,
+            requested_users: Default::default(),
+            source: TriggerSource::AppDefaults,
+            actions,
+            name,
+        }
+    }
+
+    pub fn summary_locked() -> Trigger {
+        let criteria = Expression::Equals(
+            ValuePointer::LockStatus(TimeSpecifier::Current),
+            ValuePointer::ConstBool(true),
+        );
+        let actions = vec![Action::SetSummary(
+            SummaryTemplate::new("Locked".to_owned()).unwrap(),
+        )];
+        let name = "Summary - Locked".to_string();
+        Trigger {
+            criteria,
+            enabled: true,
+            requestable: false,
+            requested_users: Default::default(),
+            source: TriggerSource::AppDefaults,
+            actions,
+            name,
+        }
+    }
+
+    pub fn summary_in_meeting() -> Trigger {
+        let criteria = Expression::GreaterThan(
+            ValuePointer::NumAppsUsingMicrophone(TimeSpecifier::Current),
+            ValuePointer::ConstUsize(0),
+        );
+        let actions = vec![Action::SetSummary(
+            SummaryTemplate::new("In Meeting".to_owned()).unwrap(),
+        )];
+        let name = "Summary - In Meeting".to_string();
+        Trigger {
+            criteria,
+            enabled: true,
+            requestable: false,
             requested_users: Default::default(),
             source: TriggerSource::AppDefaults,
             actions,
@@ -309,6 +392,7 @@ pub mod tests {
     #[test]
     pub fn execute_triggers_when_trigger_not_requestable_and_not_requested_executes_trigger() {
         let mut notification_dispatch = MockNotificationDispatch::new();
+        let mut user_summaries = UserSummaries::new();
         let mut manager = TriggerManager::default();
         manager.add_trigger(Trigger {
             requestable: false,
@@ -326,12 +410,14 @@ pub mod tests {
             "".to_owned(),
             empty_update().as_ref(),
             &notification_dispatch,
+            &mut user_summaries,
         );
     }
 
     #[test]
     pub fn execute_triggers_when_trigger_requestable_and_requested_executes_trigger() {
         let mut notification_dispatch = MockNotificationDispatch::new();
+        let mut user_summaries = UserSummaries::new();
         let mut manager = TriggerManager::default();
         manager.add_trigger(Trigger {
             requestable: true,
@@ -349,12 +435,14 @@ pub mod tests {
             "".to_owned(),
             empty_update().as_ref(),
             &notification_dispatch,
+            &mut user_summaries,
         );
     }
 
     #[test]
     pub fn execute_triggers_when_trigger_requestable_and_not_requested_skips_trigger() {
         let mut notification_dispatch = MockNotificationDispatch::new();
+        let mut user_summaries = UserSummaries::new();
         let mut manager = TriggerManager::default();
         manager.add_trigger(Trigger {
             requestable: true,
@@ -372,12 +460,14 @@ pub mod tests {
             "".to_owned(),
             empty_update().as_ref(),
             &notification_dispatch,
+            &mut user_summaries,
         );
     }
 
     #[test]
     pub fn execute_triggers_when_requested_trigger_criteria_not_met_does_not_unrequest_trigger() {
         let notification_dispatch = MockNotificationDispatch::new();
+        let mut user_summaries = UserSummaries::new();
         let mut manager = TriggerManager::default();
         manager.add_trigger(Trigger {
             requestable: true,
@@ -394,6 +484,7 @@ pub mod tests {
             "".to_owned(),
             empty_update().as_ref(),
             &notification_dispatch,
+            &mut user_summaries,
         );
 
         assert_eq!(
@@ -416,10 +507,9 @@ pub mod tests {
             requested_users: hashmap!(REQUESTED_USER_ID.clone() => BehaviorOnTrigger::NoAction),
             source: TriggerSource::AppDefaults,
             criteria: Expression::True,
-            actions: vec![Action::ShowNotification(NotificationTemplate::new(
-                "summary".to_owned(),
-                "body".to_owned(),
-            ))],
+            actions: vec![Action::ShowNotification(
+                NotificationTemplate::new("summary".to_owned(), "body".to_owned()).unwrap(),
+            )],
         }
     }
 

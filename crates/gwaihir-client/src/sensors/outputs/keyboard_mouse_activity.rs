@@ -34,7 +34,7 @@ enum UsageLevel {
     High,
 }
 
-impl SensorWidget for KeyboardMouseActivity {
+impl SensorWidget<()> for KeyboardMouseActivity {
     fn show(&self, ui: &mut egui::Ui, id: &gwaihir_client_lib::UniqueUserId) {
         let keyboard_summary = summarize(&self.keyboard_usage);
         let mouse_button_summary = summarize(&self.mouse_button_usage);

@@ -13,7 +13,7 @@ pub struct MicrophoneUsage {
 #[nutype(derive(Serialize, Deserialize, PartialEq, AsRef, Clone, Into, Debug, From))]
 pub struct AppName(String);
 
-impl SensorWidget for MicrophoneUsage {
+impl SensorWidget<()> for MicrophoneUsage {
     fn show(&self, ui: &mut egui::Ui, id: &UniqueUserId) {
         CollapsingHeader::new("Microphone Usage")
             .default_open(true)
