@@ -82,6 +82,10 @@ impl KeyboardMouseActivity {
     pub fn get_total_usage(&self) -> f64 {
         self.keyboard_usage.total() + self.mouse_movement.total() + self.mouse_button_usage.total()
     }
+
+    pub fn is_full(&self) -> bool {
+        self.keyboard_usage.data.len() == keyboard_mouse_sensor::NUM_BUCKETS_TO_KEEP
+    }
 }
 
 impl KeyboardMouseActivityData {

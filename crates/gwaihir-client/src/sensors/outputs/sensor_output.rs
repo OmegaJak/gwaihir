@@ -21,21 +21,6 @@ pub trait SensorWidget<R> {
     fn show(&self, ui: &mut egui::Ui, id: &UniqueUserId) -> R;
 }
 
-impl SensorWidget<()> for SensorOutput {
-    fn show(&self, ui: &mut egui::Ui, id: &UniqueUserId) {
-        match self {
-            SensorOutput::Empty => (),
-            SensorOutput::LockStatus(status) => status.show(ui, id),
-            SensorOutput::MicrophoneUsage(usage) => usage.show(ui, id),
-            SensorOutput::OnlineStatus(online) => {
-                online.show(ui, id);
-            }
-            SensorOutput::SummarizedWindowActivity(activity) => activity.show(ui, id),
-            SensorOutput::KeyboardMouseActivity(activity) => activity.show(ui, id),
-        }
-    }
-}
-
 impl SensorOutput {
     pub fn should_send_to_remote(&self) -> bool {
         match self {

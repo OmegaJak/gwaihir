@@ -8,9 +8,7 @@ use crate::{
     sensors::{
         lock_status_sensor::{init_lock_status_sensor, EventLoopRegisteredLockStatusSensorBuilder},
         outputs::{
-            online_status::OnlineStatus,
-            sensor_output::{SensorOutput, SensorWidget},
-            sensor_outputs::SensorOutputs,
+            online_status::OnlineStatus, sensor_output::SensorWidget, sensor_outputs::SensorOutputs,
         },
     },
     tray_icon::{hide_to_tray, TrayIconData},
@@ -457,12 +455,8 @@ impl eframe::App for GwaihirApp {
                             OnlineStatus { online }
                                 .show(ui, id)
                                 .on_hover_text_at_pointer(last_updated_text(status));
-                        } else {
-                            status.sensor_outputs.show_first(
-                                |o| matches!(o, SensorOutput::OnlineStatus(_)),
-                                ui,
-                                id,
-                            );
+                        } else if let Some(s) = status.sensor_outputs.find_online_status() {
+                            s.show(ui, id);
                         }
                         ui.heading(status.display_name())
                             .context_menu(|ui| {
@@ -523,25 +517,18 @@ fn last_updated_text(status: &UserStatus<SensorOutputs>) -> String {
 }
 
 fn show_sensor_status(status: &UserStatus<SensorOutputs>, ui: &mut egui::Ui, id: &UniqueUserId) {
-    status
-        .sensor_outputs
-        .show_first(|o| matches!(o, SensorOutput::LockStatus(_)), ui, id);
+    let sensor_outputs = &status.sensor_outputs;
+    if let Some(a) = sensor_outputs.find_summarized_window_activity() {
+        a.show(ui, id)
+    }
 
-    status.sensor_outputs.show_first(
-        |o| matches!(o, SensorOutput::SummarizedWindowActivity(_)),
-        ui,
-        id,
-    );
+    if let Some(a) = sensor_outputs.find_keyboard_mouse_activity() {
+        a.show(ui, id);
+    }
 
-    status.sensor_outputs.show_first(
-        |o| matches!(o, SensorOutput::KeyboardMouseActivity(_)),
-        ui,
-        id,
-    );
-
-    status
-        .sensor_outputs
-        .show_first(|o| matches!(o, SensorOutput::MicrophoneUsage(_)), ui, id);
+    if let Some(u) = sensor_outputs.find_microphone_usage() {
+        u.show(ui, id);
+    }
 }
 
 impl GwaihirApp {

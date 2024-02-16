@@ -51,7 +51,7 @@ impl ValuePointer {
         match self {
             ValuePointer::OnlineStatus(time_specifier) => {
                 get_outputs_by_time_specifier(&data.update, time_specifier)
-                    .get_online_status()
+                    .find_online_status()
                     .map(|v| Value::Bool(v.online))
             }
             ValuePointer::LockStatus(time) => get_outputs_by_time_specifier(&data.update, time)
