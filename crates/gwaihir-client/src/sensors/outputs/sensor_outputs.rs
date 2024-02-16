@@ -1,4 +1,7 @@
-use gwaihir_client_lib::{AcceptsOnlineStatus, UniqueUserId};
+use gwaihir_client_lib::{
+    chrono::{Duration, Utc},
+    AcceptsOnlineStatus, UniqueUserId,
+};
 use log::error;
 use serde::{Deserialize, Serialize};
 
@@ -64,6 +67,18 @@ impl SensorOutputs {
         for output in self.outputs.iter() {
             if let SensorOutput::MicrophoneUsage(usage) = output {
                 return Some(usage.usage.len());
+            }
+        }
+
+        None
+    }
+
+    pub fn active_window_duration(&self) -> Option<Duration> {
+        for output in self.outputs.iter() {
+            if let SensorOutput::SummarizedWindowActivity(activity) = output {
+                return Some(
+                    Utc::now().signed_duration_since(activity.current_window.started_using),
+                );
             }
         }
 

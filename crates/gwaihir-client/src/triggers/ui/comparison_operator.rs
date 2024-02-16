@@ -41,6 +41,7 @@ impl ComparisonOperator {
             ),
             ValueKind::F64 => self.is_numeric_operator(),
             ValueKind::Usize => self.is_numeric_operator(),
+            ValueKind::Duration => self.is_numeric_operator(),
         }
     }
 
@@ -234,12 +235,15 @@ impl From<&ValuePointerKind> for ValueKind {
             ValuePointerKind::NumAppsUsingMicrophone | ValuePointerKind::ConstUsize => {
                 ValueKind::Usize
             }
+            ValuePointerKind::TimeSinceMostRecentUpdate
+            | ValuePointerKind::ConstDuration
+            | ValuePointerKind::ActiveWindowDuration => ValueKind::Duration,
         }
     }
 }
 
 impl ValuePointerKind {
-    fn get_default_value_pointer(&self) -> ValuePointer {
+    pub fn get_default_value_pointer(&self) -> ValuePointer {
         let time = TimeSpecifier::Current;
         match self {
             ValuePointerKind::OnlineStatus => ValuePointer::OnlineStatus(time),
@@ -253,6 +257,11 @@ impl ValuePointerKind {
             ValuePointerKind::ConstUserId => ValuePointer::ConstUserId(UniqueUserId::new("")),
             ValuePointerKind::ConstF64 => ValuePointer::ConstF64(0.0),
             ValuePointerKind::ConstUsize => ValuePointer::ConstUsize(0),
+            ValuePointerKind::TimeSinceMostRecentUpdate => ValuePointer::TimeSinceMostRecentUpdate,
+            ValuePointerKind::ConstDuration => {
+                ValuePointer::ConstDuration(std::time::Duration::from_secs(30))
+            }
+            ValuePointerKind::ActiveWindowDuration => ValuePointer::ActiveWindowDuration(time),
         }
     }
 
@@ -267,10 +276,17 @@ impl ValuePointerKind {
                 UserSelectableExpression::NumAppsUsingMicrophone.to_string()
             }
             ValuePointerKind::UserId => UserSelectableExpression::UserId.to_string(),
+            ValuePointerKind::TimeSinceMostRecentUpdate => {
+                UserSelectableExpression::TimeSinceMostRecentUpdate.to_string()
+            }
+            ValuePointerKind::ActiveWindowDuration => {
+                UserSelectableExpression::ActiveWindowDuration.to_string()
+            }
             ValuePointerKind::ConstBool
             | ValuePointerKind::ConstUserId
             | ValuePointerKind::ConstF64
-            | ValuePointerKind::ConstUsize => "Fixed Value".to_owned(),
+            | ValuePointerKind::ConstUsize
+            | ValuePointerKind::ConstDuration => "Fixed Value".to_owned(),
         }
     }
 }

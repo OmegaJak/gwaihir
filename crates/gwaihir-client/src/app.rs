@@ -349,7 +349,7 @@ impl eframe::App for GwaihirApp {
                         self.persistence.trigger_manager.execute_triggers(
                             &status.user_id,
                             display_name,
-                            Update::new(&current.sensor_outputs, &status.sensor_outputs),
+                            Update::new(current, &status),
                             &OSNotificationDispatch,
                             &mut self.user_summaries,
                         );

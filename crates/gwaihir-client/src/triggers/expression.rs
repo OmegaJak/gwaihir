@@ -3,7 +3,7 @@ use super::{
     Update,
 };
 use crate::sensors::outputs::sensor_outputs::SensorOutputs;
-use gwaihir_client_lib::UniqueUserId;
+use gwaihir_client_lib::{UniqueUserId, UserStatus};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -30,7 +30,7 @@ pub type EvalResult<T> = Result<T, EvaluationError>;
 
 pub struct EvalData<'a, 'b> {
     pub user: &'a UniqueUserId,
-    pub update: Update<&'b SensorOutputs>,
+    pub update: Update<&'b UserStatus<SensorOutputs>>,
 }
 
 #[derive(Debug)]

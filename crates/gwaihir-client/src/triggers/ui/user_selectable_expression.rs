@@ -1,4 +1,4 @@
-use crate::triggers::{Expression, TimeSpecifier, ValuePointer};
+use crate::triggers::{value_pointer::ValuePointerKind, Expression, TimeSpecifier, ValuePointer};
 use enum_iterator::Sequence;
 use gwaihir_client_lib::UniqueUserId;
 
@@ -9,6 +9,8 @@ pub enum UserSelectableExpression {
     TotalKeyboardMouseUsage,
     UserId,
     NumAppsUsingMicrophone,
+    TimeSinceMostRecentUpdate,
+    ActiveWindowDuration,
 }
 
 impl UserSelectableExpression {
@@ -34,6 +36,14 @@ impl UserSelectableExpression {
                 ValuePointer::NumAppsUsingMicrophone(TimeSpecifier::Current),
                 ValuePointer::ConstUsize(0),
             ),
+            UserSelectableExpression::TimeSinceMostRecentUpdate => Expression::GreaterThan(
+                ValuePointer::TimeSinceMostRecentUpdate,
+                ValuePointerKind::ConstDuration.get_default_value_pointer(),
+            ),
+            UserSelectableExpression::ActiveWindowDuration => Expression::GreaterThan(
+                ValuePointer::ActiveWindowDuration(TimeSpecifier::Current),
+                ValuePointerKind::ConstDuration.get_default_value_pointer(),
+            ),
         }
     }
 }
@@ -46,6 +56,10 @@ impl std::fmt::Display for UserSelectableExpression {
             UserSelectableExpression::TotalKeyboardMouseUsage => write!(f, "Total KB/M Usage"),
             UserSelectableExpression::UserId => write!(f, "User Id"),
             UserSelectableExpression::NumAppsUsingMicrophone => write!(f, "# Apps Using Mic"),
+            UserSelectableExpression::TimeSinceMostRecentUpdate => {
+                write!(f, "Time Since Most Recent Update")
+            }
+            UserSelectableExpression::ActiveWindowDuration => write!(f, "Active Window Duration"),
         }
     }
 }

@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use gwaihir_client_lib::UniqueUserId;
 use uuid::Uuid;
 
@@ -128,6 +130,16 @@ impl SimpleTriggerWidgetExtension for ValuePointer {
             ValuePointer::ConstUsize(v) => {
                 ui.add(egui::DragValue::new(v).speed(1).clamp_range(0..=100));
             }
+            ValuePointer::TimeSinceMostRecentUpdate => {
+                ui.label("Time Since MRU");
+            }
+            ValuePointer::ConstDuration(d) => {
+                show_duration_ui(d, ui);
+            }
+            ValuePointer::ActiveWindowDuration(t) => {
+                t.ui(ui);
+                ui.label(UserSelectableExpression::ActiveWindowDuration.to_string());
+            }
         }
     }
 }
@@ -196,4 +208,37 @@ fn get_expression_id_extension(criteria: &mut Expression) -> &str {
         Expression::LessThanOrEquals(_, _) => "le",
         Expression::True => "true",
     }
+}
+
+fn show_duration_ui(d: &mut Duration, ui: &mut egui::Ui) {
+    const SECS_PER_HR: u64 = 3600;
+    const SECS_PER_MIN: u64 = 60;
+    let mut hours = d.as_secs() / SECS_PER_HR;
+    let mut minutes = (d.as_secs() / SECS_PER_MIN) % SECS_PER_MIN;
+    let mut secs = d.as_secs() % SECS_PER_MIN;
+
+    ui.horizontal_with_no_item_spacing(|ui| {
+        let h_res = ui.add(
+            egui::DragValue::new(&mut hours)
+                .speed(0.25)
+                .clamp_range(0..=1000),
+        );
+        ui.label("h ");
+        let m_res = ui.add(
+            egui::DragValue::new(&mut minutes)
+                .speed(0.25)
+                .clamp_range(0..=59),
+        );
+        ui.label("m ");
+        let s_res = ui.add(
+            egui::DragValue::new(&mut secs)
+                .speed(0.25)
+                .clamp_range(0..=59),
+        );
+        ui.label("s ");
+
+        if h_res.changed() || m_res.changed() || s_res.changed() {
+            *d = Duration::from_secs(hours * SECS_PER_HR + minutes * SECS_PER_MIN + secs);
+        }
+    });
 }

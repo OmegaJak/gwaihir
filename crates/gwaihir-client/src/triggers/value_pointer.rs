@@ -1,10 +1,12 @@
+use std::time::Duration;
+
 use crate::sensors::outputs::sensor_outputs::SensorOutputs;
 
 use super::{
     expression::{EvalData, EvalResult, EvaluationError, OperationType},
     Update,
 };
-use gwaihir_client_lib::UniqueUserId;
+use gwaihir_client_lib::{chrono::Utc, UniqueUserId, UserStatus};
 use kinded::Kinded;
 use serde::{Deserialize, Serialize};
 
@@ -19,11 +21,14 @@ pub enum ValuePointer {
     TotalKeyboardMouseUsage(TimeSpecifier),
     NumAppsUsingMicrophone(TimeSpecifier),
     UserId,
+    TimeSinceMostRecentUpdate,
+    ActiveWindowDuration(TimeSpecifier),
 
     ConstBool(bool),
     ConstUserId(UniqueUserId),
     ConstF64(f64),
     ConstUsize(usize),
+    ConstDuration(Duration),
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
@@ -38,6 +43,7 @@ pub enum Value {
     UserId(UniqueUserId),
     F64(f64),
     Usize(usize),
+    Duration(Duration),
 }
 
 impl ValuePointer {
@@ -66,17 +72,31 @@ impl ValuePointer {
                     .map(Value::Usize)
             }
             ValuePointer::ConstUsize(v) => Some(Value::Usize(*v)),
+            ValuePointer::TimeSinceMostRecentUpdate => Some(Value::Duration(
+                Utc::now()
+                    .signed_duration_since(data.update.updated.last_update)
+                    .abs()
+                    .to_std()
+                    .expect(
+                        "conversion to std duration should always work for a positive duration",
+                    ),
+            )),
+            ValuePointer::ConstDuration(d) => Some(Value::Duration(d.to_owned())),
+            ValuePointer::ActiveWindowDuration(t) => get_outputs_by_time_specifier(&data.update, t)
+                .active_window_duration()
+                .and_then(|d| d.to_std().ok())
+                .map(Value::Duration),
         }
     }
 }
 
 fn get_outputs_by_time_specifier<'a>(
-    update: &'a Update<&SensorOutputs>,
+    update: &'a Update<&UserStatus<SensorOutputs>>,
     specifier: &TimeSpecifier,
 ) -> &'a SensorOutputs {
     match specifier {
-        TimeSpecifier::Last => update.original,
-        TimeSpecifier::Current => update.updated,
+        TimeSpecifier::Last => &update.original.sensor_outputs,
+        TimeSpecifier::Current => &update.updated.sensor_outputs,
     }
 }
 
@@ -87,8 +107,18 @@ impl Value {
             (Value::UserId(left), Value::UserId(right)) => EvalResult::Ok(left == right),
             (Value::F64(left), Value::F64(right)) => EvalResult::Ok(left == right),
             (Value::Usize(left), Value::Usize(right)) => EvalResult::Ok(left == right),
+            (Value::Duration(left), Value::Duration(right)) => EvalResult::Ok(left == right),
 
-            (a, b) => EvalResult::Err(EvaluationError::TypeMismatch(a.to_owned(), b.to_owned())),
+            (a @ Value::Bool(_), b)
+            | (a, b @ Value::Bool(_))
+            | (a @ Value::UserId(_), b)
+            | (a, b @ Value::UserId(_))
+            | (a @ Value::F64(_), b)
+            | (a, b @ Value::F64(_))
+            | (a @ Value::Usize(_), b)
+            | (a, b @ Value::Usize(_)) => {
+                EvalResult::Err(EvaluationError::TypeMismatch(a.to_owned(), b.to_owned()))
+            }
         }
     }
 
@@ -100,7 +130,15 @@ impl Value {
         match (self, other) {
             (Value::F64(left), Value::F64(right)) => EvalResult::Ok(left > right),
             (Value::Usize(left), Value::Usize(right)) => EvalResult::Ok(left > right),
-            (a, b) => EvalResult::Err(EvaluationError::InvalidOperation(
+            (Value::Duration(left), Value::Duration(right)) => EvalResult::Ok(left > right),
+            (a @ Value::Bool(_), b)
+            | (a, b @ Value::Bool(_))
+            | (a @ Value::UserId(_), b)
+            | (a, b @ Value::UserId(_))
+            | (a @ Value::F64(_), b)
+            | (a, b @ Value::F64(_))
+            | (a @ Value::Usize(_), b)
+            | (a, b @ Value::Usize(_)) => EvalResult::Err(EvaluationError::InvalidOperation(
                 OperationType::GreaterThan,
                 a.to_owned(),
                 b.to_owned(),
@@ -112,7 +150,15 @@ impl Value {
         match (self, other) {
             (Value::F64(left), Value::F64(right)) => EvalResult::Ok(left < right),
             (Value::Usize(left), Value::Usize(right)) => EvalResult::Ok(left < right),
-            (a, b) => EvalResult::Err(EvaluationError::InvalidOperation(
+            (Value::Duration(left), Value::Duration(right)) => EvalResult::Ok(left < right),
+            (a @ Value::Bool(_), b)
+            | (a, b @ Value::Bool(_))
+            | (a @ Value::UserId(_), b)
+            | (a, b @ Value::UserId(_))
+            | (a @ Value::F64(_), b)
+            | (a, b @ Value::F64(_))
+            | (a @ Value::Usize(_), b)
+            | (a, b @ Value::Usize(_)) => EvalResult::Err(EvaluationError::InvalidOperation(
                 OperationType::LessThan,
                 a.to_owned(),
                 b.to_owned(),
@@ -148,11 +194,14 @@ pub mod persistence {
         TotalKeyboardMouseUsage(TimeSpecifier),
         NumAppsUsingMicrophone(TimeSpecifier),
         UserId,
+        TimeSinceMostRecentUpdate,
+        ActiveWindowDuration(TimeSpecifier),
 
         ConstBool(bool),
         ConstUserId(UniqueUserId),
         ConstF64(f64),
         ConstUsize(usize),
+        ConstDuration(Duration),
     }
 
     impl From<VersionedValuePointer> for ValuePointer {
@@ -170,6 +219,9 @@ pub mod persistence {
                 ValuePointerV2::ConstF64(v) => Self::ConstF64(v),
                 ValuePointerV2::NumAppsUsingMicrophone(time) => Self::NumAppsUsingMicrophone(time),
                 ValuePointerV2::ConstUsize(time) => Self::ConstUsize(time),
+                ValuePointerV2::TimeSinceMostRecentUpdate => Self::TimeSinceMostRecentUpdate,
+                ValuePointerV2::ConstDuration(d) => Self::ConstDuration(d),
+                ValuePointerV2::ActiveWindowDuration(t) => Self::ActiveWindowDuration(t),
             }
         }
     }
@@ -190,6 +242,11 @@ pub mod persistence {
                 ValuePointer::NumAppsUsingMicrophone(time) => {
                     ValuePointerV2::NumAppsUsingMicrophone(time)
                 }
+                ValuePointer::TimeSinceMostRecentUpdate => {
+                    ValuePointerV2::TimeSinceMostRecentUpdate
+                }
+                ValuePointer::ConstDuration(d) => ValuePointerV2::ConstDuration(d),
+                ValuePointer::ActiveWindowDuration(t) => ValuePointerV2::ActiveWindowDuration(t),
             })
         }
     }

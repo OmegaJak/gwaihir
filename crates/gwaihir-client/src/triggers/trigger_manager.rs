@@ -7,7 +7,7 @@ use crate::{
     notification::NotificationDispatch, sensors::outputs::sensor_outputs::SensorOutputs,
     user_summaries::UserSummaries,
 };
-use gwaihir_client_lib::UniqueUserId;
+use gwaihir_client_lib::{UniqueUserId, UserStatus};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -54,7 +54,7 @@ impl TriggerManager {
         &mut self,
         user_id: &UniqueUserId,
         user_display_name: String,
-        update: Update<&SensorOutputs>,
+        update: Update<&UserStatus<SensorOutputs>>,
         notification_dispatch: &impl NotificationDispatch,
         user_summaries: &mut UserSummaries,
     ) {
@@ -381,6 +381,7 @@ pub mod tests {
         notification::MockNotificationDispatch,
         triggers::{Action, Expression, NotificationTemplate, ValuePointer},
     };
+    use gwaihir_client_lib::{chrono::Utc, Username};
     use lazy_static::lazy_static;
     use maplit::hashmap;
 
@@ -513,8 +514,17 @@ pub mod tests {
         }
     }
 
-    fn empty_update() -> Update<SensorOutputs> {
-        Update::new(empty_sensor_outputs(), empty_sensor_outputs())
+    fn empty_update() -> Update<UserStatus<SensorOutputs>> {
+        Update::new(empty_status(), empty_status())
+    }
+
+    fn empty_status() -> UserStatus<SensorOutputs> {
+        UserStatus {
+            user_id: UniqueUserId::new(""),
+            username: Username::new(""),
+            last_update: Utc::now(),
+            sensor_outputs: empty_sensor_outputs(),
+        }
     }
 
     fn empty_sensor_outputs() -> SensorOutputs {
