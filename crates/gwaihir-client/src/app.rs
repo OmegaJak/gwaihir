@@ -342,18 +342,17 @@ impl eframe::App for GwaihirApp {
                 RemoteUpdate::UserStatusUpdated(status) => {
                     if self.subscribed_to_user(&status.user_id) {
                         debug!("Got user update from DB: {:#?}", &status);
-                        if let Some(current) = self.current_status.get(&status.user_id) {
-                            let display_name = self
-                                .get_user_display_name(&status.user_id)
-                                .unwrap_or_else(|| "Unknown".to_string());
-                            self.persistence.trigger_manager.execute_triggers(
-                                &status.user_id,
-                                display_name,
-                                Update::new(&current.sensor_outputs, &status.sensor_outputs),
-                                &OSNotificationDispatch,
-                                &mut self.user_summaries,
-                            );
-                        }
+                        let current = self.current_status.get(&status.user_id).unwrap_or(&status);
+                        let display_name = self
+                            .get_user_display_name(&status.user_id)
+                            .unwrap_or_else(|| "Unknown".to_string());
+                        self.persistence.trigger_manager.execute_triggers(
+                            &status.user_id,
+                            display_name,
+                            Update::new(&current.sensor_outputs, &status.sensor_outputs),
+                            &OSNotificationDispatch,
+                            &mut self.user_summaries,
+                        );
                         self.current_status.insert(status.user_id.clone(), status);
                     }
                 }
@@ -451,9 +450,8 @@ impl eframe::App for GwaihirApp {
                     ui.horizontal(|ui| {
                         ui.spacing_mut().item_spacing.x = 2.0;
                         if summary.is_some() {
-                            let online = status
-                                .last_update
-                                .signed_duration_since(Utc::now())
+                            let online = Utc::now()
+                                .signed_duration_since(status.last_update)
                                 .num_minutes()
                                 < 6;
                             OnlineStatus { online }
