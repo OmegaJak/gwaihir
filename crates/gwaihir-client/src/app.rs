@@ -507,7 +507,13 @@ impl eframe::App for GwaihirApp {
                 .log_expect("Failed to queue fake user update");
         });
         self.triggers_window
-            .show(ctx, &mut self.persistence.trigger_manager);
+            .show(ctx, &mut self.persistence.trigger_manager, || {
+                for status in self.current_status.values() {
+                    self.network
+                        .queue_fake_update(RemoteUpdate::UserStatusUpdated(status.clone()))
+                        .log_expect("Failed to queue fake user updates following trigger update");
+                }
+            });
     }
 }
 

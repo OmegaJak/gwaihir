@@ -27,7 +27,12 @@ impl TriggersWindow {
         self.shown = shown;
     }
 
-    pub fn show(&mut self, ctx: &egui::Context, trigger_manager: &mut TriggerManager) {
+    pub fn show(
+        &mut self,
+        ctx: &egui::Context,
+        trigger_manager: &mut TriggerManager,
+        mut reevaluate_all_triggers: impl FnMut(),
+    ) {
         self.shown = show_centered_window(self.shown, "Triggers", ctx, |ui| {
             egui::TopBottomPanel::bottom("triggers_bottom_panel")
                 .resizable(false)
@@ -37,6 +42,11 @@ impl TriggersWindow {
                         if ui.button("Reset default triggers").clicked() {
                             trigger_manager.reset_default_triggers();
                         }
+
+                        if ui.button("Reevaluate triggers").clicked() {
+                            reevaluate_all_triggers();
+                        }
+
                         if let Some(trigger) = self.last_deleted_trigger.as_ref() {
                             if ui.button("Recover last deleted trigger").clicked() {
                                 trigger_manager.add_trigger(trigger.clone());
