@@ -11,7 +11,6 @@ use crate::{
             online_status::OnlineStatus, sensor_output::SensorWidget, sensor_outputs::SensorOutputs,
         },
     },
-    tray_icon::{hide_to_tray, TrayIconData},
     triggers::{ui::TriggersWindow, BehaviorOnTrigger, TriggerManager, Update},
     ui::{
         add_fake_user_window::AddFakeUserWindow,
@@ -24,7 +23,7 @@ use crate::{
     user_summaries::UserSummaries,
 };
 use chrono_humanize::HumanTime;
-use egui::{Color32, RichText, ScrollArea};
+use egui::{Color32, RichText, ScrollArea, ViewportCommand};
 use gwaihir_client_lib::{
     chrono::{Local, Utc},
     NetworkInterface, RemoteUpdate, UniqueUserId, UserStatus, APP_ID,
@@ -44,7 +43,11 @@ use std::{
     time::Duration,
 };
 
+#[cfg(feature = "hide_to_tray")]
+use crate::tray_icon::{hide_to_tray, TrayIconData};
+
 pub struct GwaihirApp {
+    #[cfg(feature = "hide_to_tray")]
     tray_icon_data: Option<TrayIconData>,
 
     sensor_monitor_thread_join_handle: Option<JoinHandle<()>>,
@@ -99,7 +102,6 @@ impl GwaihirApp {
             NetworkManager::new::<SpacetimeDBInterface, _>(cc.egui_ctx.clone(), creation_params);
 
         GwaihirApp {
-            tray_icon_data: None,
             tx_to_monitor_thread,
             rx_from_monitor_thread,
             current_status: HashMap::new(),
@@ -120,6 +122,9 @@ impl GwaihirApp {
 
             add_fake_user_window: AddFakeUserWindow::new(),
             triggers_window: TriggersWindow::new(),
+
+            #[cfg(feature = "hide_to_tray")]
+            tray_icon_data: None,
         }
     }
 
@@ -320,7 +325,7 @@ impl eframe::App for GwaihirApp {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         match self.rx_from_monitor_thread.try_recv() {
             Err(TryRecvError::Empty) => (),
             Err(TryRecvError::Disconnected) => {
@@ -363,9 +368,10 @@ impl eframe::App for GwaihirApp {
                 .set_user_id(self.current_user_id.clone());
         }
 
+        #[cfg(feature = "hide_to_try")]
         if let Some(icon_data) = self.tray_icon_data.take() {
-            self.tray_icon_data = crate::tray_icon::handle_events(frame, icon_data);
-            ctx.request_repaint_after(Duration::from_millis(100000000));
+            self.tray_icon_data = crate::tray_icon::handle_events(ctx, icon_data);
+            ctx.request_repaint_after(Duration::from_secs(5));
             return;
         }
 
@@ -375,8 +381,9 @@ impl eframe::App for GwaihirApp {
                 ui.menu_button("File", |ui| {
                     ui.auto_launch_checkbox(APP_ID.to_string(), None);
 
+                    #[cfg(feature = "hide_to_try")]
                     if ui.button("Hide to tray").clicked() {
-                        let tray_icon_data = hide_to_tray(frame);
+                        let tray_icon_data = hide_to_tray(ctx);
                         self.tray_icon_data = Some(tray_icon_data);
                         ui.close_menu();
                     }
@@ -425,7 +432,7 @@ impl eframe::App for GwaihirApp {
                     });
 
                     if ui.button("Quit").clicked() {
-                        frame.close();
+                        ctx.send_viewport_cmd(ViewportCommand::Close);
                     }
                 });
 
@@ -459,10 +466,10 @@ impl eframe::App for GwaihirApp {
                             s.show(ui, id);
                         }
                         ui.heading(status.display_name())
+                            .on_hover_text_at_pointer("Right click for options")
                             .context_menu(|ui| {
                                 self.show_user_context_menu(id, ui, status);
-                            })
-                            .on_hover_text_at_pointer("Right click for options");
+                            });
                         if summary.is_none() {
                             ui.label(RichText::new(format!(
                                 " {} ",

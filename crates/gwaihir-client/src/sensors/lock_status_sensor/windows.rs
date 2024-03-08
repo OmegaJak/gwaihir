@@ -12,11 +12,7 @@ use winit::platform::windows::EventLoopBuilderExtWindows;
 pub fn register_os_hook(
     handle: raw_window_handle::Win32WindowHandle,
 ) -> Result<(), LockStatusSensorError> {
-    if handle.hwnd.is_null() {
-        return Err(LockStatusSensorError::NullWindowHandle);
-    }
-
-    let hwnd: isize = handle.hwnd as isize;
+    let hwnd: isize = isize::from(handle.hwnd);
     unsafe {
         WTSRegisterSessionNotification(HWND(hwnd), NOTIFY_FOR_THIS_SESSION);
     }

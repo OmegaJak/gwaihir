@@ -6,9 +6,9 @@ edition = "2021"
 rust-version = "1.71"
 
 [dependencies]
-egui = { git = "https://github.com/emilk/egui", branch = "master" }
-egui_plot = { git = "https://github.com/emilk/egui", branch = "master" }
-eframe = { git = "https://github.com/emilk/egui", branch = "master", default-features = false, features = [
+egui = "0.26.2"
+egui_plot = "0.26.2"
+eframe = { version = "=0.26.2", default-features = false, features = [
     "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
     "default_fonts", # Embed the default egui fonts.
     "glow",          # Use the glow rendering backend. Alternative: "wgpu".
@@ -18,7 +18,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1.0.105"
 serde_with = { version = "3.3.0", features = ["chrono_0_4"] }
 pro-serde-versioned = { version = "1.0.2", features = ["derive"] }
-winit = "0.28.6"
+winit = "0.29.10"
 thiserror = "1.0.44"
 lodepng = "3.7.2"
 nutype = { version = "0.4.0-beta.2", features = ["serde"] }
@@ -56,8 +56,8 @@ networking-spacetimedb = { path = "../networking-spacetimedb" }
 # eframe = { path = "../egui/crates/eframe" }
 
 # OS Interactions
-raw-window-handle = "0.5.2"
-tray-icon = "0.8.0"
+raw-window-handle = "0.6.0"
+tray-icon = { version = "0.11.3", optional = true }
 directories-next = "2.0.0"
 opener = "0.6.1"
 active-win-pos-rs = "0.8.1"
@@ -79,3 +79,6 @@ pulsectl-rs = "0.3.2"
 assert_matches = "1.5.0"
 lazy_static = "1.4.0"
 mockall = "0.12.1"
+
+[features]
+hide_to_tray = ["tray-icon"]

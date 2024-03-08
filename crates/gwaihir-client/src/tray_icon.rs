@@ -1,4 +1,4 @@
-use eframe::Frame;
+use egui::ViewportCommand;
 use log::info;
 use tray_icon::{
     menu::{Menu, MenuEvent, MenuId, MenuItem},
@@ -17,13 +17,12 @@ pub struct MenuIds {
 
 const TRAY_ICON_BYTES: &[u8; 1860] = include_bytes!("../assets/eagle_32.png");
 
-pub fn hide_to_tray(frame: &mut Frame) -> TrayIconData {
+pub fn hide_to_tray(ctx: &egui::Context) -> TrayIconData {
     let menu = Menu::new();
     let show_item = MenuItem::new("Show", true, None);
     let quit_item = MenuItem::new("Quit", true, None);
     menu.append(&show_item).unwrap();
     menu.append(&quit_item).unwrap();
-    // menu.show_context_menu_for_hwnd(hwnd, position)
     let icon = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
         .with_tooltip("Resume the thingy")
@@ -31,7 +30,7 @@ pub fn hide_to_tray(frame: &mut Frame) -> TrayIconData {
         .build()
         .unwrap();
 
-    frame.set_visible(false);
+    ctx.send_viewport_cmd(ViewportCommand::Visible(false));
 
     TrayIconData {
         _tray_icon: icon,
@@ -42,23 +41,28 @@ pub fn hide_to_tray(frame: &mut Frame) -> TrayIconData {
     }
 }
 
-pub fn handle_events(frame: &mut Frame, tray_icon_data: TrayIconData) -> Option<TrayIconData> {
+pub fn handle_events(ctx: &egui::Context, tray_icon_data: TrayIconData) -> Option<TrayIconData> {
     if let Ok(TrayIconEvent {
         click_type: ClickType::Double,
         ..
     }) = TrayIconEvent::receiver().try_recv()
     {
         info!("Making visible");
-        frame.set_visible(true);
+        ctx.send_viewport_cmd(ViewportCommand::Visible(true));
         return None;
     }
 
     if let Ok(MenuEvent { id: menu_item_id }) = MenuEvent::receiver().try_recv() {
+        info!("Menu event");
         if menu_item_id == tray_icon_data.menu_ids.quit_id {
-            frame.close();
+            info!("Closing");
+            ctx.send_viewport_cmd(ViewportCommand::Close);
             return None;
-        } else if menu_item_id == tray_icon_data.menu_ids.show_id {
-            frame.set_visible(true);
+        }
+
+        if menu_item_id == tray_icon_data.menu_ids.show_id {
+            info!("Showing");
+            ctx.send_viewport_cmd(ViewportCommand::Visible(true));
             return None;
         }
     }

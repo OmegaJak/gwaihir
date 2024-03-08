@@ -13,23 +13,24 @@ impl ActionWidgetExtensions for Action {
         let res = match self {
             Action::ShowNotification(template) => template.ui(format!("{id_base}_notif"), ui),
             Action::SetSummary(summary) => summary.ui(format!("{id_base}_setsummary"), ui),
-        };
+        }
+        .on_hover_text_at_pointer("Right click for more options");
 
-        res.on_hover_text_at_pointer("Right click for more options")
-            .context_menu(|ui| {
-                ui.menu_button("Swap", |ui| {
-                    if !matches!(self, Action::SetSummary(_)) && ui.button("Set Summary").clicked()
-                    {
-                        *self = Action::SetSummary(SummaryTemplate::default())
-                    }
+        res.context_menu(|ui| {
+            ui.menu_button("Swap", |ui| {
+                if !matches!(self, Action::SetSummary(_)) && ui.button("Set Summary").clicked() {
+                    *self = Action::SetSummary(SummaryTemplate::default())
+                }
 
-                    if !matches!(self, Action::ShowNotification(_))
-                        && ui.button("Show Notification").clicked()
-                    {
-                        *self = Action::ShowNotification(NotificationTemplate::default())
-                    }
-                });
-            })
+                if !matches!(self, Action::ShowNotification(_))
+                    && ui.button("Show Notification").clicked()
+                {
+                    *self = Action::ShowNotification(NotificationTemplate::default())
+                }
+            });
+        });
+
+        res
     }
 }
 

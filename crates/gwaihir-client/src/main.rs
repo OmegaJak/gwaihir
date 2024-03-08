@@ -4,7 +4,7 @@
 use crate::sensor_monitor_thread::{create_sensor_monitor_thread, MainToMonitorMessages};
 pub use app::GwaihirApp;
 use directories_next::ProjectDirs;
-use eframe::IconData;
+use egui::ViewportBuilder;
 use flexi_logger::LoggerHandle;
 use gwaihir_client_lib::APP_ID;
 use log::info;
@@ -18,10 +18,16 @@ mod periodic_repaint_thread;
 mod persistence;
 mod sensor_monitor_thread;
 mod sensors;
-mod tray_icon;
 pub mod triggers;
 mod ui;
 mod user_summaries;
+
+// TODO: Re-introduce once the problems introduced by: https://github.com/emilk/egui/issues/3321, https://github.com/emilk/egui/pull/3831, https://github.com/emilk/egui/pull/3877, https://github.com/emilk/egui/pull/3985/files
+// such as https://github.com/emilk/egui/issues/3655 and https://github.com/emilk/egui/issues/3902
+// are fixed. After those changes, the main loop isn't called while the window is hidden.
+// So until then, disable hide to tray functionality.
+#[cfg(feature = "hide_to_try")]
+mod tray_icon;
 
 const ICON_BYTES: &[u8] = include_bytes!("../assets/eagle.png");
 
@@ -30,8 +36,9 @@ fn main() -> eframe::Result<()> {
     info!("Starting Gwaihir");
 
     let mut native_options = eframe::NativeOptions {
-        app_id: Some(APP_ID.to_string()),
-        icon_data: Some(IconData::try_from_png_bytes(ICON_BYTES).unwrap()),
+        viewport: ViewportBuilder::default()
+            .with_app_id(APP_ID)
+            .with_icon(eframe::icon_data::from_png_bytes(ICON_BYTES).unwrap()),
         ..Default::default()
     };
     let registered_builder =

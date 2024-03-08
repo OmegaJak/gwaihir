@@ -172,9 +172,8 @@ fn show_activity_graph(
         .set_margin_fraction(Vec2::new(0.0, 0.1))
         .include_y(1.0) // so we have something when there's no data
         .include_y(data_summary.map_or(1.0, |s| s.max) * 1.5) // so we can see label
-        .auto_bounds_x()
+        .auto_bounds([true, true].into())
         .x_axis_label("seconds")
-        .auto_bounds_y()
         .y_axis_width(3)
         .height(100.0)
         .allow_zoom(false)

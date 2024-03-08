@@ -38,6 +38,7 @@ impl TriggerWidgetExtension for Trigger {
         let mut action = TriggerAction::None;
         ui.horizontal(|ui| {
             ui.heading(self.name.clone())
+                .on_hover_text_at_pointer("Right click for options")
                 .context_menu(|ui| {
                     ui.name_input(
                         "Set name",
@@ -52,8 +53,7 @@ impl TriggerWidgetExtension for Trigger {
                         action = TriggerAction::Delete;
                         ui.close_menu();
                     }
-                })
-                .on_hover_text_at_pointer("Right click for options");
+                });
             ui.checkbox(&mut self.enabled, "Enabled");
             ui.checkbox(&mut self.requestable, "Requestable")
                 .on_hover_text(

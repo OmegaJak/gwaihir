@@ -1,5 +1,5 @@
 use crate::triggers::{text_template::TextTemplate, TextTemplateError};
-use egui::{Color32, TextBuffer};
+use egui::{text_selection::CCursorRange, Color32, TextBuffer};
 
 pub enum TextEditStyle {
     Singleline,
@@ -81,19 +81,19 @@ fn show_insert_notification_template_variable_menu(
 ) -> egui::Response {
     let mut inserted_variable = false;
     let text_edit_id = text_edit_response.id;
-    text_edit_response = text_edit_response.context_menu(|ui| {
+    text_edit_response.context_menu(|ui| {
         ui.menu_button("Insert Variable", |ui| {
             for variable in TextTemplate::get_available_variables() {
                 if ui.button(variable.clone()).clicked() {
                     if let Some(mut state) = egui::TextEdit::load_state(ui.ctx(), text_edit_id) {
-                        if let Some(range) = state.ccursor_range() {
+                        if let Some(range) = state.cursor.char_range() {
                             text_edit_contents.insert_text(&variable, range.primary.index);
-                            state.set_ccursor_range(Some(egui::text_edit::CCursorRange::one(
+                            state.cursor.set_char_range(Some(CCursorRange::one(
                                 egui::text::CCursor::new(range.primary.index + variable.len()),
                             )));
                         } else {
                             *text_edit_contents = format!("{text_edit_contents}{variable}");
-                            state.set_ccursor_range(Some(egui::text_edit::CCursorRange::one(
+                            state.cursor.set_char_range(Some(CCursorRange::one(
                                 egui::text::CCursor::new(text_edit_contents.chars().count()),
                             )));
                         }

@@ -14,7 +14,7 @@ use windows as sys;
 #[cfg(target_os = "windows")]
 type WindowHandle = raw_window_handle::Win32WindowHandle;
 #[cfg(target_os = "windows")]
-use raw_window_handle::HasRawWindowHandle;
+use winit::raw_window_handle::HasWindowHandle;
 
 #[cfg(target_os = "linux")]
 mod linux;
@@ -108,17 +108,28 @@ pub fn init_lock_status_sensor(
     sensor_builder: Rc<RefCell<Option<EventLoopRegisteredLockStatusSensorBuilder>>>,
 ) -> Option<LockStatusSensor> {
     #[cfg(target_os = "windows")]
-    return match cc.raw_window_handle() {
-        raw_window_handle::RawWindowHandle::Win32(handle) => {
-            match sensor_builder.take().expect("The lock status sensor builder should be ready when we initialize the Template App").register_os_hook(handle) {
+    return match cc.window_handle() {
+        Ok(handle) => match handle.as_raw() {
+            winit::raw_window_handle::RawWindowHandle::Win32(raw_handle) => match sensor_builder
+                .take()
+                .expect(
+                    "The lock status sensor builder should be ready when\
+                 we initialize the Template App",
+                )
+                .register_os_hook(raw_handle)
+            {
                 Ok(builder) => Some(builder.build()),
                 Err(err) => {
                     error!("{:#?}", err);
                     None
                 }
-            }
+            },
+            _ => panic!("Running on an unsupported version of Windows"),
+        },
+        Err(e) => {
+            error!("{:#?}", e);
+            None
         }
-        _ => panic!("Got a window handle other than Win32 on windows!"),
     };
 
     None

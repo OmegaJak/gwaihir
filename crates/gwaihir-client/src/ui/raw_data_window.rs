@@ -78,8 +78,7 @@ impl RawDataWindow {
                 if let Some(user_id) = &self.user_id {
                     ui.horizontal(|ui| {
                         ui.label("User ID: ");
-                        let mut user_id = user_id.to_string();
-                        ui.text_edit_singleline(&mut user_id);
+                        ui.label(user_id.to_string());
                     });
                 }
                 if let Ok(mut text) = serde_json::to_string_pretty(data) {
